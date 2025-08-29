@@ -1,0 +1,77 @@
+---
+description: good-job Front develop rules
+globs: ['src/**/*']
+alwaysApply: true
+---
+
+# Good Job – AI Mock Interview Platform
+
+## Project Rules for Next.js-based AI Mock Interview Service Development
+
+---
+
+## 📁 Project Structure & Architecture
+
+- All page routing must be created under the `src/app/` directory.
+- Common/shared resources should be placed in centralized folders:
+    - `src/components/` → **Global UI components**
+    - `src/apis/` → **Shared API functions**
+    - `src/constants/` → **Global constants**
+    - `src/utils/` → **Common utility functions (grouped by functionality)**
+
+- Route-specific or feature-specific resources should be placed in underscore-prefixed folders within their respective route directories:
+    - `src/app/users/_components/` → **Page-specific components**
+    - `src/app/interview/_lib/` → **Page-specific utility functions**
+    - `src/app/interview/_apis/` → **Page-specific API functions**
+
+- Use `[id]` folder naming convention for dynamic routes.
+
+---
+
+## 🧠 State Management
+
+- Client state is managed using `Zustand` (e.g., user authentication, UI state).
+- Server state is managed using `@tanstack/react-query` (e.g., interview data, user profiles).
+- Global context providers should be placed in the `src/providers/` directory.
+
+---
+
+## 📝 Form & Validation
+
+- Use `react-hook-form` for all form handling.
+- Define form validation rules using `Zod` schemas.
+- Integrate Zod with React Hook Form using `@hookform/resolvers`.
+
+---
+
+## 🎨 Styling
+
+- Tailwind CSS utility classes should be prioritized for styling.
+- Custom styles may be defined in `globals.css`.
+- Styling is processed through the PostCSS pipeline.
+
+---
+
+## ✅ Code Quality
+
+- All components and functions must have proper TypeScript type definitions.
+- Follow ESLint rules, including those provided by Next.js and TypeScript.
+- Maintain consistent code formatting using Prettier.
+
+---
+
+## 🗂️ File & Folder Naming
+
+- Use **PascalCase** for component filenames (e.g., `ButtonSample.tsx`).
+- Use **kebab-case** for folder names (e.g., `button-sample/`).
+- Use an underscore (`_`) prefix for folders excluded from routing (e.g., `_components`, `_lib`, `_apis`).
+- Shared resources go into top-level folders under `src/`, while page-specific resources are placed in route-specific `_` folders.
+
+---
+
+## 📌 Summary
+
+- **Shared resources** → `src/components/`, `src/apis/`, `src/utils/`, `src/constants/`
+- **Page-specific resources** → `src/app/[route]/_components/`, `_lib/`, `_apis/`
+
+---
