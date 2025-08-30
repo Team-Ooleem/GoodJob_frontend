@@ -53,7 +53,7 @@ curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
 
 ```bash
 # Node.js 22.19.0 설치
-nvm install 22.19.9
+nvm install 22.19.0
 
 # 23.11.1 버전 사용
 nvm use 22.19.0
