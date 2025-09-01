@@ -98,6 +98,35 @@
 
 ## UI 컴포넌트 & 스타일링
 
+### antd
+
+**버전**: ^5.27.1  
+**설치**: `pnpm add antd`
+
+**역할**: 엔터프라이즈급 UI 디자인 언어 및 React UI 라이브러리
+
+**주요 기능**:
+
+- 풍부한 컴포넌트 세트 (버튼, 폼, 테이블, 모달 등)
+- 일관된 디자인 시스템
+- 접근성(Accessibility) 지원
+- TypeScript 완전 지원
+- 테마 커스터마이징
+- 다국어 지원
+
+**프로젝트에서의 활용**:
+
+- 기본 UI 컴포넌트 (Button, Input, Form, Table, Modal 등)
+- 복잡한 데이터 표시 컴포넌트 (DatePicker, Select, Upload 등)
+- 레이아웃 컴포넌트 (Layout, Grid, Space 등)
+- 피드백 컴포넌트 (Message, Notification, Spin 등)
+
+**디자인 시스템 가이드라인**:
+
+- **기본 컴포넌트**: Ant Design 컴포넌트를 우선 사용
+- **커스텀 스타일링**: Tailwind CSS로 추가 스타일링 및 레이아웃
+- **일관성**: Ant Design의 디자인 토큰과 일치하는 색상/간격 사용
+
 ### @tailwindcss/postcss
 
 **버전**: ^4  
@@ -124,6 +153,13 @@
 - 반응형 디자인 지원
 - 커스터마이징 가능한 디자인 시스템
 - JIT(Just-In-Time) 컴파일러
+
+**프로젝트에서의 활용**:
+
+- Ant Design 컴포넌트의 추가 스타일링
+- 레이아웃 및 간격 조정
+- 반응형 디자인 구현
+- 커스텀 컴포넌트 스타일링
 
 ## 폼 관리
 
