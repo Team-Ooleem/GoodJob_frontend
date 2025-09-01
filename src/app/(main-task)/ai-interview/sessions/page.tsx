@@ -1,3 +1,10 @@
+// local components
+import { Webcam } from '../_components/Webcam';
+
 export default function AiInterviewSessionsPage() {
-    return <div>AiInterviewSessionsPage</div>;
+    return (
+        <div>
+            <Webcam />
+        </div>
+    );
 }
