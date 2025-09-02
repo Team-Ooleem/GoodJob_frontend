@@ -1,8 +1,5 @@
 'use client';
 
-import { useEffect } from 'react';
-import * as fabric from 'fabric';
-
 // global hooks
 import { useWindowSize } from '@/hooks';
 
