@@ -1,10 +1,10 @@
 // local components
-import { WhiteBoard } from '../_components';
+import { FabricWhiteBoard } from '../_components';
 
 export default function CoachingResumePage() {
     return (
         <>
-            <WhiteBoard />
+            <FabricWhiteBoard />
         </>
     );
 }
