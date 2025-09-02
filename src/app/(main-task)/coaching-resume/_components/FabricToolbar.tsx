@@ -6,9 +6,9 @@ import { Flex, Button } from 'antd';
 import { useCanvasStore } from '../_stores';
 
 export function FabricToolbar() {
-    const isDrawingMode = useCanvasStore((s) => s.isDrawingMode);
-    const setDrawingMode = useCanvasStore((s) => s.setDrawingMode);
-    const hasCanvas = useCanvasStore((s) => !!s.canvasInstance);
+    const isDrawingMode = useCanvasStore((store) => store.isDrawingMode);
+    const setDrawingMode = useCanvasStore((store) => store.setDrawingMode);
+    const hasCanvas = useCanvasStore((store) => !!store.canvasInstance);
 
     // TODO: 툴바 버튼 컴포넌트 분리 및 스타일링 필요
     return (
