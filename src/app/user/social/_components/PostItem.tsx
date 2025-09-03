@@ -13,6 +13,7 @@ import {
 } from '@ant-design/icons';
 import { useForm } from 'react-hook-form';
 import { useState } from 'react';
+import Image from 'next/image';
 import { Post } from '../_apis/social.api';
 import {
     useSocialProfile,
@@ -171,14 +172,17 @@ export default function PostItem({ post, currentUserId }: PostItemProps) {
             <div className='mb-4'>
                 {post?.mediaUrl && (
                     <div className='mt-3'>
-                        <div
-                            className='relative w-full max-w-full overflow-hidden rounded-lg bg-gray-100'
-                            style={{ aspectRatio: '4/3' }}
-                        >
-                            <img
+                        <div className='relative w-full max-w-full overflow-hidden rounded-lg bg-gray-100'>
+                            <Image
                                 src={post?.mediaUrl}
                                 alt='포스트 미디어'
-                                className='absolute inset-0 w-full h-full object-contain'
+                                width={800}
+                                height={600}
+                                className='w-full h-auto object-contain'
+                                style={{ aspectRatio: '4/3' }}
+                                priority={false}
+                                placeholder='blur'
+                                blurDataURL='data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k='
                             />
                         </div>
                     </div>

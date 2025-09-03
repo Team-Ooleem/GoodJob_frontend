@@ -4,6 +4,7 @@ import { Avatar, Button, Card, message, Upload, Spin } from 'antd';
 import { UserOutlined, PictureOutlined, SendOutlined } from '@ant-design/icons';
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
+import Image from 'next/image';
 import { useSocialProfile, usePostMutations } from '../_hooks';
 import { validateImageFile } from '../_utils';
 
@@ -129,9 +130,11 @@ export default function PostComposer() {
                         </div>
                         {mediaPreview && (
                             <div className='mt-2 relative'>
-                                <img
+                                <Image
                                     src={mediaPreview}
                                     alt='미리보기'
+                                    width={128}
+                                    height={128}
                                     className='w-32 h-32 object-cover rounded-lg'
                                 />
                                 <button
