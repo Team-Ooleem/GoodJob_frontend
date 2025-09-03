@@ -43,10 +43,3 @@ ol,
 li {
     list-style: none;
 }
-
-select,
-input,
-textarea {
-    border: none;
-    outline: none;
-}
