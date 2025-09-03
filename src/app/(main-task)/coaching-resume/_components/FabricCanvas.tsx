@@ -7,7 +7,7 @@ import * as fabric from 'fabric';
 import { useWindowSize } from '@/hooks';
 
 // local hooks
-import { useFabricCanvas, useFabricDotGrid } from '../_hooks';
+import { useFabricCanvas, useFabricDotGrid, useCollaborativeCanvas } from '../_hooks';
 
 // local stores
 import { useCanvasStore } from '../_stores';
@@ -28,6 +28,7 @@ export function FabricCanvas() {
     });
 
     const setCanvasInstance = useCanvasStore((store) => store.setCanvasInstance);
+
     useEffect(() => {
         if (!canvas) {
             return;
@@ -39,6 +40,8 @@ export function FabricCanvas() {
             setCanvasInstance(null);
         };
     }, [canvas, setCanvasInstance]);
+
+    useCollaborativeCanvas('resume-room');
 
     return <canvas ref={canvasRef} />;
 }
