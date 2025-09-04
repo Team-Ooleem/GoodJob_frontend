@@ -24,3 +24,73 @@ ol,
 li {
     list-style: none;
 }
+
+/* Ant Design List 컴포넌트 스크롤 오버라이드 */
+.ant-list {
+    height: 100% !important;
+    overflow: visible !important;
+}
+
+.ant-list-items {
+    height: 100% !important;
+    overflow: visible !important;
+}
+
+/* Ant Design Card 컴포넌트 오버라이드 */
+.ant-card {
+    height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+.ant-card-body {
+    height: 100% !important;
+    padding: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+}
+
+/* Ant Design Tabs 컴포넌트 오버라이드 */
+.ant-tabs {
+    height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+.ant-tabs-content-holder {
+    height: 100% !important;
+    overflow: hidden !important;
+}
+
+.ant-tabs-tabpane {
+    height: 100% !important;
+    overflow: hidden !important;
+}
+
+/* 채팅 메시지 컨테이너 스크롤 */
+.chat-message-container {
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+.chat-message-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.chat-message-container::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 3px;
+}
+
+.chat-message-container::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+.chat-message-container::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}

@@ -1,10 +1,10 @@
 import { create } from 'zustand';
 
-// =============example=============
 interface User {
     id: string;
     name: string;
     email: string;
+    idx?: number; // 채팅에서 사용할 숫자 ID
 }
 
 interface UserState {
@@ -20,4 +20,3 @@ export const useUserStore = create<UserState>((set) => ({
     login: (user: User) => set({ user, isAuthenticated: true }),
     logout: () => set({ user: null, isAuthenticated: false }),
 }));
-// =============example=============
