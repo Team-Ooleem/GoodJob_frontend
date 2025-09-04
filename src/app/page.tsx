@@ -55,6 +55,11 @@ export default function Home() {
                 <Space direction='vertical' size={100}>
                     <JobCardList title='모두가 주목하고 있어요!' data={jobList} />
                     <JobCardList title='리모트 근무 포지션' data={jobList} />
+                    <JobCardList
+                        title='출퇴근 걱정없는 역세권 포지션'
+                        data={jobList.concat([...jobList.slice(1)])}
+                        variant='small'
+                    />
                     <JobCardList title='요즘 뜨는 포지션' data={jobList} />
                 </Space>
             </div>
