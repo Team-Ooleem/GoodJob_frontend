@@ -8,16 +8,16 @@ import { JobProps } from '@/types';
 
 type JobCardList = {
     title: string;
-    data: JobProps[];
+    data: (JobProps & { id: string })[];
 };
 
 export function JobCardList({ title, data }: JobCardList) {
     return (
         <Flex vertical gap={25}>
             <h1 className='font-semibold text-xl'>{title}</h1>
-            <Flex gap={20}>
+            <Flex style={{ rowGap: 75, columnGap: 20 }} wrap='wrap'>
                 {data.map((job) => (
-                    <JobCard {...job} />
+                    <JobCard key={job.id} {...job} />
                 ))}
             </Flex>
         </Flex>
