@@ -15,6 +15,7 @@ type CanvasStoreState = {
     canvasInstance: fabric.Canvas | null;
     isDrawingMode: boolean;
     brush: BrushConfig;
+    isEraserMode: boolean;
 
     // lifecycle
     setCanvasInstance: (canvas: fabric.Canvas | null) => void;
@@ -22,6 +23,7 @@ type CanvasStoreState = {
     // drawing
     setDrawingMode: (enabled: boolean) => void;
     setBrushOptions: (options: Partial<BrushConfig>) => void;
+    setEraserMode: (enabled: boolean) => void;
 
     // objects
     deleteActiveObject: () => void;
@@ -34,6 +36,7 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     canvasInstance: null,
     isDrawingMode: false,
     brush: { color: '#000000', width: 3, type: 'pencil' },
+    isEraserMode: false,
 
     setCanvasInstance: (canvas) => {
         const previousCanvas = get().canvasInstance;
@@ -46,6 +49,19 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
             ensureFreeDrawingBrush(canvas, get().brush);
         }
     },
+
+    setEraserMode: (enabled) =>
+        set((state) => {
+            const canvas = state.canvasInstance;
+            if (canvas) {
+                canvas.isDrawingMode = false;
+                canvas.freeDrawingBrush = undefined;
+            }
+            return {
+                isEraserMode: enabled,
+                isDrawingMode: false,
+            };
+        }),
 
     setDrawingMode: (enabled) => {
         const canvas = get().canvasInstance;

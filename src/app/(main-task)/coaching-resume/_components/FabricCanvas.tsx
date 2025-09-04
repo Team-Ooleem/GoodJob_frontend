@@ -12,6 +12,7 @@ import {
     useCollaborativeCanvas,
     useZoomPan,
     useCanvasShortCut,
+    useEraser,
 } from '../_hooks';
 
 // local stores
@@ -48,6 +49,9 @@ export function FabricCanvas() {
 
     // 줌 인, 아웃 / 휠 이동
     useZoomPan(canvas);
+
+    // 지우개 모드
+    useEraser();
 
     // 캔버스 관련 단축키 관리
     useCanvasShortCut();
