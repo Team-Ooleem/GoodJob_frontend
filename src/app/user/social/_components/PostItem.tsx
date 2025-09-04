@@ -13,6 +13,7 @@ import {
 } from '@ant-design/icons';
 import { useForm } from 'react-hook-form';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Post } from '../_apis/social.api';
 import {
@@ -22,29 +23,30 @@ import {
     useCommentMutations,
     useFollowMutations,
 } from '../_hooks';
-import { formatTimeAgo } from '../_utils';
+import { formatTimeAgo } from '@/utils/utils';
 const { Text } = Typography;
 
 interface PostItemProps {
     post: Post;
     currentUserId: number;
+    onPostDeleted?: () => void;
+    onPostUpdated?: () => void;
 }
 
-export default function PostItem({ post, currentUserId }: PostItemProps) {
+export default function PostItem({
+    post,
+    currentUserId,
+    onPostDeleted,
+    onPostUpdated,
+}: PostItemProps) {
+    const router = useRouter();
     const [isCommentOpen, setIsCommentOpen] = useState(false);
-
-    // 디버깅: 포스트 데이터 확인
-    console.log('PostItem - post 데이터:', post);
-    console.log('PostItem - currentUserId:', currentUserId);
 
     // 댓글 입력을 위한 현재 사용자 프로필 조회
     const { data: currentUserProfile } = useSocialProfile(currentUserId.toString());
 
     // 댓글 목록 조회 (댓글 창이 열렸을 때만)
-    const { data: commentsData, isLoading: commentsLoading } = useComments(
-        post.postIdx,
-        isCommentOpen,
-    );
+    const { data: commentsData } = useComments(post.postIdx, isCommentOpen);
 
     // 뮤테이션 훅들
     const { likePost, deletePost } = usePostMutations(currentUserId);
@@ -66,7 +68,12 @@ export default function PostItem({ post, currentUserId }: PostItemProps) {
 
     // 이벤트 핸들러들
     const handleLikeToggle = () => {
-        likePost.mutate(post.postIdx);
+        likePost.mutate(post.postIdx, {
+            onSuccess: () => {
+                // 좋아요 성공 시 콜백 호출
+                onPostUpdated?.();
+            },
+        });
     };
 
     const handleFollowToggle = () => {
@@ -75,21 +82,45 @@ export default function PostItem({ post, currentUserId }: PostItemProps) {
 
     // 댓글 제출 핸들러
     const onCommentSubmit = (data: any) => {
-        createComment.mutate({
-            postId: post.postIdx,
-            content: data.content,
-        });
-        resetComment();
+        createComment.mutate(
+            {
+                postId: post.postIdx,
+                content: data.content,
+            },
+            {
+                onSuccess: () => {
+                    // 댓글 작성 성공 시 콜백 호출
+                    onPostUpdated?.();
+                    resetComment();
+                },
+            },
+        );
     };
 
     // 댓글 삭제 핸들러
     const handleDeleteComment = (commentId: number, userId: number) => {
-        deleteComment.mutate({ commentId, userId });
+        deleteComment.mutate(
+            { commentId, userId },
+            {
+                onSuccess: () => {
+                    // 댓글 삭제 성공 시 콜백 호출
+                    onPostUpdated?.();
+                },
+            },
+        );
     };
 
     // 포스트 삭제 핸들러
     const handleDeletePost = () => {
-        deletePost.mutate({ postId: post.postIdx, userId: currentUserId });
+        deletePost.mutate(
+            { postId: post.postIdx, userId: currentUserId },
+            {
+                onSuccess: () => {
+                    // 포스트 삭제 성공 시 콜백 호출
+                    onPostDeleted?.();
+                },
+            },
+        );
     };
 
     // 댓글 창 토글 핸들러
@@ -97,27 +128,32 @@ export default function PostItem({ post, currentUserId }: PostItemProps) {
         setIsCommentOpen(!isCommentOpen);
     };
 
+    // 사용자 이름 클릭 핸들러
+    const handleUserNameClick = (userId: number) => {
+        router.push(`/user/social/profile/${userId}`);
+    };
+
     // 본인이 작성한 글인지 확인
     const isOwnPost = post?.userId === currentUserId;
-
-    console.log('commentsData', commentsData);
-    console.log('commentsData?.comments', commentsData?.comments);
-    if (commentsData?.comments) {
-        commentsData.comments.forEach((comment, index) => {
-            console.log(`Comment ${index}:`, comment);
-        });
-    }
 
     return (
         <Card className='bg-white shadow-sm mb-4'>
             {/* 포스트 헤더 */}
             <div className='flex items-start justify-between mb-4'>
                 <div className='flex gap-2 items-start space-x-3'>
-                    <Avatar size={48} src={post?.authorProfileImage} icon={<UserOutlined />} />
+                    <Avatar
+                        size={48}
+                        src={post?.author?.profileImage || post?.authorProfileImage}
+                        icon={<UserOutlined />}
+                    />
                     <div className='flex-1'>
                         <div className='flex items-center space-x-2 mb-1'>
-                            <Text strong className='text-base'>
-                                {post?.authorName || '익명 사용자'}
+                            <Text
+                                strong
+                                className='text-base cursor-pointer hover:text-blue-600 transition-colors'
+                                onClick={() => handleUserNameClick(post.userId)}
+                            >
+                                {post?.author?.name || post?.authorName || '익명 사용자'}
                             </Text>
                         </div>
                         <div className='flex items-center space-x-2'>
@@ -144,7 +180,7 @@ export default function PostItem({ post, currentUserId }: PostItemProps) {
                             삭제
                         </Button>
                     </div>
-                ) : post?.isFollowingAuthor ? (
+                ) : post?.isFollowingAuthor || false ? (
                     <Button
                         type='default'
                         size='small'
@@ -227,22 +263,32 @@ export default function PostItem({ post, currentUserId }: PostItemProps) {
             {/* 액션 버튼들 */}
             <div className='flex justify-between mb-4 border-t border-b border-gray-200'>
                 <Button
-                    icon={post?.isLikedByCurrentUser ? <LikeFilled /> : <LikeOutlined />}
+                    icon={
+                        post?.isLiked || post?.isLikedByCurrentUser ? (
+                            <LikeFilled />
+                        ) : (
+                            <LikeOutlined />
+                        )
+                    }
                     type='text'
                     className={`flex-1 font-medium ${
-                        post?.isLikedByCurrentUser
+                        post?.isLiked || post?.isLikedByCurrentUser
                             ? '!text-sky-600 !bg-sky-50 hover:!bg-sky-100 !border !border-sky-200'
                             : '!text-gray-600 hover:!text-sky-600 hover:!bg-sky-50'
                     }`}
                     style={{
-                        color: post?.isLikedByCurrentUser ? '#0284c7' : '#6b7280',
-                        backgroundColor: post?.isLikedByCurrentUser ? '#f0f9ff' : 'transparent',
-                        border: post?.isLikedByCurrentUser ? '1px solid #bae6fd' : 'none',
+                        color: post?.isLiked || post?.isLikedByCurrentUser ? '#0284c7' : '#6b7280',
+                        backgroundColor:
+                            post?.isLiked || post?.isLikedByCurrentUser ? '#f0f9ff' : 'transparent',
+                        border:
+                            post?.isLiked || post?.isLikedByCurrentUser
+                                ? '1px solid #bae6fd'
+                                : 'none',
                     }}
                     onClick={handleLikeToggle}
                     loading={likePost.isPending}
                 >
-                    {post?.isLikedByCurrentUser ? '추천됨' : '추천'}
+                    {post?.isLiked || post?.isLikedByCurrentUser ? '추천됨' : '추천'}
                 </Button>
                 <Button
                     icon={<MessageOutlined />}
@@ -268,28 +314,34 @@ export default function PostItem({ post, currentUserId }: PostItemProps) {
 
                                 return (
                                     <div
-                                        key={comment.commentId}
+                                        key={comment?.commentId}
                                         className='flex gap-2 items-start space-x-3'
                                     >
                                         <Avatar
                                             size={32}
-                                            src={comment.userProfileImage}
+                                            src={comment?.userProfileImage}
                                             icon={<UserOutlined />}
                                         />
                                         <div className='flex-1'>
                                             <div className='flex items-center space-x-2 mb-1'>
-                                                <Text strong className='text-sm'>
-                                                    {comment.userName || '익명 사용자'}
+                                                <Text
+                                                    strong
+                                                    className='text-sm cursor-pointer hover:text-blue-600 transition-colors'
+                                                    onClick={() =>
+                                                        handleUserNameClick(comment?.userId)
+                                                    }
+                                                >
+                                                    {comment?.userName || '익명 사용자'}
                                                 </Text>
                                                 <Text type='secondary' className='text-xs'>
-                                                    {formatTimeAgo(comment.createdAt)}
+                                                    {formatTimeAgo(comment?.createdAt)}
                                                 </Text>
                                             </div>
                                             <Text className='text-sm text-gray-800'>
-                                                {comment.content}
+                                                {comment?.content}
                                             </Text>
                                         </div>
-                                        {comment.userId === currentUserId && (
+                                        {comment?.userId === currentUserId && (
                                             <Button
                                                 type='text'
                                                 size='small'
@@ -297,8 +349,8 @@ export default function PostItem({ post, currentUserId }: PostItemProps) {
                                                 className='!text-red-500 !border-red-200 !bg-red-50 hover:!text-red-700 hover:!bg-red-100 hover:!border-red-300 !shadow-sm !rounded-full !w-8 !h-8 !p-0 !flex !items-center !justify-center'
                                                 onClick={() =>
                                                     handleDeleteComment(
-                                                        comment.commentId,
-                                                        comment.userId,
+                                                        comment?.commentId,
+                                                        comment?.userId,
                                                     )
                                                 }
                                                 loading={deleteComment.isPending}

@@ -1,2 +1,1 @@
-export * from './date.utils';
-export * from './validation.utils';
+export { validateImageFile } from './validation.utils';
