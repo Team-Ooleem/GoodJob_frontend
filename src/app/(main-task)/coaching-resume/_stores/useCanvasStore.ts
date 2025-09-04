@@ -16,6 +16,7 @@ type CanvasStoreState = {
     isDrawingMode: boolean;
     brush: BrushConfig;
     isEraserMode: boolean;
+    isStickyMode: boolean;
 
     // lifecycle
     setCanvasInstance: (canvas: fabric.Canvas | null) => void;
@@ -28,6 +29,8 @@ type CanvasStoreState = {
     // objects
     deleteActiveObject: () => void;
     clearAllObjects: () => void;
+    setStickyMode: (enabled: boolean) => void;
+    addStickyNote: (x: number, y: number, text?: string) => void;
 };
 
 type DrawingBrush = fabric.PencilBrush | fabric.SprayBrush;
@@ -37,6 +40,7 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     isDrawingMode: false,
     brush: { color: '#000000', width: 3, type: 'pencil' },
     isEraserMode: false,
+    isStickyMode: false,
 
     setCanvasInstance: (canvas) => {
         const previousCanvas = get().canvasInstance;
@@ -50,10 +54,11 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
         }
     },
 
+    // TODO: 책임이 많아서 단축키가 제대로 작동하지 않는 문제가 생긴다면 여기를 먼저 확인할 것
     setEraserMode: (enabled) =>
         set((state) => {
             const canvas = state.canvasInstance;
-            if (canvas) {
+            if (canvas && enabled) {
                 canvas.isDrawingMode = false;
                 canvas.freeDrawingBrush = undefined;
             }
@@ -82,6 +87,112 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
 
         if (!canvas) return;
         ensureFreeDrawingBrush(canvas, nextBrush);
+    },
+
+    setStickyMode: (enabled) =>
+        set(() => {
+            const canvas = get().canvasInstance;
+            if (canvas) {
+                canvas.isDrawingMode = false;
+                canvas.freeDrawingBrush = undefined;
+            }
+            return { isStickyMode: enabled, isDrawingMode: false, isEraserMode: false };
+        }),
+
+    addStickyNote: (x, y, text = '') => {
+        const canvas = get().canvasInstance;
+        if (!canvas) return;
+
+        const rectWidth = 200;
+        const minRectHeight = 150;
+        const padding = 10;
+
+        const shadow = new fabric.Shadow({
+            color: 'rgba(0,0,0,0.2)',
+            blur: 10,
+            offsetX: 0,
+            offsetY: 2,
+        });
+
+        // 배경 Rect
+        const rect = new fabric.Rect({
+            left: x,
+            top: y,
+            width: rectWidth,
+            height: minRectHeight,
+            fill: '#FFEB3B',
+            selectable: false, // 직접 선택 불가
+            evented: true, // 이벤트는 받음
+            shadow,
+        });
+
+        // 텍스트 박스
+        const textbox = new fabric.Textbox(text, {
+            left: x + padding,
+            top: y + padding,
+            width: rectWidth - padding * 2,
+            height: minRectHeight - padding * 2,
+            fontSize: 16,
+            fontFamily: 'Arial',
+            fill: '#333',
+            textAlign: 'left',
+            editable: true,
+            splitByGrapheme: true,
+            lockScalingX: true,
+            lockScalingY: true,
+            lockRotation: true,
+            hasControls: false,
+        });
+
+        // 텍스트 입력 → 배경 크기 늘리기
+        textbox.on('changed', () => {
+            const neededHeight = Math.max(textbox.height + padding * 2, minRectHeight);
+            rect.set({ height: neededHeight });
+            textbox.set({ height: neededHeight - padding * 2 });
+            canvas.requestRenderAll();
+        });
+
+        // 텍스트 이동 → 배경 따라오기
+        textbox.on('moving', () => {
+            rect.set({
+                left: textbox.left! - padding,
+                top: textbox.top! - padding,
+            });
+        });
+
+        // 배경 클릭 → 텍스트 선택
+        rect.on('mousedown', () => {
+            canvas.setActiveObject(textbox);
+            canvas.renderAll();
+        });
+
+        // 삭제 동기화 (텍스트가 지워지면 배경도 같이 제거)
+        textbox.on('removed', () => {
+            canvas.remove(rect);
+        });
+
+        // 더블클릭 시 편집
+        textbox.on('mousedblclick', () => {
+            textbox.enterEditing();
+            textbox.hiddenTextarea?.focus();
+        });
+
+        // 캔버스에 추가
+        canvas.add(rect);
+        canvas.add(textbox);
+
+        const initialHeight = Math.max(textbox.height + padding * 2, minRectHeight);
+        rect.set({ height: initialHeight });
+        textbox.set({ height: initialHeight - padding * 2 });
+
+        // 생성 직후 자동 편집
+        canvas.setActiveObject(textbox);
+        canvas.renderAll();
+        textbox.enterEditing();
+        textbox.hiddenTextarea?.focus();
+
+        // 스티커 모드 해제
+        useCanvasStore.setState({ isStickyMode: false });
     },
 
     deleteActiveObject: () => {

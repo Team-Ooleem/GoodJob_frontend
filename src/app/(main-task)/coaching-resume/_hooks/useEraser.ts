@@ -39,14 +39,16 @@ export function useEraser() {
         const handleMouseMove = (e: fabric.TPointerEventInfo) => {
             if (!isEraserMode || !isErasing) return;
 
-            const pointer = canvas.getPointer(e.e);
+            const pointer = canvas.getScenePoint(e.e);
             const objects = canvas.getObjects();
 
             objects.forEach((obj) => {
-                if (hasStrokeTest(obj) && obj.isPointNearStroke(pointer, 6)) {
-                    canvas.remove(obj);
-                } else if (obj.containsPoint(pointer)) {
-                    canvas.remove(obj);
+                if (obj instanceof fabric.Path) {
+                    if (hasStrokeTest(obj) && obj.isPointNearStroke(pointer, 6)) {
+                        canvas.remove(obj);
+                    } else if (obj.containsPoint(pointer)) {
+                        canvas.remove(obj);
+                    }
                 }
             });
 

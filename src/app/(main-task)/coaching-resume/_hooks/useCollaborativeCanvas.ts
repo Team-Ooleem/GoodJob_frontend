@@ -160,6 +160,13 @@ export function useCollaborativeCanvas(room: string) {
             const obj = e.target as FabricObject;
             if (!obj) return;
 
+            obj.set({
+                hasControls: false,
+                lockScalingX: true,
+                lockScalingY: true,
+                lockRotation: true,
+            });
+
             // free drawing 직후 object:added가 한 번 더 들어오는 걸 스킵
             if (suppressNextAddedId && obj.id === suppressNextAddedId) {
                 suppressNextAddedId = null;

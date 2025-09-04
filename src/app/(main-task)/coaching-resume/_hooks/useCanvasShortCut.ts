@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import * as fabric from 'fabric';
 import { useCanvasStore } from '../_stores/useCanvasStore';
 
 /**
@@ -10,50 +11,71 @@ import { useCanvasStore } from '../_stores/useCanvasStore';
  * - M : 연필 모드(드로잉 모드 활성화)
  * - Shift + M : 형광펜 모드(드로잉 모드 활성화 + 브러시 전환)
  * - Shift + Backspace : 지우개 모드
+ * - S : 스티커 메모 모드
  */
 export const useCanvasShortCut = () => {
-    const deleteActiveObject = useCanvasStore((store) => store.deleteActiveObject); // 현재 활성 객체 삭제 함수
-    const setDrawingMode = useCanvasStore((store) => store.setDrawingMode); // 드로잉 모드 on/off 설정 함수
-    const setBrushOptions = useCanvasStore((store) => store.setBrushOptions); // 브러시 옵션 변경 함수
+    const deleteActiveObject = useCanvasStore((store) => store.deleteActiveObject);
+    const setDrawingMode = useCanvasStore((store) => store.setDrawingMode);
+    const setBrushOptions = useCanvasStore((store) => store.setBrushOptions);
     const setEraserMode = useCanvasStore((store) => store.setEraserMode);
+    const setStickyMode = useCanvasStore((store) => store.setStickyMode);
+    const canvas = useCanvasStore((store) => store.canvasInstance);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            // fabric.Textbox 편집 중이면 단축키 무시
+            const active = canvas?.getActiveObject();
+            if (active && active.type === 'textbox' && (active as fabric.Textbox).isEditing) {
+                return;
+            }
+
             // Delete 또는 Backspace → 현재 선택된 객체 삭제
-            if ((e.key === 'Delete' || e.key === 'Backspace') && !e.shiftKey) {
+            if ((e.code === 'Delete' || e.code === 'Backspace') && !e.shiftKey) {
                 deleteActiveObject();
+                return;
             }
 
             // Shift + Backspace → 지우개 모드
-            if ((e.key === 'Delete' || e.key === 'Backspace') && e.shiftKey) {
+            if ((e.code === 'Delete' || e.code === 'Backspace') && e.shiftKey) {
                 setEraserMode(true);
+                return;
             }
 
-            // V 키 입력 시 드로잉 모드 해제 → 선택 모드로 전환
+            // V → 선택 모드
             if (e.code === 'KeyV') {
                 setDrawingMode(false);
                 setEraserMode(false);
+                return;
             }
 
-            // Shift + M → 형광펜 모드
+            // Shift + M → 형광펜
             if (e.code === 'KeyM' && e.shiftKey) {
+                setDrawingMode(false);
+                setBrushOptions({ type: 'highlighter', width: 20 });
                 setDrawingMode(true);
-                setBrushOptions({ type: 'highlighter' });
                 setEraserMode(false);
+                return;
             }
 
-            // M → 연필 모드
-            else if (e.code === 'KeyM') {
+            // M → 연필
+            if (e.code === 'KeyM') {
+                setDrawingMode(false);
+                setBrushOptions({ type: 'pencil', color: '#000000', width: 3 });
                 setDrawingMode(true);
-                setBrushOptions({ type: 'pencil' });
                 setEraserMode(false);
+                return;
+            }
+
+            // S → 스티커 메모 모드
+            if (e.code === 'KeyS') {
+                setStickyMode(true);
+                setDrawingMode(false);
+                setEraserMode(false);
+                return;
             }
         };
 
         window.addEventListener('keydown', handleKeyDown);
-
-        return () => {
-            window.removeEventListener('keydown', handleKeyDown);
-        };
-    }, [deleteActiveObject, setDrawingMode]);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [canvas, deleteActiveObject, setDrawingMode, setBrushOptions, setEraserMode]);
 };

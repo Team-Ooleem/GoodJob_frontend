@@ -13,6 +13,7 @@ import {
     useZoomPan,
     useCanvasShortCut,
     useEraser,
+    useStickyNote,
 } from '../_hooks';
 
 // local stores
@@ -55,6 +56,9 @@ export function FabricCanvas() {
 
     // 캔버스 관련 단축키 관리
     useCanvasShortCut();
+
+    // 스티커 메모
+    useStickyNote();
 
     // 화면 공유 소켓 접속
     useCollaborativeCanvas('resume-room');
