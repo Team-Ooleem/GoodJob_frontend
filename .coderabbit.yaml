@@ -12,6 +12,6 @@ reviews:
         enabled: true
         drafts: false
 base_branches:
-    - feature/.*
+    - develop
 chat:
     auto_reply: true
