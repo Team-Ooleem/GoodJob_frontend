@@ -9,19 +9,25 @@ import { useCanvasStore } from '../_stores/useCanvasStore';
  * - V : 선택 모드(드로잉 모드 해제)
  * - M : 연필 모드(드로잉 모드 활성화)
  * - Shift + M : 형광펜 모드(드로잉 모드 활성화 + 브러시 전환)
+ * - Shift + Backspace : 지우개 모드
  */
 export const useCanvasShortCut = () => {
     const deleteActiveObject = useCanvasStore((store) => store.deleteActiveObject); // 현재 활성 객체 삭제 함수
     const setDrawingMode = useCanvasStore((store) => store.setDrawingMode); // 드로잉 모드 on/off 설정 함수
     const setBrushOptions = useCanvasStore((store) => store.setBrushOptions); // 브러시 옵션 변경 함수
+    const setEraserMode = useCanvasStore((store) => store.setEraserMode);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            // Delete 또는 Backspace 키 입력 시 현재 선택된 객체 삭제
-            if (e.key === 'Delete' || e.key === 'Backspace') {
+            // Delete 또는 Backspace → 현재 선택된 객체 삭제
+            if ((e.key === 'Delete' || e.key === 'Backspace') && !e.shiftKey) {
                 deleteActiveObject();
             }
 
+            // Shift + Backspace → 지우개 모드
+            if ((e.key === 'Delete' || e.key === 'Backspace') && e.shiftKey) {
+                setEraserMode(true);
+            }
             // V 키 입력 시 드로잉 모드 해제 → 선택 모드로 전환
             if (e.code === 'KeyV') {
                 setDrawingMode(false);
