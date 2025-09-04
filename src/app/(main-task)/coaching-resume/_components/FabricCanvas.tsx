@@ -19,6 +19,10 @@ import {
 // local stores
 import { useCanvasStore } from '../_stores';
 
+// BUGS:
+// 스티커 메모 생성 전 고스트 메모가 소켓으로 공유되고 있음
+// 스티커 메모 생성 후 스티커 메모 옮기면 다른 PC에서 텍스트만 움직임
+// 객체 트랜스폼 기능이 여러개 객체 선택하면 활성화됨
 export function FabricCanvas() {
     const { width, height } = useWindowSize();
     const { canvasRef, canvas } = useFabricCanvas({
