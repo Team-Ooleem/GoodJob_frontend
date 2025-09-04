@@ -1,13 +1,12 @@
 'use client';
 
 import { useEffect } from 'react';
-import * as fabric from 'fabric';
 
 // global hooks
 import { useWindowSize } from '@/hooks';
 
 // local hooks
-import { useFabricCanvas, useFabricDotGrid, useCollaborativeCanvas } from '../_hooks';
+import { useFabricCanvas, useFabricDotGrid, useCollaborativeCanvas, useZoomPan } from '../_hooks';
 
 // local stores
 import { useCanvasStore } from '../_stores';
@@ -41,6 +40,10 @@ export function FabricCanvas() {
         };
     }, [canvas, setCanvasInstance]);
 
+    // 줌 인, 아웃 / 휠 이동
+    useZoomPan(canvas);
+
+    // 화면 공유 소켓 접속
     useCollaborativeCanvas('resume-room');
 
     return <canvas ref={canvasRef} />;
