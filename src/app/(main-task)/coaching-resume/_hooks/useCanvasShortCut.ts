@@ -20,7 +20,7 @@ export const useCanvasShortCut = () => {
             }
 
             // V 키 입력 시 드로잉 모드 해제 → 선택 모드로 전환
-            if (e.key.toLowerCase() === 'v') {
+            if (e.code === 'KeyV') {
                 setDrawingMode(false);
             }
         };
