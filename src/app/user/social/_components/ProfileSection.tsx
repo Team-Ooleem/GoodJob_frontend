@@ -3,11 +3,13 @@
 import { Avatar, Card, Typography, Divider, Spin, Button } from 'antd';
 import { UserOutlined, EnvironmentOutlined, TeamOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useSocialProfile } from '../_hooks';
 
 const { Text, Title } = Typography;
 
 export default function ProfileSection() {
+    const router = useRouter();
     const [currentUserId, setCurrentUserId] = useState<string>('');
 
     // localStorage에서 user_idx 가져오기
@@ -17,6 +19,13 @@ export default function ProfileSection() {
             setCurrentUserId(userId);
         }
     }, []);
+
+    // 내 프로필 클릭 핸들러
+    const handleMyProfileClick = () => {
+        if (currentUserId) {
+            router.push(`/user/social/profile/${currentUserId}`);
+        }
+    };
 
     // 사용자 프로필 데이터 가져오기
     const {
@@ -74,7 +83,11 @@ export default function ProfileSection() {
                     icon={<UserOutlined />}
                     className='mb-4'
                 />
-                <Title level={4} className='mb-2'>
+                <Title
+                    level={4}
+                    className='mb-2 cursor-pointer hover:text-blue-600 transition-colors'
+                    onClick={handleMyProfileClick}
+                >
                     {profile?.name || '사용자'}
                 </Title>
                 <Text className='text-gray-600 block mb-1'>
