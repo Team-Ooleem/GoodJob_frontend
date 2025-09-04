@@ -43,7 +43,7 @@ export const useStickyNote = () => {
                 top: scenePoint.y - minRectHeight / 2,
             });
 
-            // ✅ preview를 맨 위로 올리기
+            // preview를 맨 위로 올리기
             canvas.remove(preview);
             canvas.add(preview);
 
