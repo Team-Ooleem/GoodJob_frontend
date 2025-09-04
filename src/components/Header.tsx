@@ -8,7 +8,7 @@ export function Header() {
     return (
         <div className='w-full h-auto border-b-1 border-gray-200'>
             <div className='mx-auto w-[1400px] h-[60px] flex justify-between items-center'>
-                <Flex justify='center' align='center' gap={70}>
+                <Flex justify='center' align='center' gap={30}>
                     <Image
                         src='/assets/good-job-logo.webp'
                         alt='올인원 채용 플랫폼 굿잡'
