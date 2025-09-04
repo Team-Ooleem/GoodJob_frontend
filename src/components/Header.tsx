@@ -6,8 +6,8 @@ import { HeaderNavigation } from './HeaderNavigation';
 
 export function Header() {
     return (
-        <div className='w-full h-auto border-b-1 border-gray-200'>
-            <div className='mx-auto w-[1400px] h-[60px] flex justify-between items-center'>
+        <div className='w-full h-auto border-b border-gray-200'>
+            <div className='mx-auto max-w-[1400px] w-full px-4 md:px-6 h-[60px] flex justify-between items-center'>
                 <Flex justify='center' align='center' gap={30}>
                     <Image
                         src='/assets/good-job-logo.webp'

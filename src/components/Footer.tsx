@@ -1,11 +1,9 @@
 export function Footer() {
     return (
-        <div className='w-full h-[130px] border-t-1 border-gray-200'>
-            <div className='mx-auto w-[1400px] flex justify-between items-start'>
-                <div className='h-[60px] flex justify-between items-center'>
-                    <p className='text-sm text-neutral-500'>ⓒ 2025 Team Ooleem</p>
-                </div>
+        <footer className='w-full h-[130px] border-t border-neutral-200'>
+            <div className='mx-auto w-full max-w-[1400px] px-4 py-6'>
+                <p className='text-sm text-neutral-500'>ⓒ 2025 Team Ooleem</p>
             </div>
-        </div>
+        </footer>
     );
 }

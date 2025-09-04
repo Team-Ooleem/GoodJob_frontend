@@ -51,7 +51,7 @@ export default function Home() {
         <>
             <Header />
             <div className='w-full h-[237px] bg-blue-500'></div>
-            <div className='w-[1400px] mx-auto pt-32 pb-52'>
+            <div className='max-w-[1400px] w-full mx-auto px-4 md:px-6 pt-32 pb-52'>
                 <Space direction='vertical' size={100}>
                     <JobCardList title='모두가 주목하고 있어요!' data={jobList} />
                     <JobCardList title='리모트 근무 포지션' data={jobList} />

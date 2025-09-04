@@ -32,23 +32,17 @@ export function JobCard({
             align={isLarge ? 'start' : 'center'}
             style={style}
         >
-            <Suspense
-                fallback={
-                    <div
-                        className={`rounded-xl bg-neutral-300 ${
-                            isLarge ? 'w-[264px] h-[176px]' : 'w-[120px] h-[90px]'
-                        }`}
-                    />
+            <Image
+                src={imageUrl}
+                alt={`${company} ${title}`}
+                width={isLarge ? 264 : 120}
+                height={isLarge ? 176 : 90}
+                className='rounded-xl object-cover'
+                sizes={
+                    isLarge ? '(min-width: 1024px) 264px, 50vw' : '(min-width: 1024px) 120px, 33vw'
                 }
-            >
-                <Image
-                    src={imageUrl}
-                    alt='임시 이미지'
-                    width={isLarge ? 264 : 120}
-                    height={isLarge ? 176 : 90}
-                    className='rounded-xl object-cover'
-                />
-            </Suspense>
+                loading='lazy'
+            />
             <Flex vertical gap={isLarge ? 5 : 3}>
                 <h2 className='font-semibold text-neutral-800'>{title}</h2>
                 <p className='text-sm text-neutral-500'>{company}</p>
