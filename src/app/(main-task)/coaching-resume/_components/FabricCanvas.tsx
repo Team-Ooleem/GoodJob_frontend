@@ -6,7 +6,13 @@ import { useEffect } from 'react';
 import { useWindowSize } from '@/hooks';
 
 // local hooks
-import { useFabricCanvas, useFabricDotGrid, useCollaborativeCanvas, useZoomPan } from '../_hooks';
+import {
+    useFabricCanvas,
+    useFabricDotGrid,
+    useCollaborativeCanvas,
+    useZoomPan,
+    useCanvasShortCut,
+} from '../_hooks';
 
 // local stores
 import { useCanvasStore } from '../_stores';
@@ -42,6 +48,9 @@ export function FabricCanvas() {
 
     // 줌 인, 아웃 / 휠 이동
     useZoomPan(canvas);
+
+    // 캔버스 관련 단축키 관리
+    useCanvasShortCut();
 
     // 화면 공유 소켓 접속
     useCollaborativeCanvas('resume-room');
