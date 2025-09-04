@@ -11,12 +11,19 @@ type BrushConfig = {
     type: BrushKind;
 };
 
+type StickyNoteConfig = {
+    width: number;
+    minHeight: number;
+    padding: number;
+};
+
 type CanvasStoreState = {
     canvasInstance: fabric.Canvas | null;
     isDrawingMode: boolean;
     brush: BrushConfig;
     isEraserMode: boolean;
     isStickyMode: boolean;
+    stickyNoteConfig: StickyNoteConfig;
 
     // lifecycle
     setCanvasInstance: (canvas: fabric.Canvas | null) => void;
@@ -31,6 +38,7 @@ type CanvasStoreState = {
     clearAllObjects: () => void;
     setStickyMode: (enabled: boolean) => void;
     addStickyNote: (x: number, y: number, text?: string) => void;
+    setStickyNoteConfig: (config: Partial<StickyNoteConfig>) => void;
 };
 
 type DrawingBrush = fabric.PencilBrush | fabric.SprayBrush;
@@ -41,6 +49,16 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     brush: { color: '#000000', width: 3, type: 'pencil' },
     isEraserMode: false,
     isStickyMode: false,
+    stickyNoteConfig: {
+        width: 200,
+        minHeight: 150,
+        padding: 10,
+    },
+
+    setStickyNoteConfig: (config) =>
+        set((state) => ({
+            stickyNoteConfig: { ...state.stickyNoteConfig, ...config },
+        })),
 
     setCanvasInstance: (canvas) => {
         const previousCanvas = get().canvasInstance;
@@ -103,9 +121,7 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
         const canvas = get().canvasInstance;
         if (!canvas) return;
 
-        const rectWidth = 200;
-        const minRectHeight = 150;
-        const padding = 10;
+        const { width: rectWidth, minHeight: minRectHeight, padding } = get().stickyNoteConfig;
 
         const shadow = new fabric.Shadow({
             color: 'rgba(0,0,0,0.2)',
