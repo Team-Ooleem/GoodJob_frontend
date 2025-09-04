@@ -13,20 +13,81 @@ export interface SocialProfile {
     isFollowing?: boolean;
 }
 
+// 새로운 API 명세에 맞는 타입들
+export interface UserProfileInfo {
+    // 기본 정보
+    name: string;
+    profileImage?: string;
+    shortBio?: string;
+    bio?: string;
+    phone?: string;
+    email?: string;
+
+    // 희망 정보
+    desiredJobTitle?: string;
+    desiredLocation?: string;
+    desiredSalary?: number;
+
+    // 소셜 정보
+    followerCount: number;
+    followingCount: number;
+    isFollowing?: boolean; // 현재 사용자가 이 유저를 팔로우하고 있는지 여부
+
+    // 경력 정보
+    careers?: {
+        companyName: string;
+        position: string;
+        department?: string;
+        jobTitle?: string;
+        startDate: string;
+        endDate?: string;
+        isCurrent: boolean;
+        description?: string;
+        companyType?: string;
+    }[];
+
+    // 학력 정보
+    education?: {
+        schoolName: string;
+        major: string;
+        degreeName: string;
+        startDate: string;
+        endDate?: string;
+        isCurrent: boolean;
+    }[];
+
+    // 보유 기술
+    skills?: string[];
+
+    // 이력서 정보
+    resumeInfo?: {
+        resumeId: number;
+        title: string;
+        createdAt: string;
+        updatedAt: string;
+    }[];
+}
+
 export interface Post {
     postIdx: number;
     userId: number;
-    authorName: string;
-    authorProfileImage: string | null;
-    authorShortBio: string;
     content: string;
-    mediaUrl: string | null;
+    mediaUrl?: string;
     createdAt: string;
     updatedAt: string;
+    author: {
+        name: string;
+        profileImage?: string;
+    };
     likeCount: number;
     commentCount: number;
-    isLikedByCurrentUser: boolean;
-    isFollowingAuthor: boolean;
+    isLiked: boolean;
+    // 기존 호환성을 위한 필드들 (점진적 마이그레이션용)
+    authorName?: string;
+    authorProfileImage?: string | null;
+    authorShortBio?: string;
+    isLikedByCurrentUser?: boolean;
+    isFollowingAuthor?: boolean;
 }
 
 export interface PostsResponse {
@@ -73,6 +134,20 @@ export interface LikeResponse {
 export interface DeleteResponse {
     success: boolean;
     message: string;
+}
+
+// ===== 프로필 상세 페이지용 타입 정의 =====
+export interface UserProfileDetailResponse {
+    userInfo: UserProfileInfo;
+    posts: Post[];
+    hasMore: boolean;
+    nextCursor?: number;
+}
+
+export interface UserPostsResponse {
+    posts: Post[];
+    hasMore: boolean;
+    nextCursor?: number;
 }
 
 // ===== API 서비스 클래스 =====
@@ -130,8 +205,6 @@ export class SocialApi {
 
         try {
             const url = `/social/posts?${params.toString()}`;
-            console.log('🔗 API 요청 URL:', url);
-            console.log('📋 요청 파라미터:', { currentUserId, limit, cursor });
 
             const response = await api.get<PostsResponse>(url);
             return response.data;
@@ -214,6 +287,75 @@ export class SocialApi {
         const response = await api.delete(`/social/posts/${postId}`, {
             data: { userId },
         });
+        return response.data;
+    }
+
+    /**
+     * 사용자 기본 프로필 정보 조회
+     */
+    static async getUserProfile(
+        targetUserId: string,
+        currentUserId: number,
+    ): Promise<UserProfileInfo> {
+        const params = new URLSearchParams({
+            currentUserId: currentUserId.toString(),
+        });
+
+        const response = await api.get<UserProfileInfo>(
+            `/social/profile/${targetUserId}?${params.toString()}`,
+        );
+        return response.data;
+    }
+
+    /**
+     * 사용자 상세 프로필 정보 조회 (프로필 + 포스트)
+     */
+    static async getUserProfileDetail(
+        targetUserId: string,
+        currentUserId: number,
+        postsLimit: number = 10,
+        postsCursor?: number,
+    ): Promise<UserProfileDetailResponse> {
+        const params = new URLSearchParams({
+            currentUserId: currentUserId.toString(),
+            limit: postsLimit.toString(),
+        });
+
+        if (postsCursor !== undefined) {
+            params.append('cursor', postsCursor.toString());
+        }
+
+        const response = await api.get<UserProfileDetailResponse>(
+            `/social/profile/${targetUserId}/detail?${params.toString()}`,
+        );
+        return response.data;
+    }
+
+    /**
+     * 특정 사용자의 포스트만 조회
+     */
+    static async getUserPosts(
+        targetUserId: string,
+        currentUserId: number,
+        limit: number = 10,
+        cursor?: number,
+    ): Promise<UserPostsResponse> {
+        if (limit < 1 || limit > 20) {
+            throw new Error('limit은 1-20 사이의 값이어야 합니다.');
+        }
+
+        const params = new URLSearchParams({
+            currentUserId: currentUserId.toString(),
+            limit: limit.toString(),
+        });
+
+        if (cursor !== undefined) {
+            params.append('cursor', cursor.toString());
+        }
+
+        const response = await api.get<UserPostsResponse>(
+            `/social/posts/user/${targetUserId}?${params.toString()}`,
+        );
         return response.data;
     }
 }
