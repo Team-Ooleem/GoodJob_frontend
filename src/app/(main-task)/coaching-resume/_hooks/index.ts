@@ -5,3 +5,4 @@ export * from './useZoomPan';
 export * from './useCanvasShortCut';
 export * from './useEraser';
 export * from './useStickyNote';
+export * from './useLockTransform';

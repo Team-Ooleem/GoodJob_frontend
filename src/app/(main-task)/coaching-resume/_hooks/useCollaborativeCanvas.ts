@@ -161,10 +161,14 @@ export function useCollaborativeCanvas(room: string) {
             if (!obj) return;
 
             obj.set({
-                hasControls: false,
-                lockScalingX: true,
-                lockScalingY: true,
-                lockRotation: true,
+                hasControls: false, // 컨트롤 핸들 안 보임
+                lockScalingX: true, // X축 스케일 잠금
+                lockScalingY: true, // Y축 스케일 잠금
+                lockRotation: true, // 회전 잠금
+                lockSkewingX: true, // 기울이기 X 잠금
+                lockSkewingY: true, // 기울이기 Y 잠금
+                lockMovementX: false, // X축 이동 허용
+                lockMovementY: false, // Y축 이동 허용
             });
 
             // free drawing 직후 object:added가 한 번 더 들어오는 걸 스킵
@@ -204,8 +208,6 @@ export function useCollaborativeCanvas(room: string) {
         canvas.on('object:removed', onRemoved);
         canvas.on('path:created', onPathCreated);
 
-        // init 들어온 뒤 reconcile 되므로 여기서는 강제 호출 안 함
-
         return () => {
             canvas.off('object:added', onAdded);
             canvas.off('object:modified', onModified);
@@ -213,7 +215,7 @@ export function useCollaborativeCanvas(room: string) {
             canvas.off('path:created', onPathCreated);
 
             ydoc.off('update', onLocalYUpdate);
-            socket.disconnect(); // 언마운트 시 "WebSocket is closed..." 로그는 정상
+            socket.disconnect();
             ydoc.destroy();
         };
     }, [canvas, room]);
