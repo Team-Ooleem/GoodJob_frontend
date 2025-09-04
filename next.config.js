@@ -11,14 +11,6 @@ const nextConfig = {
             },
         ],
     },
-    async rewrites() {
-        return [
-            {
-                source: '/ws/:path*',
-                destination: 'http://localhost:3000/:path*',
-            },
-        ];
-    },
 };
 
 module.exports = nextConfig;

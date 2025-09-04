@@ -40,7 +40,7 @@ export function useCollaborativeCanvas(room: string) {
         let suppressNextAddedId: string | null = null;
 
         // --- Socket.IO ---
-        const socket = io('http://localhost:3000', {
+        const socket = io('http://localhost:4000', {
             withCredentials: true,
             transports: ['websocket', 'polling'],
         });
