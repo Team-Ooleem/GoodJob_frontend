@@ -114,10 +114,14 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
             offsetY: 2,
         });
 
+        // 중심 좌표를 기준으로 왼쪽 위 좌표 계산
+        const rectLeft = x - rectWidth / 2;
+        const rectTop = y - minRectHeight / 2;
+
         // 배경 Rect
         const rect = new fabric.Rect({
-            left: x,
-            top: y,
+            left: rectLeft,
+            top: rectTop,
             width: rectWidth,
             height: minRectHeight,
             fill: '#FFEB3B',
@@ -128,8 +132,8 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
 
         // 텍스트 박스
         const textbox = new fabric.Textbox(text, {
-            left: x + padding,
-            top: y + padding,
+            left: rectLeft + padding,
+            top: rectTop + padding,
             width: rectWidth - padding * 2,
             height: minRectHeight - padding * 2,
             fontSize: 16,
