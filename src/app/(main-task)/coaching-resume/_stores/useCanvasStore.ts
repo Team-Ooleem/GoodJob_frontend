@@ -24,9 +24,6 @@ type CanvasStoreState = {
     setBrushOptions: (options: Partial<BrushConfig>) => void;
 
     // objects
-    addRectangle: () => void;
-    addCircle: () => void;
-    addTextBox: (text?: string) => void;
     deleteActiveObject: () => void;
     clearAllObjects: () => void;
 };
@@ -69,59 +66,6 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
 
         if (!canvas) return;
         ensureFreeDrawingBrush(canvas, nextBrush);
-    },
-
-    addRectangle: () => {
-        const canvas = get().canvasInstance;
-        if (!canvas) return;
-
-        const rect = new fabric.Rect({
-            left: 100,
-            top: 100,
-            width: 120,
-            height: 80,
-            fill: 'transparent',
-            stroke: '#000',
-            strokeWidth: 2,
-        });
-
-        canvas.add(rect);
-        canvas.setActiveObject(rect);
-        canvas.requestRenderAll();
-    },
-
-    addCircle: () => {
-        const canvas = get().canvasInstance;
-        if (!canvas) return;
-
-        const circle = new fabric.Circle({
-            left: 150,
-            top: 150,
-            radius: 40,
-            fill: 'transparent',
-            stroke: '#000',
-            strokeWidth: 2,
-        });
-
-        canvas.add(circle);
-        canvas.setActiveObject(circle);
-        canvas.requestRenderAll();
-    },
-
-    addTextBox: (text = 'Text') => {
-        const canvas = get().canvasInstance;
-        if (!canvas) return;
-
-        const textBox = new fabric.IText(text, {
-            left: 120,
-            top: 120,
-            fontSize: 24,
-            fill: '#111',
-        });
-
-        canvas.add(textBox);
-        canvas.setActiveObject(textBox);
-        canvas.requestRenderAll();
     },
 
     deleteActiveObject: () => {
