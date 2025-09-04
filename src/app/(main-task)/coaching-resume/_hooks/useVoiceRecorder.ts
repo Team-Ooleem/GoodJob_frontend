@@ -38,6 +38,7 @@ export function useVoiceRecorder({ onRecordingChange }: RecorderOptions = {}) {
             // 데이터 수집
             mediaRecorderRef.current.ondataavailable = (e: BlobEvent) => {
                 if (e.data.size > 0) audioChunksRef.current.push(e.data);
+                console.log('오디오 청크 수집:', e.data.size);
             };
 
             // 녹음 종료 시 처리
@@ -51,15 +52,14 @@ export function useVoiceRecorder({ onRecordingChange }: RecorderOptions = {}) {
 
                     // 서버 호출
                     const sttResponse = await axios.post(
-                        'http://localhost:3001/stt/transcribe',
+                        'http://localhost:4000/api/stt/transcribe',
                         formData,
                         { headers: { 'Content-Type': 'multipart/form-data' } },
                     );
+                    console.log(sttResponse.data.result.transcript);
 
-                    const transcript = sttResponse.data.result?.transcript || '';
+                    const transcript = sttResponse.data.result?.transcript || ' ';
                     console.log('STT 결과:', transcript);
-
-                    // DB 저장은 서버 내부에서 처리되므로 클라이언트는 별도 처리 필요 없음
                 } catch (err) {
                     console.error('STT 또는 DB 처리 실패', err);
                 }
