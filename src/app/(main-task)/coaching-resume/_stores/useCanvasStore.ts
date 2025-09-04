@@ -88,11 +88,14 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
         const canvas = get().canvasInstance;
         if (!canvas) return;
 
-        const activeObject = canvas.getActiveObject();
-        if (activeObject) {
-            canvas.remove(activeObject);
-            canvas.requestRenderAll();
+        const activeObjects = canvas.getActiveObjects(); // 항상 배열 리턴
+
+        if (activeObjects.length) {
+            activeObjects.forEach((obj) => canvas.remove(obj));
         }
+
+        canvas.discardActiveObject();
+        canvas.requestRenderAll();
     },
 
     clearAllObjects: () => {
