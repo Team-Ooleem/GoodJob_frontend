@@ -3,7 +3,7 @@
 import { create } from 'zustand';
 import * as fabric from 'fabric';
 
-type BrushKind = 'pencil' | 'spray';
+type BrushKind = 'pencil' | 'highlighter';
 
 type BrushConfig = {
     color: string;
@@ -90,22 +90,26 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     },
 }));
 
-// TODO: 삼항연산자가 무분별하게 많이 쓰여져 있음
 function ensureFreeDrawingBrush(canvas: fabric.Canvas, brushConfig: BrushConfig) {
+    const { type, color, width } = brushConfig;
+
+    // 필요할 경우 새 브러시 생성
     const needsNewBrush =
-        !canvas.freeDrawingBrush ||
-        (brushConfig.type === 'pencil' &&
-            !(canvas.freeDrawingBrush instanceof fabric.PencilBrush)) ||
-        (brushConfig.type === 'spray' && !(canvas.freeDrawingBrush instanceof fabric.SprayBrush));
+        !canvas.freeDrawingBrush || !(canvas.freeDrawingBrush instanceof fabric.PencilBrush);
 
     if (needsNewBrush) {
-        canvas.freeDrawingBrush =
-            brushConfig.type === 'spray'
-                ? new fabric.SprayBrush(canvas)
-                : new fabric.PencilBrush(canvas);
+        canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
     }
 
-    const brush = canvas.freeDrawingBrush as DrawingBrush;
-    brush.width = brushConfig.width;
-    brush.color = brushConfig.color;
+    const brush = canvas.freeDrawingBrush as fabric.PencilBrush;
+
+    // 기본 설정
+    brush.width = width;
+    brush.color = color;
+
+    // 형광펜 전용 옵션
+    if (type === 'highlighter') {
+        brush.width = width * 2; // 더 두껍게
+        brush.color = 'rgba(255, 255, 0, 0.3)'; // 형광펜 색상
+    }
 }
