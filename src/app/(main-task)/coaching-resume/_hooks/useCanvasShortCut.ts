@@ -28,21 +28,25 @@ export const useCanvasShortCut = () => {
             if ((e.key === 'Delete' || e.key === 'Backspace') && e.shiftKey) {
                 setEraserMode(true);
             }
+
             // V 키 입력 시 드로잉 모드 해제 → 선택 모드로 전환
             if (e.code === 'KeyV') {
                 setDrawingMode(false);
+                setEraserMode(false);
             }
 
             // Shift + M → 형광펜 모드
             if (e.code === 'KeyM' && e.shiftKey) {
                 setDrawingMode(true);
                 setBrushOptions({ type: 'highlighter' });
+                setEraserMode(false);
             }
 
             // M → 연필 모드
             else if (e.code === 'KeyM') {
                 setDrawingMode(true);
                 setBrushOptions({ type: 'pencil' });
+                setEraserMode(false);
             }
         };
 
