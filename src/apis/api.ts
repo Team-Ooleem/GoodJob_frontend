@@ -13,10 +13,18 @@ export const api = axios.create(apiConfig);
 // 요청 인터셉터 (필요시 토큰 추가 등)
 api.interceptors.request.use(
     (config) => {
-        // 토큰이 있다면 헤더에 추가
-        const token = localStorage.getItem('token');
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
+        // 토큰이 필요 없는 경로들 (공개 API)
+        const publicPaths = ['/api/auth/google'];
+
+        // 현재 요청 경로가 공개 경로인지 확인
+        const isPublicPath = publicPaths.some((path) => config.url?.includes(path));
+
+        // 공개 경로가 아니고 토큰이 있다면 헤더에 추가
+        if (!isPublicPath) {
+            const token = localStorage.getItem('token');
+            if (token) {
+                config.headers.Authorization = `Bearer ${token}`;
+            }
         }
         return config;
     },
