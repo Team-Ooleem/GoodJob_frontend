@@ -1,1 +1,2 @@
-export * from './fabirc';
+export * from './fabric';
+export * from './job';
