@@ -1,9 +1,94 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Webcam, Question, Avatar } from '../_components';
+import { Webcam, WebcamHandle, Question, Avatar } from '../_components';
 import { message } from 'antd';
 import { useInterviewAnalysis } from '@/hooks/use-interview-analysis';
+import axios from 'axios';
+
+// ===== 추가: WAV 레코더 유틸 =====
+class WavRecorder {
+    private audioCtx: AudioContext | null = null;
+    private stream: MediaStream | null = null;
+    private source: MediaStreamAudioSourceNode | null = null;
+    private processor: ScriptProcessorNode | null = null;
+    private buffers: Float32Array[] = [];
+    private recording = false;
+
+    async start() {
+        this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        this.audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        this.source = this.audioCtx.createMediaStreamSource(this.stream);
+        this.processor = this.audioCtx.createScriptProcessor(4096, 1, 1);
+        this.source.connect(this.processor);
+        this.processor.connect(this.audioCtx.destination);
+        this.buffers = [];
+        this.recording = true;
+
+        this.processor.onaudioprocess = (e) => {
+            if (!this.recording) return;
+            const ch0 = e.inputBuffer.getChannelData(0);
+            this.buffers.push(new Float32Array(ch0));
+        };
+    }
+
+    async stop(): Promise<Blob> {
+        this.recording = false;
+        if (this.processor) this.processor.disconnect();
+        if (this.source) this.source.disconnect();
+        if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
+
+        const sr = this.audioCtx?.sampleRate || 44100;
+        const samples = this.merge(this.buffers);
+        const wav = this.encodeWAV(samples, sr);
+        if (this.audioCtx) await this.audioCtx.close();
+        return wav;
+    }
+
+    private merge(chunks: Float32Array[]) {
+        const total = chunks.reduce((a, b) => a + b.length, 0);
+        const out = new Float32Array(total);
+        let off = 0;
+        for (const c of chunks) {
+            out.set(c, off);
+            off += c.length;
+        }
+        return out;
+    }
+
+    private encodeWAV(samples: Float32Array, sampleRate: number) {
+        const buffer = new ArrayBuffer(44 + samples.length * 2);
+        const view = new DataView(buffer);
+
+        const writeString = (off: number, str: string) => {
+            for (let i = 0; i < str.length; i++) view.setUint8(off + i, str.charCodeAt(i));
+        };
+        const floatTo16 = (off: number, input: Float32Array) => {
+            for (let i = 0; i < input.length; i++, off += 2) {
+                let s = Math.max(-1, Math.min(1, input[i]));
+                s = s < 0 ? s * 0x8000 : s * 0x7fff;
+                view.setInt16(off, s, true);
+            }
+        };
+
+        writeString(0, 'RIFF');
+        view.setUint32(4, 36 + samples.length * 2, true);
+        writeString(8, 'WAVE');
+        writeString(12, 'fmt ');
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true); // PCM
+        view.setUint16(22, 1, true); // mono
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * 2, true);
+        view.setUint16(32, 2, true);
+        view.setUint16(34, 16, true);
+        writeString(36, 'data');
+        view.setUint32(40, samples.length * 2, true);
+        floatTo16(44, samples);
+
+        return new Blob([view], { type: 'audio/wav' });
+    }
+}
 
 // Web Speech API 타입 정의
 declare global {
@@ -25,6 +110,19 @@ const interviewData = {
     ],
 };
 
+interface AudioFeatures {
+    f0_mean: number;
+    f0_std: number;
+    f0_cv?: number;
+    f0_std_semitone?: number;
+    rms_std: number;
+    rms_cv: number;
+    jitter_like: number;
+    shimmer_like: number;
+    silence_ratio: number;
+    sr: number;
+}
+
 interface InterviewSession {
     questionNumber: number;
     question: string;
@@ -32,6 +130,9 @@ interface InterviewSession {
     timeSpent: number;
     detectionData: any[];
     timestamp: Date;
+    // ===== 추가: 오디오 관련 필드 =====
+    audioUrl?: string; // 클라이언트에서 재생용
+    audioFeatures?: AudioFeatures; // 서버 분석 결과
 }
 
 export default function AiInterviewSessionsPage() {
@@ -48,6 +149,21 @@ export default function AiInterviewSessionsPage() {
     const timerRef = useRef<NodeJS.Timeout | null>(null);
     const speakingTimerRef = useRef<NodeJS.Timeout | null>(null);
     const recognitionRef = useRef<any>(null);
+
+    const webcamRef = useRef<WebcamHandle>(null);
+
+    // ===== 추가: WAV 레코더 인스턴스 & 최신 오디오 Blob 참조 =====
+    const recorderRef = useRef<WavRecorder | null>(null);
+    const lastAudioBlobRef = useRef<Blob | null>(null);
+
+    // 컴포넌트 내부: 세션ID를 한 번 생성해 유지 (uuid 없어도 OK)
+    const sessionIdRef = useRef<string>(
+        `sess_${Math.random().toString(36).slice(2, 10)}_${Date.now()}`,
+    );
+    const SESSION_ID = sessionIdRef.current as any as string;
+    // 질문ID는 q1/q2/... 형태로 쓸게요.
+    const qid = `q${currentQuestionIndex + 1}`;
+    const qtext = interviewData.questions[currentQuestionIndex];
 
     // react-query hook
     const interviewAnalysisMutation = useInterviewAnalysis();
@@ -157,6 +273,27 @@ export default function AiInterviewSessionsPage() {
         }
     };
 
+    // 기존: fetch 버전 analyzeAudioBlob
+    // -> axios 버전으로 교체
+    const AUDIO_API_BASE = process.env.NEXT_PUBLIC_AUDIO_API_BASE; // 예: http://localhost:8081
+
+    const analyzeAudioBlob = async (
+        blob: Blob,
+        filename = 'answer.wav',
+    ): Promise<AudioFeatures> => {
+        if (!AUDIO_API_BASE) throw new Error('NEXT_PUBLIC_AUDIO_API_BASE가 설정되지 않았습니다.');
+        const form = new FormData();
+        form.append('file', blob, filename);
+
+        // axios는 브라우저에서 multipart boundary를 자동 설정합니다. Content-Type 수동 지정 X
+        const res = await axios.post(`${AUDIO_API_BASE}/audio/analyze`, form, {
+            timeout: 60000, // 선택: 타임아웃
+            withCredentials: false, // CORS 쿠키 미사용이면 false (기본값)
+            // headers: { 'Content-Type': 'multipart/form-data' } // 직접 지정하지 않는 것을 권장
+        });
+        return res.data?.features as AudioFeatures;
+    };
+
     // ChatGPT API 호출 형식으로 데이터 변환
     const formatMessagesForChatGPT = (qaList: Array<{ question: string; answer: string }>) => {
         const interviewContext = `
@@ -239,6 +376,59 @@ ${qaList
             answer: session.answer,
         }));
 
+        // (선택) 오디오 종합 평균 같은 간단 요약 만들기
+        const audioAgg = (() => {
+            const feats = sessions.map((s) => s.audioFeatures).filter(Boolean) as AudioFeatures[];
+            const mean = (arr: number[]) =>
+                arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+            return {
+                f0_mean: mean(feats.map((f) => f.f0_mean)),
+                f0_std: mean(feats.map((f) => f.f0_std)),
+                rms_cv: mean(feats.map((f) => f.rms_cv)),
+                jitter_like: mean(feats.map((f) => f.jitter_like)),
+                shimmer_like: mean(feats.map((f) => f.shimmer_like)),
+                silence_ratio: mean(feats.map((f) => f.silence_ratio)),
+            };
+        })();
+
+        // 결과를 로컬에 보관(결과 페이지에서 활용)
+        localStorage.setItem(
+            'interviewAudioPerQuestion',
+            JSON.stringify(
+                sessions.map((s) => ({
+                    questionNumber: s.questionNumber,
+                    question: s.question,
+                    audioFeatures: s.audioFeatures,
+                    audioUrl: s.audioUrl,
+                })),
+            ),
+        );
+        localStorage.setItem('interviewAudioOverall', JSON.stringify(audioAgg));
+
+        try {
+            const finalizeRes = await axios.post(
+                `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/metrics/${SESSION_ID}/finalize`,
+                {},
+                { timeout: 10000 },
+            );
+            // 응답 형식: { ok: true, aggregate: { perQuestion: {...}, overall: {...} } }
+            const visualAgg = finalizeRes.data?.aggregate;
+            if (visualAgg) {
+                // 결과 페이지에서 사용하도록 보관
+                localStorage.setItem(
+                    'interviewVisualPerQuestion',
+                    JSON.stringify(visualAgg.perQuestion),
+                );
+                localStorage.setItem('interviewVisualOverall', JSON.stringify(visualAgg.overall));
+            }
+        } catch (e: any) {
+            console.warn('세션 영상 집계 finalize 실패:', {
+                url: `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/metrics/${SESSION_ID}/finalize`,
+                status: e?.response?.status,
+                data: e?.response?.data,
+            });
+        }
+
         // 질문-답변 리스트를 콘솔에 출력
         console.log('🎯 면접 완료 - 질문답변 리스트:');
         console.log('=====================================');
@@ -307,7 +497,7 @@ ${qaList
             // 성공/실패 관계없이 결과 페이지로 이동
             setTimeout(() => {
                 window.location.href = '/ai-interview/result';
-            }, 2000);
+            }, 20000); // 테스트 용도로 일단 20초, 원래 2초였음
         } catch (error) {
             message.destroy();
             console.error('❌ 면접 분석 API 호출 오류:', error);
@@ -325,12 +515,12 @@ ${qaList
             // 실패해도 결과 페이지로 이동
             setTimeout(() => {
                 window.location.href = '/ai-interview/result';
-            }, 2000);
+            }, 20000); // 테스트 용도로 일단 20초, 원래 2초였음
         }
     };
 
-    // 답변 시작
-    const handleStartAnswer = () => {
+    // 답변 시작 - 원래 async 없었는데 밑에서 await 쓰면서 GPT가 추가
+    const handleStartAnswer = async () => {
         setIsRecording(true);
         setTimeLeft(60);
         setTranscribedText('');
@@ -347,8 +537,20 @@ ${qaList
         };
         setCurrentSession(newSession);
 
+        // ▼ 문항 시작: 웹캠에 문항 메타 전달
+        webcamRef.current?.startQuestion(qid, { orderNo: currentQuestionIndex + 1, text: qtext });
+
         // 실제 음성 인식 시작 (기존 설정 유지)
         startSpeechRecognition();
+
+        // WAV 레코더 시작
+        try {
+            recorderRef.current = new WavRecorder();
+            await recorderRef.current.start();
+        } catch (e) {
+            console.error('마이크 접근 실패:', e);
+            message.error('마이크 접근 권한을 확인해주세요.');
+        }
 
         // AI가 말하는 시뮬레이션
         simulateAISpeaking(2000);
@@ -362,6 +564,41 @@ ${qaList
         // 음성 인식 중지
         stopSpeechRecognition();
 
+        // ▼ 문항 종료: 집계 결과 받기 & 서버로 전송
+        const qid = `q${currentQuestionIndex + 1}`;
+        const agg = webcamRef.current?.endQuestion();
+        if (agg) {
+            try {
+                await axios.post(
+                    `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/metrics/${SESSION_ID}/${qid}/aggregate`,
+                    agg,
+                    { timeout: 10000 },
+                );
+            } catch (e) {
+                console.warn('문항 영상 집계 업로드 실패:', e);
+            }
+        }
+
+        // WAV 정지 → 업로드 분석
+        let audioUrl: string | undefined;
+        let audioFeatures: AudioFeatures | undefined;
+
+        try {
+            if (recorderRef.current) {
+                const blob = await recorderRef.current.stop();
+                lastAudioBlobRef.current = blob;
+                audioUrl = URL.createObjectURL(blob);
+
+                // 오디오 분석 서버 호출
+                audioFeatures = await analyzeAudioBlob(blob, `q${currentQuestionIndex + 1}.wav`);
+            }
+        } catch (e) {
+            console.error('오디오 분석 실패:', e);
+            message.warning('오디오 분석에 실패했어요. 네트워크를 확인해주세요.');
+        } finally {
+            recorderRef.current = null;
+        }
+
         if (currentSession) {
             const finalAnswer = transcribedText || `답변 ${currentSession.questionNumber}번 완료`;
 
@@ -369,6 +606,8 @@ ${qaList
                 ...currentSession,
                 answer: finalAnswer,
                 timeSpent: 60 - timeLeft,
+                audioUrl,
+                audioFeatures,
             };
 
             setSessions((prev) => [...prev, completedSession]);
@@ -445,7 +684,7 @@ ${qaList
     return (
         <div className='w-screen h-screen flex flex-col justify-end items-center bg-gradient-to-br from-blue-100 via-indigo-50 to-purple-100 relative overflow-hidden'>
             {/* 웹캠 */}
-            <Webcam css='absolute top-0 right-0' onDetection={handleDetection} />
+            <Webcam ref={webcamRef} css='absolute top-0 right-0' onDetection={handleDetection} />
 
             {/* AI 아바타 */}
             <div>
