@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Card, message, Typography, Space, Input } from 'antd';
 import { UserOutlined } from '@ant-design/icons';
-import { getProfile, updateProfile } from '@/apis/profile-api';
+import { updateProfile } from '@/apis/profile-api';
 import { Profile } from '@/types/types';
 
 const { Title, Text } = Typography;
@@ -15,28 +15,6 @@ export default function ProfileInputPage() {
     const [shortBio, setShortBio] = useState('');
     const [bio, setBio] = useState('');
     const [loading, setLoading] = useState(false);
-    const [initialLoading, setInitialLoading] = useState(true);
-
-    // 프로필 데이터 로드
-    useEffect(() => {
-        const loadProfile = async () => {
-            try {
-                setInitialLoading(true);
-                const response = await getProfile();
-                if (response.success) {
-                    setShortBio(response.data.profile.short_bio || '');
-                    setBio(response.data.profile.bio || '');
-                }
-            } catch (error) {
-                // 프로필이 없는 경우는 정상적인 상황일 수 있음
-                console.log('No existing profile found');
-            } finally {
-                setInitialLoading(false);
-            }
-        };
-
-        loadProfile();
-    }, []);
 
     const handleShortBioChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
@@ -93,17 +71,6 @@ export default function ProfileInputPage() {
         // 희망 연봉 선택 페이지로 이동
         router.push('/salary-selection');
     };
-
-    if (initialLoading) {
-        return (
-            <div className='min-h-screen bg-gray-50 flex items-center justify-center'>
-                <div className='text-center'>
-                    <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4'></div>
-                    <Text>프로필을 불러오는 중...</Text>
-                </div>
-            </div>
-        );
-    }
 
     return (
         <div className='min-h-screen bg-gray-50 py-8'>
