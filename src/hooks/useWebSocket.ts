@@ -42,12 +42,24 @@ export const useWebSocket = ({
             socketRef.current = socket;
 
             socket.on('connect', () => {
+                console.log('🔗 [WEBSOCKET] 연결 성공:', {
+                    socketId: socket.id,
+                    userId: userId,
+                    userIdType: typeof userId,
+                });
+
                 onConnectionStatusChange(true);
                 reconnectAttempts.current = 0;
 
                 // 연결 시 사용자 등록
                 if (userId) {
-                    socket.emit('register_user', { userId });
+                    console.log('📝 [WEBSOCKET] register_user 이벤트 전송:', {
+                        userId,
+                        type: typeof userId,
+                    });
+                    socket.emit('register_user', userId); // 숫자 직접 전송
+                } else {
+                    console.log('❌ [WEBSOCKET] userId가 없어서 사용자 등록 실패');
                 }
             });
 

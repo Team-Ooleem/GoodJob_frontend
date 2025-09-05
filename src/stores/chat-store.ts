@@ -137,41 +137,52 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     },
 
     addMessage: (message) => {
+        console.log('📥 [STORE] addMessage 시작:', {
+            message,
+            timestamp: new Date().toISOString(),
+        });
+
         // 현재 사용자 ID를 localStorage에서 가져오기
         const currentUserId = parseInt(localStorage.getItem('user_idx') || '0', 10);
-        if (!currentUserId) return;
+        if (!currentUserId) {
+            console.log('❌ [STORE] addMessage 실패 - currentUserId 없음');
+            return;
+        }
 
         // 메시지의 발신자/수신자 중 현재 사용자가 아닌 상대방 ID 찾기
         const otherUserId =
             message.sender_id === currentUserId ? message.receiver_id : message.sender_id;
 
+        console.log('👥 [STORE] 사용자 정보:', {
+            currentUserId,
+            otherUserId,
+            messageSenderId: message.sender_id,
+            messageReceiverId: message.receiver_id,
+        });
+
         // conversations에서 해당 상대방과의 대화 찾기
         const state = get();
         let conversation = state.conversations.find((conv) => conv.other_user_id === otherUserId);
 
+        console.log('🔍 [STORE] 대화 찾기 결과:', {
+            conversations: state.conversations,
+            otherUserId,
+            foundConversation: conversation,
+        });
+
         // 대화를 찾지 못한 경우 처리
         if (!conversation) {
+            console.log('⚠️ [STORE] 대화를 찾지 못함 - 임시 conversation 생성');
             // 임시 conversation 생성하여 메시지 저장
             const tempConversationId = `temp_${otherUserId}`;
 
             set((currentState) => {
                 const existingMessages = currentState.messages[tempConversationId] || [];
-                const isDuplicate = existingMessages.some(
-                    (existingMsg) =>
-                        existingMsg.message_id === message.message_id ||
-                        (existingMsg.content === message.content &&
-                            existingMsg.sender_id === message.sender_id &&
-                            existingMsg.receiver_id === message.receiver_id &&
-                            Math.abs(
-                                new Date(existingMsg.created_at).getTime() -
-                                    new Date(message.created_at).getTime(),
-                            ) < 5000),
-                );
-
-                if (isDuplicate) {
-                    console.log('Duplicate temp message detected, skipping:', message);
-                    return currentState;
-                }
+                console.log('💾 [STORE] 임시 conversation에 메시지 추가:', {
+                    tempConversationId,
+                    existingMessagesCount: existingMessages.length,
+                    newMessageId: message.message_id,
+                });
 
                 return {
                     messages: {
@@ -225,25 +236,18 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
         const conversationKey = conversation.conversation_id.toString();
 
-        set((state) => {
-            // 중복 메시지 체크 - ID, 내용, 발신자, 수신자로 체크
-            const existingMessages = state.messages[conversationKey] || [];
-            const isDuplicate = existingMessages.some(
-                (existingMsg) =>
-                    existingMsg.message_id === message.message_id ||
-                    (existingMsg.content === message.content &&
-                        existingMsg.sender_id === message.sender_id &&
-                        existingMsg.receiver_id === message.receiver_id &&
-                        Math.abs(
-                            new Date(existingMsg.created_at).getTime() -
-                                new Date(message.created_at).getTime(),
-                        ) < 5000), // 5초 이내 같은 내용
-            );
+        console.log('✅ [STORE] 정식 conversation 찾음:', {
+            conversationId: conversation.conversation_id,
+            conversationKey,
+        });
 
-            if (isDuplicate) {
-                console.log('Duplicate message detected, skipping:', message);
-                return state;
-            }
+        set((state) => {
+            const existingMessages = state.messages[conversationKey] || [];
+            console.log('✅ [STORE] 새 메시지 추가 중...', {
+                existingMessagesCount: existingMessages.length,
+                newMessageId: message.message_id,
+                newMessageContent: message.content,
+            });
 
             // sender 정보는 웹소켓 메시지에서 제공되는 정보 사용
             const senderName =
@@ -253,22 +257,27 @@ export const useChatStore = create<ChatStore>((set, get) => ({
                 message.sender_profile_img ||
                 (message.sender_id !== currentUserId ? conversation.other_user_profile_img : '');
 
+            const newMessage = {
+                message_id: message.message_id,
+                sender_id: message.sender_id,
+                receiver_id: message.receiver_id,
+                content: message.content,
+                created_at: message.created_at,
+                is_read: 0,
+                sender_name: senderName,
+                sender_profile_img: senderProfileImg,
+            };
+
+            console.log('💾 [STORE] 메시지 추가 완료:', {
+                conversationKey,
+                newMessage,
+                totalMessages: existingMessages.length + 1,
+            });
+
             return {
                 messages: {
                     ...state.messages,
-                    [conversationKey]: [
-                        ...existingMessages,
-                        {
-                            message_id: message.message_id,
-                            sender_id: message.sender_id,
-                            receiver_id: message.receiver_id,
-                            content: message.content,
-                            created_at: message.created_at,
-                            is_read: 0,
-                            sender_name: senderName,
-                            sender_profile_img: senderProfileImg,
-                        },
-                    ],
+                    [conversationKey]: [...existingMessages, newMessage],
                 },
             };
         });
