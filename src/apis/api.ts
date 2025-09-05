@@ -5,6 +5,7 @@ export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE || 'http://localhos
 export const apiConfig = {
     baseURL: API_BASE_URL,
     timeout: 5000,
+    withCredentials: true,
 };
 
 // axios 인스턴스 생성
@@ -13,19 +14,6 @@ export const api = axios.create(apiConfig);
 // 요청 인터셉터 (JWT 토큰 자동 추가)
 api.interceptors.request.use(
     (config) => {
-        // 토큰이 필요 없는 경로들 (공개 API)
-        const publicPaths = ['/auth/google', '/auth/login'];
-
-        // 현재 요청 경로가 공개 경로인지 확인
-        const isPublicPath = publicPaths.some((path) => config.url?.includes(path));
-
-        // 공개 경로가 아니고 토큰이 있다면 헤더에 추가
-        if (!isPublicPath) {
-            const token = localStorage.getItem('token');
-            if (token) {
-                config.headers.Authorization = `Bearer ${token}`;
-            }
-        }
         return config;
     },
     (error) => {
@@ -37,7 +25,6 @@ api.interceptors.request.use(
 api.interceptors.response.use(
     (res) => res,
     async (err) => {
-        console.log('🔴 [API] 응답 인터셉터 에러:', err);
         // 401 에러 시 토큰 제거 및 로그인 페이지로 리다이렉트
         if (err?.response?.status === 401) {
             // 이 때 프론트는 직접 httpOnly 쿠키를 지울 수 없으므로
