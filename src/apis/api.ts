@@ -43,3 +43,18 @@ api.interceptors.response.use(
         throw err;
     },
 );
+
+// 사용자 인증 관련 API
+export const authApi = {
+    // 현재 로그인된 사용자 정보 조회
+    me: async () => {
+        const response = await api.get('/auth/me');
+        return response.data;
+    },
+
+    // 로그아웃
+    logout: async () => {
+        const response = await api.post('/auth/logout');
+        return response.data;
+    },
+};

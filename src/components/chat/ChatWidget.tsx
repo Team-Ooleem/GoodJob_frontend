@@ -7,9 +7,11 @@ import { useChatStore } from '@/stores/chat-store';
 import { ChatButton } from './ChatButton';
 import { ChatWindow } from './ChatWindow';
 import { WebSocketMessage } from '@/types/chat';
+import { useAuth } from '@/hooks';
 
 export const ChatWidget = () => {
-    const [userId, setUserId] = useState<number | null>(null);
+    const { user, isAuthenticated } = useAuth();
+    const userId = user?.idx || null;
     const {
         addMessage,
         updateUnreadCount,
@@ -18,15 +20,6 @@ export const ChatWidget = () => {
         loadConversations,
         loadConversationsWithUnread,
     } = useChatStore();
-
-    // localStorage에서 user_idx 가져오기
-    useEffect(() => {
-        const storedUserId = localStorage.getItem('user_idx');
-        if (storedUserId) {
-            const userId = parseInt(storedUserId, 10);
-            setUserId(userId);
-        }
-    }, []);
 
     // Zustand 함수들을 useCallback으로 메모이제이션
     const handleMessage = useCallback(
@@ -78,7 +71,7 @@ export const ChatWidget = () => {
         }
     }, [userId, loadConversationsWithUnread]);
 
-    if (!userId) return null;
+    if (!isAuthenticated || !userId) return null;
 
     return (
         <>

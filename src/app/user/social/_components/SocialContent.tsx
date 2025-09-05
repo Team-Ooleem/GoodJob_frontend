@@ -4,20 +4,15 @@ import { useState, useEffect } from 'react';
 import ProfileSection from './ProfileSection';
 import PostComposer from './PostComposer';
 import PostFeed from './PostFeed';
+import { useAuth } from '@/hooks/use-auth';
 
 export default function SocialContent() {
     const [currentUserId, setCurrentUserId] = useState<number | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const { user } = useAuth();
 
-    // localStorage에서 user_idx 가져오기
     useEffect(() => {
-        const userId = localStorage.getItem('user_idx');
-        if (userId) {
-            const parsedUserId = parseInt(userId, 10);
-            if (!isNaN(parsedUserId)) {
-                setCurrentUserId(parsedUserId);
-            }
-        }
+        setCurrentUserId(user?.idx || null);
         setIsLoading(false);
     }, []);
 
