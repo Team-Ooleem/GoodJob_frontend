@@ -24,10 +24,3 @@ export const formatKoreanDate = (dateString: string): string => {
         day: 'numeric',
     });
 };
-
-/**
- * 연봉을 만원 단위로 포맷팅
- */
-export const formatSalary = (salary: number): string => {
-    return `${(salary / 10000).toLocaleString()}만원`;
-};
