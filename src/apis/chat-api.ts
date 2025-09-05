@@ -49,20 +49,38 @@ export const sendMessage = async (
     receiverId: number,
     content: string,
 ): Promise<{ messageId: number; conversationId: number }> => {
+    console.log('🔥 [API] sendMessage API 호출:', {
+        senderId,
+        receiverId,
+        content,
+        timestamp: new Date().toISOString(),
+        url: `${CHAT_BASE_URL}/messages`,
+    });
+
     const response = await api.post<ChatApiResponse>(`${CHAT_BASE_URL}/messages`, {
         sender_id: senderId,
         receiver_id: receiverId,
         content,
     });
 
+    console.log('📥 [API] sendMessage API 응답:', {
+        success: response.data.success,
+        messageId: response.data.message_id,
+        conversationId: response.data.conversation_id,
+        message: response.data.message,
+    });
+
     if (!response.data.success) {
         throw new Error(response.data.message || '메시지 전송에 실패했습니다.');
     }
 
-    return {
+    const result = {
         messageId: response.data.message_id || 0,
         conversationId: response.data.conversation_id || 0,
     };
+
+    console.log('✅ [API] sendMessage API 완료:', result);
+    return result;
 };
 
 // 4. 메시지 읽음 처리

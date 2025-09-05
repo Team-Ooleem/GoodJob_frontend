@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useChatStore } from '@/stores/chat-store';
@@ -28,29 +28,49 @@ export const ChatWidget = () => {
         }
     }, []);
 
-    const { sendMessage } = useWebSocket({
-        userId: userId || 0,
-        onMessage: (message: WebSocketMessage) => {
+    // Zustand 함수들을 useCallback으로 메모이제이션
+    const handleMessage = useCallback(
+        (message: WebSocketMessage) => {
             addMessage(message);
         },
-        onUnreadCountUpdate: (count: number) => {
+        [addMessage],
+    );
+
+    const handleUnreadCountUpdate = useCallback(
+        (count: number) => {
             updateUnreadCount(count);
         },
-        onOnlineUsersUpdate: (userIds: number[]) => {
+        [updateUnreadCount],
+    );
+
+    const handleOnlineUsersUpdate = useCallback(
+        (userIds: number[]) => {
             setOnlineUsers(userIds);
         },
-        onConnectionStatusChange: (isConnected: boolean) => {
+        [setOnlineUsers],
+    );
+
+    const handleConnectionStatusChange = useCallback(
+        (isConnected: boolean) => {
             setConnectionStatus(isConnected);
         },
+        [setConnectionStatus],
+    );
+
+    const { sendMessage: sendWebSocketMessage } = useWebSocket({
+        userId: userId || 0,
+        onMessage: handleMessage,
+        onUnreadCountUpdate: handleUnreadCountUpdate,
+        onOnlineUsersUpdate: handleOnlineUsersUpdate,
+        onConnectionStatusChange: handleConnectionStatusChange,
     });
 
-    // WebSocket sendMessage를 스토어에 연결
+    // WebSocket sendMessage를 스토어에 전달 (store의 sendMessage와 구분)
     useEffect(() => {
-        const wrappedSendMessage = async (receiverId: number, content: string) => {
-            sendMessage(receiverId, content);
-        };
-        useChatStore.setState({ sendMessage: wrappedSendMessage });
-    }, [sendMessage]);
+        useChatStore.setState({
+            webSocketSendMessage: sendWebSocketMessage,
+        });
+    }, [sendWebSocketMessage]);
 
     useEffect(() => {
         if (userId) {

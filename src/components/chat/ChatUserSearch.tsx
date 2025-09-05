@@ -58,6 +58,8 @@ export const ChatUserSearch = ({ userId, onUserSelect }: ChatUserSearchProps) =>
                             // 입력할 때마다 검색 활성화
                             if (value.trim().length >= 1) {
                                 setShouldSearch(true);
+                            } else {
+                                setShouldSearch(false);
                             }
                         }}
                         onKeyDown={(e) => {
@@ -97,14 +99,14 @@ export const ChatUserSearch = ({ userId, onUserSelect }: ChatUserSearchProps) =>
                             <div>검색 중 오류가 발생했습니다</div>
                         </div>
                     </div>
-                ) : searchResults.length === 0 && searchTerm.length >= 1 ? (
+                ) : shouldSearch && searchResults.length === 0 && searchTerm.trim().length >= 1 ? (
                     <div className='flex items-center justify-center h-32'>
                         <div className='text-center text-gray-500'>
                             <div className='text-4xl mb-2'>🔍</div>
                             <div>검색 결과가 없습니다</div>
                         </div>
                     </div>
-                ) : searchResults.length === 0 && searchTerm.length < 1 ? (
+                ) : !shouldSearch || searchTerm.trim().length < 1 ? (
                     <div className='flex items-center justify-center h-32'>
                         <div className='text-center text-gray-500'>
                             <div className='text-4xl mb-2'>👤</div>

@@ -44,6 +44,9 @@ interface ChatStore extends ChatState {
     // Connection
     setConnectionStatus: (isConnected: boolean) => void;
 
+    // WebSocket integration
+    webSocketSendMessage?: (receiverId: number, content: string) => void;
+
     // Reset
     reset: () => void;
 }
@@ -134,40 +137,121 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     },
 
     addMessage: (message) => {
-        // conversationId를 찾기 위해 현재 대화 중인 상대를 확인
-        const currentConversation = get().currentConversation;
-        if (!currentConversation) return;
+        // 현재 사용자 ID를 localStorage에서 가져오기
+        const currentUserId = parseInt(localStorage.getItem('user_idx') || '0', 10);
+        if (!currentUserId) return;
 
-        // conversationId를 찾기 위해 conversations에서 매칭되는 대화 찾기
-        const conversations = get().conversations;
-        const conversation = conversations.find(
-            (conv) => conv.other_user_id === currentConversation,
-        );
-        if (!conversation) return;
+        // 메시지의 발신자/수신자 중 현재 사용자가 아닌 상대방 ID 찾기
+        const otherUserId =
+            message.sender_id === currentUserId ? message.receiver_id : message.sender_id;
+
+        // conversations에서 해당 상대방과의 대화 찾기
+        const state = get();
+        let conversation = state.conversations.find((conv) => conv.other_user_id === otherUserId);
+
+        // 대화를 찾지 못한 경우 처리
+        if (!conversation) {
+            // 임시 conversation 생성하여 메시지 저장
+            const tempConversationId = `temp_${otherUserId}`;
+
+            set((currentState) => {
+                const existingMessages = currentState.messages[tempConversationId] || [];
+                const isDuplicate = existingMessages.some(
+                    (existingMsg) =>
+                        existingMsg.message_id === message.message_id ||
+                        (existingMsg.content === message.content &&
+                            existingMsg.sender_id === message.sender_id &&
+                            existingMsg.receiver_id === message.receiver_id &&
+                            Math.abs(
+                                new Date(existingMsg.created_at).getTime() -
+                                    new Date(message.created_at).getTime(),
+                            ) < 5000),
+                );
+
+                if (isDuplicate) {
+                    console.log('Duplicate temp message detected, skipping:', message);
+                    return currentState;
+                }
+
+                return {
+                    messages: {
+                        ...currentState.messages,
+                        [tempConversationId]: [
+                            ...existingMessages,
+                            {
+                                message_id: message.message_id,
+                                sender_id: message.sender_id,
+                                receiver_id: message.receiver_id,
+                                content: message.content,
+                                created_at: message.created_at,
+                                is_read: 0,
+                                sender_name: message.sender_name || '사용자',
+                                sender_profile_img: message.sender_profile_img || '',
+                            },
+                        ],
+                    },
+                };
+            });
+
+            // 백그라운드에서 대화 목록 로드
+            get()
+                .loadConversationsWithUnread(currentUserId)
+                .then(() => {
+                    const updatedState = get();
+                    const foundConversation = updatedState.conversations.find(
+                        (conv) => conv.other_user_id === otherUserId,
+                    );
+
+                    if (foundConversation) {
+                        // 임시 메시지를 정식 conversation으로 이동
+                        const tempMessages = updatedState.messages[tempConversationId] || [];
+                        const realConversationKey = foundConversation.conversation_id.toString();
+
+                        set((state) => {
+                            const newMessages = { ...state.messages };
+                            if (tempMessages.length > 0) {
+                                newMessages[realConversationKey] = [
+                                    ...(newMessages[realConversationKey] || []),
+                                    ...tempMessages,
+                                ];
+                                delete newMessages[tempConversationId];
+                            }
+                            return { messages: newMessages };
+                        });
+                    }
+                });
+            return;
+        }
 
         const conversationKey = conversation.conversation_id.toString();
 
         set((state) => {
-            // 중복 메시지 체크
+            // 중복 메시지 체크 - ID, 내용, 발신자, 수신자로 체크
             const existingMessages = state.messages[conversationKey] || [];
             const isDuplicate = existingMessages.some(
-                (existingMsg) => existingMsg.message_id === message.message_id,
+                (existingMsg) =>
+                    existingMsg.message_id === message.message_id ||
+                    (existingMsg.content === message.content &&
+                        existingMsg.sender_id === message.sender_id &&
+                        existingMsg.receiver_id === message.receiver_id &&
+                        Math.abs(
+                            new Date(existingMsg.created_at).getTime() -
+                                new Date(message.created_at).getTime(),
+                        ) < 5000), // 5초 이내 같은 내용
             );
 
             if (isDuplicate) {
+                console.log('Duplicate message detected, skipping:', message);
                 return state;
             }
 
-            // 현재 대화 상대의 정보를 찾아서 sender 정보 설정
-            const currentUser = state.currentUserInfo;
+            // sender 정보는 웹소켓 메시지에서 제공되는 정보 사용
             const senderName =
                 message.sender_name ||
-                (currentUser && message.sender_id === currentUser.user_id ? currentUser.name : '');
+                (message.sender_id !== currentUserId ? conversation.other_user_name : '나');
             const senderProfileImg =
                 message.sender_profile_img ||
-                (currentUser && message.sender_id === currentUser.user_id
-                    ? currentUser.profile_img
-                    : '');
+                (message.sender_id !== currentUserId ? conversation.other_user_profile_img : '');
 
             return {
                 messages: {
@@ -211,40 +295,62 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
     sendMessage: async (receiverId, content) => {
         try {
-            const currentUser = get().currentUserInfo;
-            if (!currentUser) {
-                throw new Error('사용자 정보가 없습니다.');
+            // localStorage에서 현재 사용자 ID 가져오기
+            const currentUserId = parseInt(localStorage.getItem('user_idx') || '0', 10);
+            const webSocketSendMessage = get().webSocketSendMessage;
+
+            if (!currentUserId) {
+                throw new Error('로그인이 필요합니다.');
             }
 
-            const result = await sendMessageApi(currentUser.user_id, receiverId, content);
+            console.log('🚀 [STORE] sendMessage 시작:', {
+                senderId: currentUserId,
+                receiverId,
+                content,
+                timestamp: new Date().toISOString(),
+            });
 
-            // 메시지가 성공적으로 전송되면 로컬에 추가
-            const message: WebSocketMessage = {
+            // 1. 먼저 API를 통해 메시지를 DB에 저장
+            console.log('📡 [STORE] API 호출 시작 - sendMessageApi');
+            const result = await sendMessageApi(currentUserId, receiverId, content);
+            console.log('✅ [STORE] API 호출 완료 - sendMessageApi:', result);
+
+            // 2. 임시 메시지를 로컬에 즉시 추가 (UI 즉시 반영)
+            console.log('💾 [STORE] 로컬 메시지 추가 시작');
+            const tempMessage: WebSocketMessage = {
                 message_id: result.messageId,
-                sender_id: currentUser.user_id,
+                sender_id: currentUserId,
                 receiver_id: receiverId,
                 content,
                 created_at: new Date().toISOString(),
-                sender_name: currentUser.name,
-                sender_profile_img: currentUser.profile_img,
+                sender_name: '나', // 현재 사용자는 '나'로 표시
+                sender_profile_img: '', // 프로필 이미지는 나중에 설정
             };
 
-            get().addMessage(message);
+            get().addMessage(tempMessage);
+            console.log('✅ [STORE] 로컬 메시지 추가 완료');
 
-            // 새 채팅방이 생성된 경우에만 대화목록 갱신
-            // (conversationId가 새로 생성되었는지 확인)
+            // 3. WebSocket을 통해 실시간 전송 (상대방에게 알림)
+            if (webSocketSendMessage) {
+                console.log('🌐 [STORE] WebSocket 전송 시작');
+                webSocketSendMessage(receiverId, content);
+                console.log('✅ [STORE] WebSocket 전송 완료');
+            } else {
+                console.log('⚠️ [STORE] WebSocket 함수가 없음');
+            }
+
+            // 4. 새 채팅방이 생성된 경우 대화목록 갱신
             if (result.conversationId && result.conversationId > 0) {
-                // 기존 대화인지 확인
                 const existingConversation = get().conversations.find(
                     (conv) => conv.conversation_id === result.conversationId,
                 );
 
                 if (!existingConversation) {
-                    // 새 채팅방이면 대화목록 갱신
-                    await get().loadConversationsWithUnread(currentUser.user_id);
+                    await get().loadConversationsWithUnread(currentUserId);
                 }
             }
         } catch (error) {
+            console.error('Message send error:', error);
             throw error;
         }
     },

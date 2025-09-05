@@ -34,7 +34,7 @@ export const ChatWindow = ({ userId }: ChatWindowProps) => {
     }, [isOpen, userId, loadConversationsWithUnread]);
 
     const handleConversationSelect = async (otherUserId: number, userInfo?: ChatUser) => {
-        // 사용자 정보 저장
+        // 대화 상대방 정보 저장
         if (userInfo) {
             setCurrentUserInfo(userInfo);
         }
