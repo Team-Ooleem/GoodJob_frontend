@@ -1,0 +1,12 @@
+'use client';
+
+import { ChatWidget } from '@/components/chat';
+
+export default function UserLayout({ children }: { children: React.ReactNode }) {
+    return (
+        <div className='min-h-screen bg-gray-50'>
+            {children}
+            <ChatWidget />
+        </div>
+    );
+}
