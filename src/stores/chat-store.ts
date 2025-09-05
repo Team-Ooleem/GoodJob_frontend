@@ -47,6 +47,9 @@ interface ChatStore extends ChatState {
     // WebSocket integration
     webSocketSendMessage?: (receiverId: number, content: string) => void;
 
+    // Direct chat functions
+    startChatWithUser: (userInfo: ChatUser) => void;
+
     // Reset
     reset: () => void;
 }
@@ -386,6 +389,29 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     // Connection
     setConnectionStatus: (isConnected) => {
         set({ isConnected });
+    },
+
+    // Direct chat functions
+    startChatWithUser: (userInfo) => {
+        // 채팅창 열기
+        set({ isOpen: true });
+
+        // 현재 대화 상대 설정
+        set({ currentConversation: userInfo.user_id });
+
+        // 사용자 정보 설정
+        set({ currentUserInfo: userInfo });
+
+        // 현재 사용자 ID 가져오기
+        const currentUserId = parseInt(localStorage.getItem('user_idx') || '0', 10);
+
+        if (currentUserId) {
+            // 해당 사용자와의 메시지 로드
+            get().loadMessagesByUsers(currentUserId, userInfo.user_id);
+
+            // 대화 목록도 갱신
+            get().loadConversationsWithUnread(currentUserId);
+        }
     },
 
     // Reset
