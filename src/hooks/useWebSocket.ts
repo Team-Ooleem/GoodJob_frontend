@@ -36,6 +36,7 @@ export const useWebSocket = ({
                 reconnectionAttempts: 3, // 재연결 시도 횟수 제한
                 reconnectionDelay: 2000, // 재연결 지연 시간 증가
                 reconnectionDelayMax: 10000, // 최대 재연결 지연 시간
+                auth: { userId }, // 사용자 ID 전달
             });
 
             socketRef.current = socket;
@@ -43,6 +44,11 @@ export const useWebSocket = ({
             socket.on('connect', () => {
                 onConnectionStatusChange(true);
                 reconnectAttempts.current = 0;
+
+                // 연결 시 사용자 등록
+                if (userId) {
+                    socket.emit('register_user', { userId });
+                }
             });
 
             // 메시지 수신 (다른 사용자로부터)
@@ -154,7 +160,15 @@ export const useWebSocket = ({
         return () => {
             disconnect();
         };
-    }, [userId]); // connect, disconnect 의존성 제거
+    }, [userId, connect, disconnect]);
+
+    // 웹소켓 연결 후 사용자 등록
+    useEffect(() => {
+        if (socketRef.current?.connected && userId) {
+            // 서버에 사용자 ID 등록
+            socketRef.current.emit('register_user', { userId });
+        }
+    }, [userId]);
 
     return {
         sendMessage,
