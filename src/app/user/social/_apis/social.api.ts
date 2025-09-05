@@ -26,7 +26,7 @@ export interface UserProfileInfo {
     // 희망 정보
     desiredJobTitle?: string;
     desiredLocation?: string;
-    desiredSalary?: number;
+    desiredSalary?: string;
 
     // 소셜 정보
     followerCount: number;
