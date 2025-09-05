@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button, Card, Spin, message, Typography, Space, Alert } from 'antd';
 import { FolderOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { getJobCategories, getJobRoles } from '@/apis/job-api';
@@ -9,6 +10,7 @@ import { JobCategory, JobRole } from '@/types/types';
 const { Title, Text } = Typography;
 
 export default function JobSelectionPage() {
+    const router = useRouter();
     const [categories, setCategories] = useState<JobCategory[]>([]);
     const [roles, setRoles] = useState<JobRole[]>([]);
     const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
@@ -80,7 +82,8 @@ export default function JobSelectionPage() {
         const selectedRoleName = roles.find((role) => role.id === selectedRole)?.name;
 
         message.success(`선택 완료: ${selectedCategoryName} - ${selectedRoleName}`);
-        // TODO: 다음 단계로 이동하는 로직 구현
+        // 희망 근무지 선택 페이지로 이동
+        router.push('/location-selection');
     };
 
     const handlePrevious = () => {

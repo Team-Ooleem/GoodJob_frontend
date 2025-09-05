@@ -40,3 +40,96 @@ export interface ApiErrorResponse {
     };
 }
 // =============Job Types=============
+
+// =============Location Types=============
+export interface Sido {
+    sido_code: string;
+    sido_name: string;
+}
+
+export interface Gu {
+    gu_code: string;
+    gu_name: string;
+}
+
+export interface SidoResponse {
+    success: boolean;
+    data: {
+        sido: Sido[];
+    };
+}
+
+export interface GuResponse {
+    success: boolean;
+    data: {
+        gu: Gu[];
+    };
+}
+
+export interface LocationGroup {
+    sido_code: string;
+    sido_name: string;
+    gu: Gu[];
+}
+
+export interface AllLocationsResponse {
+    success: boolean;
+    data: {
+        locations: LocationGroup[];
+    };
+}
+// =============Location Types=============
+
+// =============Salary Types=============
+export interface SalaryRange {
+    id: number;
+    min_salary: number | null;
+    max_salary: number | null;
+    display_text: string;
+}
+
+export interface SalaryRangesResponse {
+    success: boolean;
+    data: {
+        salary_ranges: SalaryRange[];
+    };
+}
+
+export interface SalaryRangeResponse {
+    success: boolean;
+    data: {
+        salary_range: SalaryRange;
+    };
+}
+
+export interface SalarySearchResponse {
+    success: boolean;
+    data: {
+        salary_ranges: SalaryRange[];
+    };
+}
+// =============Salary Types=============
+
+// =============Profile Types=============
+export interface Profile {
+    short_bio: string;
+    bio: string;
+}
+
+export interface ProfileResponse {
+    success: boolean;
+    data: {
+        profile: Profile;
+    };
+}
+
+export interface ProfileUpdateRequest {
+    short_bio: string;
+    bio: string;
+}
+
+export interface ProfileUpdateResponse {
+    success: boolean;
+    message?: string;
+}
+// =============Profile Types=============
