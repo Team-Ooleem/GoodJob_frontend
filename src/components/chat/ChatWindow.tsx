@@ -33,6 +33,13 @@ export const ChatWindow = ({ userId }: ChatWindowProps) => {
         }
     }, [isOpen, userId, loadConversationsWithUnread]);
 
+    // currentConversation이 설정되면 메시지 탭으로 자동 이동
+    useEffect(() => {
+        if (currentConversation) {
+            setActiveTab('messages');
+        }
+    }, [currentConversation]);
+
     const handleConversationSelect = async (otherUserId: number, userInfo?: ChatUser) => {
         // 대화 상대방 정보 저장
         if (userInfo) {
@@ -58,7 +65,7 @@ export const ChatWindow = ({ userId }: ChatWindowProps) => {
 
     return (
         <div
-            className={`fixed bottom-6 right-6 z-40 w-96 h-[700px] transition-all duration-300 ease-in-out transform ${
+            className={`fixed bottom-6 right-20 z-40 w-96 h-[700px] transition-all duration-300 ease-in-out transform ${
                 isOpen ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'
             }`}
         >

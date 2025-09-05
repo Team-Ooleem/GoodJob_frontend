@@ -2,29 +2,21 @@
 
 import { Avatar, Card, Typography, Divider, Spin, Button } from 'antd';
 import { UserOutlined, EnvironmentOutlined, TeamOutlined } from '@ant-design/icons';
-import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSocialProfile } from '../_hooks';
 
 const { Text, Title } = Typography;
 
-export default function ProfileSection() {
-    const router = useRouter();
-    const [currentUserId, setCurrentUserId] = useState<string>('');
+interface ProfileSectionProps {
+    currentUserId: number;
+}
 
-    // localStorage에서 user_idx 가져오기
-    useEffect(() => {
-        const userId = localStorage.getItem('user_idx');
-        if (userId) {
-            setCurrentUserId(userId);
-        }
-    }, []);
+export default function ProfileSection({ currentUserId }: ProfileSectionProps) {
+    const router = useRouter();
 
     // 내 프로필 클릭 핸들러
     const handleMyProfileClick = () => {
-        if (currentUserId) {
-            router.push(`/user/social/profile/${currentUserId}`);
-        }
+        router.push(`/user/social/profile/${currentUserId}`);
     };
 
     // 사용자 프로필 데이터 가져오기
@@ -32,7 +24,7 @@ export default function ProfileSection() {
         data: profile,
         isLoading: profileLoading,
         error: profileError,
-    } = useSocialProfile(currentUserId);
+    } = useSocialProfile(currentUserId.toString());
 
     // 로딩 상태 처리
     if (profileLoading) {

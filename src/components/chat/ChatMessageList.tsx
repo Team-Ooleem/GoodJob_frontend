@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { SendOutlined, ArrowLeftOutlined, UserOutlined } from '@ant-design/icons';
+import { SendOutlined, ArrowLeftOutlined, UserOutlined, FileTextOutlined } from '@ant-design/icons';
 import { useChatStore } from '@/stores/chat-store';
 import { ChatMessage } from '@/types/chat';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import { Button, message as antdMessage } from 'antd';
+import { useCoachingResume } from '@/hooks/useCoachingResume';
 
 interface ChatMessageListProps {
     userId: number;
@@ -34,6 +36,8 @@ export const ChatMessageList = ({
         markConversationAsRead,
         sendMessage: sendMessageToStore,
     } = useChatStore();
+
+    const { createCoachingCanvas } = useCoachingResume();
 
     // 현재 대화의 conversationId 찾기
     const currentConversation = conversations.find((conv) => conv.other_user_id === otherUserId);
@@ -83,20 +87,8 @@ export const ChatMessageList = ({
 
         const messageContent = message.trim();
 
-        console.log('🎯 [COMPONENT] handleSendMessage 시작:', {
-            messageContent,
-            otherUserId,
-            isConnected,
-            timestamp: new Date().toISOString(),
-        });
-
         if (!isConnected) {
             alert('연결이 끊어졌습니다. 다시 시도해주세요.');
-            return;
-        }
-
-        if (typeof sendMessageToStore !== 'function') {
-            alert('메시지 전송 기능을 사용할 수 없습니다.');
             return;
         }
 
@@ -104,10 +96,8 @@ export const ChatMessageList = ({
         setIsLoading(true);
 
         try {
-            console.log('📤 [COMPONENT] sendMessageToStore 호출 시작');
             // API를 통해 메시지 전송
             await sendMessageToStore(otherUserId, messageContent);
-            console.log('✅ [COMPONENT] sendMessageToStore 호출 완료');
         } catch (error) {
             console.error('❌ [COMPONENT] sendMessageToStore 에러:', error);
             alert('메시지 전송에 실패했습니다.');
@@ -121,6 +111,81 @@ export const ChatMessageList = ({
             e.preventDefault();
             handleSendMessage();
         }
+    };
+
+    // 이력서 코칭 요청 함수
+    const handleCoachingRequest = () => {
+        createCoachingCanvas.mutate(
+            {
+                name: '이력서 코칭',
+                participantId: otherUserId,
+            },
+            {
+                onSuccess: async (response) => {
+                    // 성공 시 메시지로 링크 전송
+                    const coachingUrl = `${window.location.origin}/coaching-resume/${response.id}`;
+                    const coachingMessage = `📝 이력서 코칭에 참여하시겠습니까?\n\n링크: ${coachingUrl}`;
+
+                    await sendMessageToStore(otherUserId, coachingMessage);
+                    antdMessage.success('이력서 코칭 요청을 전송했습니다.');
+                },
+                onError: (error) => {
+                    console.error('이력서 코칭 요청 실패:', error);
+                    antdMessage.error('이력서 코칭 요청에 실패했습니다.');
+                },
+            },
+        );
+    };
+
+    // 이력서 코칭 메시지인지 확인하는 함수
+    const isCoachingMessage = (msg: ChatMessage) => {
+        return (
+            msg.content.includes('📝 이력서 코칭에 참여하시겠습니까?') &&
+            msg.content.includes('링크:')
+        );
+    };
+
+    // 이력서 코칭 메시지에서 정보 추출하는 함수
+    const extractCoachingInfo = (msg: ChatMessage) => {
+        const lines = msg.content.split('\n');
+        const linkLine =
+            lines
+                .find((line) => line.startsWith('링크:'))
+                ?.replace('링크:', '')
+                .trim() || '';
+        const sessionId = linkLine.split('/').pop() || '';
+
+        return { sessionId, link: linkLine };
+    };
+
+    // 이력서 코칭 메시지 렌더링 함수
+    const renderCoachingMessage = (msg: ChatMessage) => {
+        const { sessionId, link } = extractCoachingInfo(msg);
+
+        return (
+            <a
+                href={link}
+                target='_blank'
+                rel='noopener noreferrer'
+                className='block max-w-sm bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow'
+            >
+                <div className='p-4'>
+                    <div className='flex items-start gap-3'>
+                        <div className='w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0'>
+                            <FileTextOutlined className='text-blue-600 text-xl' />
+                        </div>
+                        <div className='flex-1 min-w-0'>
+                            <h4 className='font-semibold text-gray-900 text-sm mb-1'>
+                                이력서 코칭에 참여하시겠습니까?
+                            </h4>
+                            <div className='flex items-center text-xs text-blue-600'>
+                                <span>coaching-resume.com</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        );
     };
 
     // 공통 입력 폼 컴포넌트
@@ -159,25 +224,39 @@ export const ChatMessageList = ({
     return (
         <div className='h-full flex flex-col'>
             {/* 헤더 */}
-            <div className='flex items-center gap-2 p-4 border-b border-gray-100 flex-shrink-0'>
-                <button
-                    onClick={onBack}
-                    className='p-1 hover:bg-gray-100 rounded transition-colors'
-                >
-                    <ArrowLeftOutlined className='text-gray-500' />
-                </button>
-                <div className='w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden'>
-                    {otherUserProfileImg ? (
-                        <img
-                            src={otherUserProfileImg}
-                            alt={otherUserName}
-                            className='w-full h-full object-cover'
-                        />
-                    ) : (
-                        <UserOutlined className='text-gray-400' />
-                    )}
+            <div className='flex items-center justify-between p-4 border-b border-gray-100 flex-shrink-0'>
+                <div className='flex items-center gap-2'>
+                    <button
+                        onClick={onBack}
+                        className='p-1 hover:bg-gray-100 rounded transition-colors'
+                    >
+                        <ArrowLeftOutlined className='text-gray-500' />
+                    </button>
+                    <div className='w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden'>
+                        {otherUserProfileImg ? (
+                            <img
+                                src={otherUserProfileImg}
+                                alt={otherUserName}
+                                className='w-full h-full object-cover'
+                            />
+                        ) : (
+                            <UserOutlined className='text-gray-400' />
+                        )}
+                    </div>
+                    <span className='font-medium'>{otherUserName}</span>
                 </div>
-                <span className='font-medium'>{otherUserName}</span>
+
+                {/* 이력서 코칭 요청 버튼 */}
+                <Button
+                    type='primary'
+                    size='small'
+                    icon={<FileTextOutlined />}
+                    onClick={handleCoachingRequest}
+                    loading={createCoachingCanvas.isPending}
+                    className='flex items-center gap-1 bg-green-500 hover:bg-green-600 border-green-500 hover:border-green-600'
+                >
+                    이력서 코칭 요청
+                </Button>
             </div>
 
             {/* 메시지 영역 */}
@@ -193,6 +272,8 @@ export const ChatMessageList = ({
                     <div className='space-y-4'>
                         {conversationMessages.map((msg) => {
                             const isOwnMessage = msg.sender_id === userId;
+                            const isCoaching = isCoachingMessage(msg);
+
                             return (
                                 <div
                                     key={msg.message_id}
@@ -217,23 +298,27 @@ export const ChatMessageList = ({
                                         <div
                                             className={`flex flex-col ${isOwnMessage ? 'items-end' : 'items-start'}`}
                                         >
-                                            <div
-                                                className={`px-3 py-2 rounded-lg ${
-                                                    isOwnMessage
-                                                        ? 'bg-blue-500 text-white'
-                                                        : 'bg-gray-100 text-gray-900'
-                                                }`}
-                                            >
-                                                <span
-                                                    className={
+                                            {isCoaching ? (
+                                                renderCoachingMessage(msg)
+                                            ) : (
+                                                <div
+                                                    className={`px-3 py-2 rounded-lg ${
                                                         isOwnMessage
-                                                            ? 'text-white'
-                                                            : 'text-gray-900'
-                                                    }
+                                                            ? 'bg-blue-500 text-white'
+                                                            : 'bg-gray-100 text-gray-900'
+                                                    }`}
                                                 >
-                                                    {msg.content}
-                                                </span>
-                                            </div>
+                                                    <span
+                                                        className={
+                                                            isOwnMessage
+                                                                ? 'text-white'
+                                                                : 'text-gray-900'
+                                                        }
+                                                    >
+                                                        {msg.content}
+                                                    </span>
+                                                </div>
+                                            )}
                                             <span className='text-xs text-gray-500 mt-1'>
                                                 {format(new Date(msg.created_at), 'HH:mm', {
                                                     locale: ko,
