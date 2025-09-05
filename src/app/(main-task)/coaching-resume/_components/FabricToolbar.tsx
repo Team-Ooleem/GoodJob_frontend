@@ -5,10 +5,14 @@ import { Flex, Button } from 'antd';
 // local stores
 import { useCanvasStore } from '../_stores';
 
+// local hooks
+import { useVoiceRecorder } from '../_hooks';
+
 export function FabricToolbar() {
     const isDrawingMode = useCanvasStore((store) => store.isDrawingMode);
     const setDrawingMode = useCanvasStore((store) => store.setDrawingMode);
     const hasCanvas = useCanvasStore((store) => !!store.canvasInstance);
+    const { isRecordingRef, handleRecord } = useVoiceRecorder();
 
     // TODO: 툴바 버튼 컴포넌트 분리 및 스타일링 필요
     return (
@@ -31,6 +35,9 @@ export function FabricToolbar() {
                 onClick={() => setDrawingMode(true)}
             >
                 펜
+            </Button>
+            <Button type='default' onClick={handleRecord}>
+                {isRecordingRef.current ? '녹음 중' : '녹음'}
             </Button>
         </Flex>
     );
