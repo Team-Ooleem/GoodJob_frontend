@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Webcam, WebcamHandle, Question, Avatar } from '../_components';
 import { message } from 'antd';
 import { useInterviewAnalysis } from '@/hooks/use-interview-analysis';
+import { blobToBase64, resampleTo16kHzMonoWav } from '@/utils/audio';
 import axios from 'axios';
 
 // ===== 추가: WAV 레코더 유틸 =====
@@ -14,16 +15,22 @@ class WavRecorder {
     private processor: ScriptProcessorNode | null = null;
     private buffers: Float32Array[] = [];
     private recording = false;
+    private stopped = false; // ⬅️ 추가: 중복 stop 방지 플래그
 
     async start() {
+        // 이미 켜져있다면 무시 (혹은 먼저 stop() 호출)
+        if (this.recording) return;
         this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         this.audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
         this.source = this.audioCtx.createMediaStreamSource(this.stream);
         this.processor = this.audioCtx.createScriptProcessor(4096, 1, 1);
         this.source.connect(this.processor);
+        // ScriptProcessor는 destination에 연결해야 onaudioprocess가 트리거됨
         this.processor.connect(this.audioCtx.destination);
+
         this.buffers = [];
         this.recording = true;
+        this.stopped = false;
 
         this.processor.onaudioprocess = (e) => {
             if (!this.recording) return;
@@ -33,15 +40,47 @@ class WavRecorder {
     }
 
     async stop(): Promise<Blob> {
+        // ⬇️ 중복 호출 방지
+        if (this.stopped) {
+            // 이미 만들어둔 마지막 WAV가 없다면 최소한의 빈 WAV라도 반환
+            return this.encodeWAV(new Float32Array(0), this.audioCtx?.sampleRate || 44100);
+        }
+        this.stopped = true;
         this.recording = false;
-        if (this.processor) this.processor.disconnect();
-        if (this.source) this.source.disconnect();
-        if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
+
+        // 안전하게 끊기
+        try {
+            if (this.processor) this.processor.onaudioprocess = null;
+        } catch {}
+        try {
+            if (this.processor) this.processor.disconnect();
+        } catch {}
+        try {
+            if (this.source) this.source.disconnect();
+        } catch {}
+        try {
+            if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
+        } catch {}
 
         const sr = this.audioCtx?.sampleRate || 44100;
         const samples = this.merge(this.buffers);
         const wav = this.encodeWAV(samples, sr);
-        if (this.audioCtx) await this.audioCtx.close();
+
+        // AudioContext 닫기 (닫힌 상태면 skip)
+        try {
+            if (this.audioCtx && this.audioCtx.state !== 'closed') {
+                await this.audioCtx.close();
+            }
+        } catch {
+            // InvalidStateError 등은 무시
+        } finally {
+            this.audioCtx = null;
+            this.stream = null;
+            this.source = null;
+            this.processor = null;
+            this.buffers = [];
+        }
+
         return wav;
     }
 
@@ -168,6 +207,33 @@ export default function AiInterviewSessionsPage() {
     // react-query hook
     const interviewAnalysisMutation = useInterviewAnalysis();
 
+    const completingRef = useRef(false); // ⬅️ 완료 처리 중인지
+    const [isCompleting, setIsCompleting] = useState(false); // (선택) UI에서 버튼 비활성화 등에 사용
+
+    // 기존: Web Speech API 사용 여부 플래그 (원하면 true 유지)
+    const USE_LOCAL_INTERIM_CAPTIONS = true;
+
+    const STT_API_BASE = `${process.env.NEXT_PUBLIC_API_BASE_URL}/stt`; // 예: https://api.example.com/stt
+
+    async function transcribeWithGoogleSTT(wavBlob: Blob): Promise<string> {
+        if (!STT_API_BASE) throw new Error('NEXT_PUBLIC_STT_API_BASE_URL 미설정');
+        // (권장) 16kHz 리샘플 후 전송 — 이미 구현해둔 함수 재사용
+        const wav16k = await resampleTo16kHzMonoWav(wavBlob);
+
+        const form = new FormData();
+        form.append('file', wav16k, 'answer.wav'); // 필드명은 서버의 FileInterceptor('file')와 동일해야 함
+
+        const res = await axios.post(`${STT_API_BASE}/transcribe-file`, form, {
+            timeout: 120000,
+            // ❗️Content-Type 수동 지정 금지(axios가 boundary 자동 설정)
+            // headers: { 'Content-Type': 'multipart/form-data' }
+        });
+
+        const data = res.data as { success: boolean; result: { transcript: string } };
+        if (!data?.success) throw new Error('STT 실패');
+        return data.result.transcript || '';
+    }
+
     // AI가 말하는 시뮬레이션
     const simulateAISpeaking = (duration: number = 3000) => {
         setIsSpeaking(true);
@@ -207,6 +273,7 @@ export default function AiInterviewSessionsPage() {
 
     // 시간 초과 처리
     const handleTimeUp = () => {
+        if (completingRef.current) return; // ⬅️ 이미 완료 중이면 무시
         stopTimer();
         setIsRecording(false);
         message.warning('시간이 초과되었습니다.');
@@ -407,7 +474,7 @@ ${qaList
 
         try {
             const finalizeRes = await axios.post(
-                `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/metrics/${SESSION_ID}/finalize`,
+                `${process.env.NEXT_PUBLIC_API_BASE_URL}/metrics/${SESSION_ID}/finalize`,
                 {},
                 { timeout: 10000 },
             );
@@ -423,7 +490,7 @@ ${qaList
             }
         } catch (e: any) {
             console.warn('세션 영상 집계 finalize 실패:', {
-                url: `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/metrics/${SESSION_ID}/finalize`,
+                url: `${process.env.NEXT_PUBLIC_API_BASE_URL}/metrics/${SESSION_ID}/finalize`,
                 status: e?.response?.status,
                 data: e?.response?.data,
             });
@@ -540,8 +607,9 @@ ${qaList
         // ▼ 문항 시작: 웹캠에 문항 메타 전달
         webcamRef.current?.startQuestion(qid, { orderNo: currentQuestionIndex + 1, text: qtext });
 
-        // 실제 음성 인식 시작 (기존 설정 유지)
-        startSpeechRecognition();
+        if (USE_LOCAL_INTERIM_CAPTIONS) {
+            startSpeechRecognition(); // 유지 시
+        }
 
         // WAV 레코더 시작
         try {
@@ -557,90 +625,118 @@ ${qaList
     };
 
     // 답변 완료
+    // ↓↓↓ 여기를 통째로 교체
     const handleCompleteAnswer = async () => {
-        stopTimer();
-        setIsRecording(false);
-
-        // 음성 인식 중지
-        stopSpeechRecognition();
-
-        // ▼ 문항 종료: 집계 결과 받기 & 서버로 전송
-        const qid = `q${currentQuestionIndex + 1}`;
-        const agg = webcamRef.current?.endQuestion();
-        if (agg) {
-            try {
-                await axios.post(
-                    `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/metrics/${SESSION_ID}/${qid}/aggregate`,
-                    agg,
-                    { timeout: 10000 },
-                );
-            } catch (e) {
-                console.warn('문항 영상 집계 업로드 실패:', e);
-            }
-        }
-
-        // WAV 정지 → 업로드 분석
-        let audioUrl: string | undefined;
-        let audioFeatures: AudioFeatures | undefined;
+        // 재진입/중복 호출 가드 (타이머 만료와 버튼 클릭이 겹칠 수 있음)
+        if (completingRef.current) return;
+        completingRef.current = true;
 
         try {
-            if (recorderRef.current) {
-                const blob = await recorderRef.current.stop();
-                lastAudioBlobRef.current = blob;
-                audioUrl = URL.createObjectURL(blob);
+            stopTimer();
+            setIsRecording(false);
 
-                // 오디오 분석 서버 호출
-                audioFeatures = await analyzeAudioBlob(blob, `q${currentQuestionIndex + 1}.wav`);
+            // 음성 인식 중지는 실패해도 무시
+            try {
+                if (USE_LOCAL_INTERIM_CAPTIONS) stopSpeechRecognition();
+            } catch {}
+
+            // ▼ 문항 종료: 집계 결과 받기 & 서버로 전송
+            const qid = `q${currentQuestionIndex + 1}`;
+            const agg = webcamRef.current?.endQuestion();
+            if (agg) {
+                try {
+                    await axios.post(
+                        `${process.env.NEXT_PUBLIC_API_BASE_URL}/metrics/${SESSION_ID}/${qid}/aggregate`,
+                        agg,
+                        { timeout: 10000 },
+                    );
+                } catch (e) {
+                    console.warn('문항 영상 집계 업로드 실패:', e);
+                }
             }
-        } catch (e) {
-            console.error('오디오 분석 실패:', e);
-            message.warning('오디오 분석에 실패했어요. 네트워크를 확인해주세요.');
-        } finally {
-            recorderRef.current = null;
-        }
 
-        if (currentSession) {
-            const finalAnswer = transcribedText || `답변 ${currentSession.questionNumber}번 완료`;
+            // WAV 정지 → 업로드/전사
+            let audioUrl: string | undefined;
+            let audioFeatures: AudioFeatures | undefined;
+            let sttTranscript: string | undefined;
 
-            const completedSession = {
-                ...currentSession,
-                answer: finalAnswer,
-                timeSpent: 60 - timeLeft,
-                audioUrl,
-                audioFeatures,
-            };
+            try {
+                // recorder 인스턴스를 지역 변수로 복사하고, 즉시 ref에서 떼어 재사용을 차단
+                const rec = recorderRef.current;
+                recorderRef.current = null;
 
-            setSessions((prev) => [...prev, completedSession]);
+                if (rec) {
+                    const blob = await rec.stop(); // WavRecorder.stop()이 한 번만 호출되도록 보장
+                    lastAudioBlobRef.current = blob;
+                    audioUrl = URL.createObjectURL(blob);
 
-            // 질문-답변 리스트에 추가
-            setQaList((prev) => [
-                ...prev,
-                {
-                    question: currentSession.question,
+                    // (선택) 오디오 분석
+                    try {
+                        audioFeatures = await analyzeAudioBlob(
+                            blob,
+                            `q${currentQuestionIndex + 1}.wav`,
+                        );
+                    } catch (e) {
+                        console.warn('오디오 분석 실패:', e);
+                    }
+
+                    // ✅ Google STT 호출 (최종 답변 확정)
+                    message.loading('구글 STT로 답변을 전사 중...', 0);
+                    try {
+                        // JSON Base64 버전 쓰면 transcribeWithGoogleSTT(blob)
+                        // 멀티파트 파일 업로드 버전이면 transcribeWithGoogleSTT_FileUpload(blob)
+                        sttTranscript = await transcribeWithGoogleSTT(blob);
+                    } finally {
+                        message.destroy(); // 메시지는 finally에서 안전하게 정리
+                    }
+                }
+            } catch (e) {
+                message.destroy();
+                console.error('녹음/전사 처리 실패:', e);
+                message.warning('전사(STT)에 실패했어요. 네트워크를 확인해주세요.');
+            }
+
+            if (currentSession) {
+                // 최종 답변은 STT > 임시 자막 > 기본 문구 순으로 결정
+                const finalAnswer =
+                    (sttTranscript && sttTranscript.trim()) ||
+                    (transcribedText && transcribedText.trim()) ||
+                    `답변 ${currentSession.questionNumber}번 완료`;
+
+                const completedSession = {
+                    ...currentSession,
                     answer: finalAnswer,
-                },
-            ]);
+                    timeSpent: 60 - timeLeft,
+                    audioUrl,
+                    audioFeatures,
+                };
 
-            setCurrentSession(null);
-        }
+                setSessions((prev) => [...prev, completedSession]);
+                setQaList((prev) => [
+                    ...prev,
+                    { question: currentSession.question, answer: finalAnswer },
+                ]);
+                setCurrentSession(null);
+            }
 
-        // 음성 인식 텍스트 초기화
-        setTranscribedText('');
+            setTranscribedText('');
 
-        // 다음 질문으로 이동 또는 면접 완료
-        if (currentQuestionIndex < interviewData.questions.length - 1) {
-            // 일반 질문 완료 - 다음 질문으로 이동
-            setTimeout(() => {
-                setCurrentQuestionIndex((prev) => prev + 1);
-                setTimeLeft(60);
-                simulateAISpeaking(1500);
-            }, 2000);
-        } else {
-            // 마지막 질문 완료 - 면접 완료 처리
-            message.success('모든 답변이 완료되었습니다!');
-            setTimeout(() => {
-                handleInterviewCompletion();
-            }, 2000);
+            // 다음 질문으로 이동 또는 면접 완료
+            if (currentQuestionIndex < interviewData.questions.length - 1) {
+                setTimeout(() => {
+                    setCurrentQuestionIndex((prev) => prev + 1);
+                    setTimeLeft(60);
+                    simulateAISpeaking(1500);
+                }, 1000);
+            } else {
+                message.success('모든 답변이 완료되었습니다!');
+                setTimeout(() => {
+                    handleInterviewCompletion();
+                }, 1000);
+            }
+        } finally {
+            // 재진입 가능 상태로 복구
+            completingRef.current = false;
         }
     };
 
