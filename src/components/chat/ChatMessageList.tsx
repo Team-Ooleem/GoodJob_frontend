@@ -25,6 +25,7 @@ export const ChatMessageList = ({
     const [message, setMessage] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     const {
         messages,
@@ -103,6 +104,10 @@ export const ChatMessageList = ({
             alert('메시지 전송에 실패했습니다.');
         } finally {
             setIsLoading(false);
+            // 메시지 전송 완료 후 입력창에 포커스
+            setTimeout(() => {
+                inputRef.current?.focus();
+            }, 0);
         }
     };
 
@@ -193,6 +198,7 @@ export const ChatMessageList = ({
         <div className='p-4 border-t border-gray-100 flex-shrink-0'>
             <div className='flex gap-2'>
                 <input
+                    ref={inputRef}
                     type='text'
                     placeholder={isConnected ? '메시지를 입력하세요...' : '연결 중...'}
                     value={message}

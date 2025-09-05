@@ -10,9 +10,9 @@ import {
 } from '@ant-design/icons';
 import { UserProfileInfo } from '../../../_apis/social.api';
 import { useFollowMutations } from '../../../_hooks';
-import { useEffect, useState } from 'react';
 import { useChatStore } from '@/stores/chat-store';
 import { ChatUser } from '@/types/chat';
+import { useAuth } from '@/hooks';
 
 const { Text, Title } = Typography;
 
@@ -27,17 +27,10 @@ export default function UserProfileHeader({
     targetUserId,
     onFollowChange,
 }: UserProfileHeaderProps) {
-    const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+    const { user, isAuthenticated } = useAuth();
+    const currentUserId = user?.idx || null;
     const { toggleFollow } = useFollowMutations(currentUserId || 0);
     const { startChatWithUser } = useChatStore();
-
-    // localStorage에서 현재 사용자 ID 가져오기
-    useEffect(() => {
-        const userId = localStorage.getItem('user_idx');
-        if (userId) {
-            setCurrentUserId(parseInt(userId, 10));
-        }
-    }, []);
 
     // 현재 사용자인지 확인
     const isCurrentUserProfile = currentUserId && currentUserId.toString() === targetUserId;
@@ -128,7 +121,7 @@ export default function UserProfileHeader({
                                 </div>
 
                                 {/* 메세지 보내기 버튼 */}
-                                {!isCurrentUserProfile && currentUserId && (
+                                {!isCurrentUserProfile && isAuthenticated && (
                                     <Button
                                         type='primary'
                                         className='bg-blue-500 border-blue-500 text-white hover:bg-white hover:border-blue-500 hover:text-blue-500 transition-all duration-200'
@@ -143,7 +136,7 @@ export default function UserProfileHeader({
                     </div>
 
                     {/* 팔로우 버튼 (본인이 아닌 경우만) */}
-                    {!isCurrentUserProfile && currentUserId && (
+                    {!isCurrentUserProfile && isAuthenticated && (
                         <Button
                             type={isFollowing ? 'default' : 'primary'}
                             className={
