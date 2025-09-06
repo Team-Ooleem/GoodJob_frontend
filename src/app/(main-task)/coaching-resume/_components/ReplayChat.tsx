@@ -72,11 +72,9 @@ export function ReplayChat({ canvasIdx, isOpen, currentUserId }: ReplayChatProps
         const mentorIdx = session.mentor_idx;
         const menteeIdx = session.mentee_idx;
 
-        // Google STT의 speakerTag를 실제 사용자 ID로 변환
-        const speaker0UserId = mentorIdx; // 가정: speakerTag 0이 멘토
-        const speaker1UserId = menteeIdx; // 가정: speakerTag 1이 멘티
-
-        const actualUserId = segment.speakerTag === 0 ? speaker0UserId : speaker1UserId;
+        // 백엔드에서 이미 변환된 speakerTag 사용
+        // speakerTag 0 = 멘토, speakerTag 1 = 멘티
+        const actualUserId = segment.speakerTag === 0 ? mentorIdx : menteeIdx;
 
         // 현재 사용자면 0 (파란색, 오른쪽), 상대방이면 1 (회색, 왼쪽)
         return actualUserId === currentUserId ? 0 : 1;
