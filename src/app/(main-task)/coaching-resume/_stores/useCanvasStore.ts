@@ -25,6 +25,10 @@ type CanvasStoreState = {
     isStickyMode: boolean;
     stickyNoteConfig: StickyNoteConfig;
 
+    // history
+    isLocked: boolean;
+    history: fabric.Object[];
+
     // lifecycle
     setCanvasInstance: (canvas: fabric.Canvas | null) => void;
 
@@ -39,6 +43,12 @@ type CanvasStoreState = {
     setStickyMode: (enabled: boolean) => void;
     addStickyNote: (x: number, y: number, text?: string) => void;
     setStickyNoteConfig: (config: Partial<StickyNoteConfig>) => void;
+
+    // history
+    saveHistory: () => void;
+    addHistory: (poppedObject: fabric.Object) => void;
+    undo: () => void;
+    redo: () => void;
 };
 
 type DrawingBrush = fabric.PencilBrush | fabric.SprayBrush;
@@ -54,6 +64,8 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
         minHeight: 150,
         padding: 10,
     },
+    isLocked: false,
+    history: [],
 
     setStickyNoteConfig: (config) =>
         set((state) => ({
@@ -237,6 +249,44 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
         canvas.getObjects().forEach((object) => canvas.remove(object));
         canvas.discardActiveObject();
         canvas.requestRenderAll();
+    },
+
+    saveHistory: () => {
+        const isLocked = get().isLocked;
+        if (!isLocked) {
+            // setHistory([]);
+            set({ history: [] });
+        }
+        set({ isLocked: false });
+    },
+
+    addHistory: (poppedObject?: fabric.Object) =>
+        set((state) => ({
+            history: poppedObject ? [...state.history, poppedObject] : state.history,
+        })),
+
+    undo: () => {
+        const canvas = get().canvasInstance;
+        if (canvas) {
+            if (canvas._objects.length > 0) {
+                const poppedObject = canvas._objects.pop() as fabric.Object;
+                get().addHistory(poppedObject);
+                canvas.renderAll();
+            }
+        }
+    },
+
+    redo: () => {
+        const canvas = get().canvasInstance;
+        const history = get().history;
+        if (canvas && history) {
+            if (history.length > 0) {
+                set({ isLocked: true });
+                canvas.add(history[history.length - 1]);
+                const newHistory = history.slice(0, -1);
+                set({ history: newHistory });
+            }
+        }
     },
 }));
 

@@ -19,6 +19,8 @@ export const useCanvasShortCut = () => {
     const setBrushOptions = useCanvasStore((store) => store.setBrushOptions);
     const setEraserMode = useCanvasStore((store) => store.setEraserMode);
     const setStickyMode = useCanvasStore((store) => store.setStickyMode);
+    const undo = useCanvasStore((store) => store.undo);
+    const redo = useCanvasStore((store) => store.redo);
     const canvas = useCanvasStore((store) => store.canvasInstance);
 
     useEffect(() => {
@@ -71,6 +73,20 @@ export const useCanvasShortCut = () => {
                 setStickyMode(true);
                 setDrawingMode(false);
                 setEraserMode(false);
+                return;
+            }
+
+            // Ctrl/Cmd + Z → Undo
+            if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ' && !e.shiftKey) {
+                e.preventDefault();
+                undo();
+                return;
+            }
+
+            // Ctrl/Cmd + Shift + Z → Redo
+            if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ' && e.shiftKey) {
+                e.preventDefault();
+                redo();
                 return;
             }
         };
