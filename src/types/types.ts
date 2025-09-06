@@ -32,6 +32,21 @@ export interface JobRolesResponse {
     };
 }
 
+// 사용자 직군/직무 선호도 관련 타입
+export interface UserJobPreference {
+    categoryId: number;
+    roleId: number;
+}
+
+export interface UserJobPreferenceResponse {
+    success: boolean;
+    message: string;
+    data?: {
+        categoryId: number;
+        roleId: number;
+    };
+}
+
 export interface ApiErrorResponse {
     success: false;
     error: {
@@ -78,6 +93,21 @@ export interface AllLocationsResponse {
         locations: LocationGroup[];
     };
 }
+
+// 사용자 희망 근무지 선호도 관련 타입
+export interface UserLocationPreference {
+    sidoCode: string;
+    guCode: string;
+}
+
+export interface UserLocationPreferenceResponse {
+    success: boolean;
+    message: string;
+    data?: {
+        sidoCode: string;
+        guCode: string;
+    };
+}
 // =============Location Types=============
 
 // =============Salary Types=============
@@ -106,6 +136,19 @@ export interface SalarySearchResponse {
     success: boolean;
     data: {
         salary_ranges: SalaryRange[];
+    };
+}
+
+// 사용자 희망 연봉 선호도 관련 타입
+export interface UserSalaryPreference {
+    salaryRangeId: number;
+}
+
+export interface UserSalaryPreferenceResponse {
+    success: boolean;
+    message: string;
+    data?: {
+        salaryRangeId: number;
     };
 }
 // =============Salary Types=============

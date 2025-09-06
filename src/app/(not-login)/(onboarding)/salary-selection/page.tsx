@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Card, Spin, message, Typography, Space, Alert, Select } from 'antd';
 import { DollarOutlined, InfoCircleOutlined } from '@ant-design/icons';
-import { getSalaryRanges } from '@/apis/salary-api';
+import { getSalaryRanges, saveUserSalaryPreference } from '@/apis/salary-api';
 import { SalaryRange } from '@/types/types';
 
 const { Title, Text } = Typography;
@@ -15,6 +15,7 @@ export default function SalarySelectionPage() {
     const [salaryRanges, setSalaryRanges] = useState<SalaryRange[]>([]);
     const [selectedSalary, setSelectedSalary] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
 
     // 연봉 구간 목록 로드
     useEffect(() => {
@@ -40,17 +41,37 @@ export default function SalarySelectionPage() {
         setSelectedSalary(value);
     };
 
-    const handleNext = () => {
+    const handleNext = async () => {
         if (!selectedSalary) {
             message.warning('희망 연봉을 선택해주세요.');
             return;
         }
 
-        const selectedSalaryRange = salaryRanges.find((range) => range.id === selectedSalary);
+        try {
+            setSaving(true);
 
-        message.success(`선택 완료: ${selectedSalaryRange?.display_text}`);
-        // 프로필 입력 페이지로 이동
-        router.push('/profile-input');
+            // 서버에 희망 연봉 선호도 저장
+            const response = await saveUserSalaryPreference({
+                salaryRangeId: selectedSalary,
+            });
+
+            if (response.success) {
+                const selectedSalaryRange = salaryRanges.find(
+                    (range) => range.id === selectedSalary,
+                );
+
+                message.success(`선택 완료: ${selectedSalaryRange?.display_text}`);
+                // 프로필 입력 페이지로 이동
+                router.push('/profile-input');
+            } else {
+                message.error('희망 연봉 선택 저장에 실패했습니다.');
+            }
+        } catch (error) {
+            console.error('Error saving salary preference:', error);
+            message.error('네트워크 연결을 확인해주세요.');
+        } finally {
+            setSaving(false);
+        }
     };
 
     const handlePrevious = () => {
@@ -130,9 +151,10 @@ export default function SalarySelectionPage() {
                         size='large'
                         className='px-8 h-12 bg-green-600 hover:bg-green-700 border-green-600'
                         onClick={handleNext}
-                        disabled={!selectedSalary}
+                        disabled={!selectedSalary || saving}
+                        loading={saving}
                     >
-                        다음
+                        {saving ? '저장 중...' : '다음'}
                     </Button>
                 </div>
             </div>
