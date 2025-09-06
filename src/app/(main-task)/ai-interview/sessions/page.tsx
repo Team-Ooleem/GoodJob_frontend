@@ -6,6 +6,7 @@ import { message } from 'antd';
 import { useInterviewAnalysis } from '@/hooks/use-interview-analysis';
 import { blobToBase64, resampleTo16kHzMonoWav } from '@/utils/audio';
 import axios from 'axios';
+import { api } from '@/apis/api'; // 경로는 실제 위치에 맞게 조정
 
 // ===== 추가: WAV 레코더 유틸 =====
 class WavRecorder {
@@ -196,6 +197,7 @@ export default function AiInterviewSessionsPage() {
     const recognitionRef = useRef<any>(null);
     const completingRef = useRef(false); // 완료 처리 재진입 가드
     const webcamRef = useRef<WebcamHandle>(null);
+    const isSpeakingRef = useRef(false);
 
     // ===== 추가: WAV 레코더 인스턴스 & 최신 오디오 Blob 참조 =====
     const recorderRef = useRef<WavRecorder | null>(null);
@@ -220,28 +222,24 @@ export default function AiInterviewSessionsPage() {
     // react-query hook
     const interviewAnalysisMutation = useInterviewAnalysis();
 
-    const AI_API_BASE = `${process.env.NEXT_PUBLIC_API_BASE_URL}/ai`;
+    // const AI_API_BASE = `${process.env.NEXT_PUBLIC_API_BASE_URL}/ai`;
 
     // ===== API 클라이언트 유틸 =====
     async function fetchFirstQuestion(): Promise<QuestionDto> {
-        if (!AI_API_BASE) throw new Error('NEXT_PUBLIC_API_BASE_URL 미설정');
+        //if (!AI_API_BASE) throw new Error('NEXT_PUBLIC_API_BASE_URL 미설정');
         // 이력서 요약은 로컬/서버 등에서 가져오도록. 없으면 프롬프트용 기본값
         const resumeSummary =
             localStorage.getItem('resumeSummary') ||
             '프론트엔드 경력 3년, Next.js/React, 크래프톤 정글 (부트캠프) 수료, Pintos 운영체제 프로젝트 수행 경험';
-        const res = await axios.post(
-            `${AI_API_BASE}/question`,
-            { resumeSummary },
-            { timeout: 60000 },
-        );
+        const res = await api.post(`ai/question`, { resumeSummary }, { timeout: 60000 });
         const data = res.data as { question: QuestionDto };
         return data.question;
     }
 
     async function fetchFollowup(original: QuestionDto, answer: string): Promise<QuestionDto> {
-        if (!AI_API_BASE) throw new Error('NEXT_PUBLIC_API_BASE_URL 미설정');
-        const res = await axios.post(
-            `${AI_API_BASE}/followups`,
+        //if (!AI_API_BASE) throw new Error('NEXT_PUBLIC_API_BASE_URL 미설정');
+        const res = await api.post(
+            `ai/followups`,
             { originalQuestion: original, answer },
             { timeout: 60000 },
         );
@@ -256,17 +254,17 @@ export default function AiInterviewSessionsPage() {
     // 기존: Web Speech API 사용 여부 플래그 (원하면 true 유지)
     const USE_LOCAL_INTERIM_CAPTIONS = true;
 
-    const STT_API_BASE = `${process.env.NEXT_PUBLIC_API_BASE_URL}/stt`;
+    //const STT_API_BASE = `${process.env.NEXT_PUBLIC_API_BASE_URL}/stt`;
 
     async function transcribeWithGoogleSTT(wavBlob: Blob): Promise<string> {
-        if (!STT_API_BASE) throw new Error('NEXT_PUBLIC_STT_API_BASE_URL 미설정');
+        //if (!STT_API_BASE) throw new Error('NEXT_PUBLIC_STT_API_BASE_URL 미설정');
         // (권장) 16kHz 리샘플 후 전송 — 이미 구현해둔 함수 재사용
         const wav16k = await resampleTo16kHzMonoWav(wavBlob);
 
         const form = new FormData();
         form.append('file', wav16k, 'answer.wav'); // 필드명은 서버의 FileInterceptor('file')와 동일해야 함
 
-        const res = await axios.post(`${STT_API_BASE}/transcribe-file`, form, {
+        const res = await api.post(`/stt/transcribe-file`, form, {
             timeout: 120000,
             // ❗️Content-Type 수동 지정 금지(axios가 boundary 자동 설정)
             // headers: { 'Content-Type': 'multipart/form-data' }
@@ -276,6 +274,73 @@ export default function AiInterviewSessionsPage() {
         if (!data?.success) throw new Error('STT 실패');
         return data.result.transcript || '';
     }
+
+    const synthesizeSpeech = async (text: string): Promise<string> => {
+        //const TTS_API_BASE = `${process.env.NEXT_PUBLIC_API_BASE_URL}/tts`;
+        //if (!TTS_API_BASE) throw new Error('NEXT_PUBLIC_API_BASE_URL 미설정');
+
+        try {
+            const response = await api.post(
+                `tts/synthesize`,
+                {
+                    text: text,
+                    languageCode: 'ko-KR',
+                    voiceName: 'ko-KR-Standard-A',
+                    audioEncoding: 'MP3',
+                },
+                {
+                    timeout: 30000,
+                    responseType: 'blob',
+                },
+            );
+
+            const audioUrl = URL.createObjectURL(response.data);
+            return audioUrl;
+        } catch (error) {
+            console.error('TTS 요청 실패:', error);
+            throw error;
+        }
+    };
+
+    // 실제 TTS로 질문 읽기
+    const speakQuestion = async (questionText: string) => {
+        // 이미 TTS가 진행 중이면 무시
+        if (isSpeakingRef.current) {
+            console.log('TTS가 이미 진행 중입니다. 중복 요청 무시.');
+            return;
+        }
+
+        isSpeakingRef.current = true;
+        setIsSpeaking(true);
+
+        try {
+            const audioUrl = await synthesizeSpeech(questionText);
+
+            const audio = new Audio(audioUrl);
+
+            audio.onended = () => {
+                setIsSpeaking(false);
+                isSpeakingRef.current = false; // 완료 시 플래그 해제
+                URL.revokeObjectURL(audioUrl);
+            };
+
+            audio.onerror = () => {
+                console.error('오디오 재생 실패');
+                setIsSpeaking(false);
+                isSpeakingRef.current = false; // 에러 시 플래그 해제
+                URL.revokeObjectURL(audioUrl);
+            };
+
+            await audio.play();
+        } catch (error) {
+            console.error('TTS 처리 실패:', error);
+            setIsSpeaking(false);
+            isSpeakingRef.current = false; // 에러 시 플래그 해제
+
+            // TTS 실패 시 기존 시뮬레이션으로 폴백
+            simulateAISpeaking(3000);
+        }
+    };
 
     // AI가 말하는 시뮬레이션
     const simulateAISpeaking = (duration: number = 3000) => {
@@ -519,8 +584,8 @@ ${qaList
         localStorage.setItem('interviewAudioOverall', JSON.stringify(audioAgg));
 
         try {
-            const finalizeRes = await axios.post(
-                `${process.env.NEXT_PUBLIC_API_BASE_URL}/metrics/${SESSION_ID}/finalize`,
+            const finalizeRes = await api.post(
+                `/metrics/${SESSION_ID}/finalize`,
                 {},
                 { timeout: 10000 },
             );
@@ -694,11 +759,9 @@ ${qaList
             const agg = webcamRef.current?.endQuestion();
             if (agg) {
                 try {
-                    await axios.post(
-                        `${process.env.NEXT_PUBLIC_API_BASE_URL}/metrics/${SESSION_ID}/${aggQid}/aggregate`,
-                        agg,
-                        { timeout: 10000 },
-                    );
+                    await api.post(`/metrics/${SESSION_ID}/${aggQid}/aggregate`, agg, {
+                        timeout: 10000,
+                    });
                 } catch (e) {
                     console.warn('문항 영상 집계 업로드 실패:', e);
                 }
@@ -732,8 +795,6 @@ ${qaList
                     // ✅ Google STT 호출 (최종 답변 확정)
                     message.loading('구글 STT로 답변을 전사 중...', 0);
                     try {
-                        // JSON Base64 버전 쓰면 transcribeWithGoogleSTT(blob)
-                        // 멀티파트 파일 업로드 버전이면 transcribeWithGoogleSTT_FileUpload(blob)
                         sttTranscript = await transcribeWithGoogleSTT(blob);
                     } finally {
                         message.destroy(); // 메시지는 finally에서 안전하게 정리
@@ -777,6 +838,18 @@ ${qaList
                         message.loading('다음 질문을 생성 중...', 0);
                         const nextQ = await fetchFollowup(original, finalAnswer);
                         setDynamicQuestions((prev) => [...prev, nextQ]);
+
+                        // ✅ 질문 생성 직후 바로 다음 단계 실행
+                        setTimeout(async () => {
+                            setCurrentQuestionIndex((prev) => prev + 1);
+                            setTimeLeft(60);
+                            // nextQ를 직접 사용 (상태 업데이트를 기다리지 않음)
+                            if (nextQ?.text) {
+                                await speakQuestion(nextQ.text);
+                            } else {
+                                simulateAISpeaking(1500);
+                            }
+                        }, 1000);
                     } catch (e) {
                         console.warn('꼬리질문 생성 실패. 더미로 폴백:', e);
                         const fallback: QuestionDto = {
@@ -791,29 +864,32 @@ ${qaList
                                 '이전 답변에서 수치/성과를 확인할 수 있는 사례를 하나 제시해 주세요.',
                         };
                         setDynamicQuestions((prev) => [...prev, fallback]);
+
+                        // ✅ 폴백 질문도 직접 사용
+                        setTimeout(async () => {
+                            setCurrentQuestionIndex((prev) => prev + 1);
+                            setTimeLeft(60);
+                            if (fallback?.text) {
+                                await speakQuestion(fallback.text);
+                            } else {
+                                simulateAISpeaking(1500);
+                            }
+                        }, 1000);
                     } finally {
                         try {
                             message.destroy();
                         } catch {}
                     }
+                } else {
+                    // 마지막 질문인 경우
+                    message.success('모든 답변이 완료되었습니다!');
+                    setTimeout(() => {
+                        handleInterviewCompletion([...sessions, completedSession!]);
+                    }, 1000);
                 }
             }
 
             setTranscribedText('');
-
-            // 다음 질문으로 이동 또는 면접 완료 (동적/고정 문항수 기준)
-            if (currentQuestionIndex < MAX_QUESTIONS - 1) {
-                setTimeout(() => {
-                    setCurrentQuestionIndex((prev) => prev + 1);
-                    setTimeLeft(60);
-                    simulateAISpeaking(1500);
-                }, 1000);
-            } else {
-                message.success('모든 답변이 완료되었습니다!');
-                setTimeout(() => {
-                    handleInterviewCompletion([...sessions, completedSession!]);
-                }, 1000);
-            }
         } finally {
             // 재진입 가능 상태로 복구
             completingRef.current = false;
@@ -842,9 +918,18 @@ ${qaList
             try {
                 const q = await fetchFirstQuestion();
                 setDynamicQuestions([q]);
+
+                // 첫 질문을 TTS로 읽기
+                if (q.text) {
+                    await speakQuestion(q.text);
+                }
             } catch (e) {
                 console.warn('첫 질문 생성 실패. 더미 사용:', e);
+                const fallbackQuestion = interviewData.questions[0];
                 setDynamicQuestions([{ id: 'q1', text: interviewData.questions[0] }]);
+                if (fallbackQuestion) {
+                    await speakQuestion(fallbackQuestion);
+                }
             } finally {
                 simulateAISpeaking(3000);
                 initializeSpeechRecognition();
