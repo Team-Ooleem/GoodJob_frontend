@@ -41,6 +41,7 @@ export function FabricCanvas() {
     });
 
     const setCanvasInstance = useCanvasStore((store) => store.setCanvasInstance);
+    const saveHistory = useCanvasStore((store) => store.saveHistory);
 
     useEffect(() => {
         if (!canvas) {
@@ -48,6 +49,11 @@ export function FabricCanvas() {
         }
 
         setCanvasInstance(canvas);
+
+        // history
+        canvas.on('object:added', saveHistory);
+        canvas.on('object:modified', saveHistory);
+        canvas.on('object:removed', saveHistory);
 
         return () => {
             setCanvasInstance(null);
