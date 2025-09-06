@@ -28,9 +28,9 @@ interface ChatStore extends ChatState {
     // Messages
     loadMessages: (conversationId: number) => Promise<void>;
     loadMessagesByUsers: (userId: number, otherUserId: number) => Promise<void>;
-    addMessage: (message: WebSocketMessage) => void;
+    addMessage: (message: WebSocketMessage, currentUserId: number) => void;
     markConversationAsRead: (userId: number, otherUserId: number) => Promise<void>;
-    sendMessage: (receiverId: number, content: string) => Promise<void>;
+    sendMessage: (receiverId: number, content: string, currentUserId: number) => Promise<void>;
 
     // Users
     searchUsers: (name: string, excludeUserId: number) => Promise<ChatUser[]>;
@@ -48,7 +48,7 @@ interface ChatStore extends ChatState {
     webSocketSendMessage?: (receiverId: number, content: string) => void;
 
     // Direct chat functions
-    startChatWithUser: (userInfo: ChatUser) => void;
+    startChatWithUser: (userInfo: ChatUser, currentUserId: number) => void;
 
     // Reset
     reset: () => void;
@@ -139,14 +139,13 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         }
     },
 
-    addMessage: (message) => {
+    addMessage: (message, currentUserId) => {
         console.log('📥 [STORE] addMessage 시작:', {
             message,
+            currentUserId,
             timestamp: new Date().toISOString(),
         });
 
-        // 현재 사용자 ID를 localStorage에서 가져오기
-        const currentUserId = parseInt(localStorage.getItem('user_idx') || '0', 10);
         if (!currentUserId) {
             console.log('❌ [STORE] addMessage 실패 - currentUserId 없음');
             return;
@@ -305,10 +304,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         }
     },
 
-    sendMessage: async (receiverId, content) => {
+    sendMessage: async (receiverId, content, currentUserId) => {
         try {
-            // localStorage에서 현재 사용자 ID 가져오기
-            const currentUserId = parseInt(localStorage.getItem('user_idx') || '0', 10);
             const webSocketSendMessage = get().webSocketSendMessage;
 
             if (!currentUserId) {
@@ -339,7 +336,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
                 sender_profile_img: '', // 프로필 이미지는 나중에 설정
             };
 
-            get().addMessage(tempMessage);
+            get().addMessage(tempMessage, currentUserId);
             console.log('✅ [STORE] 로컬 메시지 추가 완료');
 
             // 3. WebSocket을 통해 실시간 전송 (상대방에게 알림)
@@ -392,7 +389,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     },
 
     // Direct chat functions
-    startChatWithUser: (userInfo) => {
+    startChatWithUser: (userInfo, currentUserId) => {
         // 채팅창 열기
         set({ isOpen: true });
 
@@ -401,9 +398,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
         // 사용자 정보 설정
         set({ currentUserInfo: userInfo });
-
-        // 현재 사용자 ID 가져오기
-        const currentUserId = parseInt(localStorage.getItem('user_idx') || '0', 10);
 
         if (currentUserId) {
             // 해당 사용자와의 메시지 로드
