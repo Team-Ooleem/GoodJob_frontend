@@ -3,7 +3,7 @@ import {
     analyzeInterview,
     InterviewAnalysisRequest,
     InterviewAnalysisResponse,
-} from '../apis/interview-api';
+} from '../apis/(onboarding)/interview-api';
 
 export const useInterviewAnalysis = () => {
     return useMutation<InterviewAnalysisResponse, Error, InterviewAnalysisRequest>({

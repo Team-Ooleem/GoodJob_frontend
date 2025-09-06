@@ -169,6 +169,7 @@ export interface ProfileResponse {
 export interface ProfileUpdateRequest {
     short_bio: string;
     bio: string;
+    profile_img?: string;
 }
 
 export interface ProfileUpdateResponse {
