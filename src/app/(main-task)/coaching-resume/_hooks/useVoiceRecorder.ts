@@ -5,9 +5,13 @@ import axios from 'axios';
 type RecorderOptions = {
     /** 녹음 상태 변경 시 콜백 (true: 녹음 시작, false: 녹음 종료) */
     onRecordingChange?: (isRecording: boolean) => void;
+    canvasIdx: number;
+    mentorId?: number;
+    menteeId?: number;
+    messageId?: number;
 };
 
-export function useVoiceRecorder({ onRecordingChange }: RecorderOptions = {}) {
+export function useVoiceRecorder({ onRecordingChange, canvasIdx }: RecorderOptions) {
     /** 녹음 상태를 Ref로 관리 (useState 없이) */
     const isRecordingRef = useRef(false);
     /** MediaRecorder 인스턴스 */
@@ -46,20 +50,36 @@ export function useVoiceRecorder({ onRecordingChange }: RecorderOptions = {}) {
                 const audioBlob = new Blob(audioChunksRef.current, { type: selectedType });
 
                 try {
-                    // FormData로 STT + DB + S3 서버 전송
-                    const formData = new FormData();
-                    formData.append('audio', audioBlob, 'voice.webm');
+                    // // 1. DB에서 현재 세션의 사용자 정보 조회
+                    // const userResponse = await axios.get(
+                    //     `http://localhost:4000/api/stt/session-users/${canvasIdx}`,
+                    // );
+                    // const { mentor, mentee } = userResponse.data;
+                    // const mentorIdx = mentor.idx;
+                    // const menteeIdx = mentee.idx;
+                    const mentorIdx = 1;
+                    const menteeIdx = 2;
 
-                    // 서버 호출
+                    console.log('사용자 정보 조회:', { mentorIdx, menteeIdx });
+
+                    // 2. Blob을 Base64로 변환
+                    const arrayBuffer = await audioBlob.arrayBuffer();
+                    const base64Data = Buffer.from(arrayBuffer).toString('base64');
+
+                    // 3. STT + DB + S3 서버 전송
                     const sttResponse = await axios.post(
-                        'http://localhost:4000/api/stt/transcribe',
-                        formData,
-                        { headers: { 'Content-Type': 'multipart/form-data' } },
+                        'http://localhost:4000/api/stt/transcribe-with-context',
+                        {
+                            audioData: base64Data,
+                            mimeType: 'audio/webm',
+                            canvasIdx: canvasIdx,
+                            mentorIdx: mentorIdx,
+                            menteeIdx: menteeIdx,
+                        },
                     );
-                    console.log(sttResponse.data.result.transcript);
 
-                    const transcript = sttResponse.data.result?.transcript || ' ';
-                    console.log('STT 결과:', transcript);
+                    console.log('STT 결과:', sttResponse.data);
+                    console.log('DB 저장 완료 - 세션 ID:', sttResponse.data.sttSessionIdx);
                 } catch (err) {
                     console.error('STT 또는 DB 처리 실패', err);
                 }
@@ -78,7 +98,7 @@ export function useVoiceRecorder({ onRecordingChange }: RecorderOptions = {}) {
             isRecordingRef.current = false;
             onRecordingChange?.(false);
         }
-    }, [onRecordingChange]);
+    }, [onRecordingChange, canvasIdx]);
 
     /** 녹음 정지 함수 */
     const stopRecording = useCallback(() => {
