@@ -149,6 +149,8 @@ const interviewData = {
     ],
 };
 
+type QuestionDto = { id: string; text: string };
+
 interface AudioFeatures {
     f0_mean: number;
     f0_std: number;
@@ -184,11 +186,15 @@ export default function AiInterviewSessionsPage() {
     const [detectionHistory, setDetectionHistory] = useState<any[]>([]);
     const [transcribedText, setTranscribedText] = useState('');
     const [qaList, setQaList] = useState<Array<{ question: string; answer: string }>>([]);
+    // 동적 질문 목록 (AI 생성)
+    const [dynamicQuestions, setDynamicQuestions] = useState<QuestionDto[]>([]);
+    // 전체 문항 수(기존 더미와 동일하게 3로 유지; 필요 시 조정)
+    const MAX_QUESTIONS = 3;
 
     const timerRef = useRef<NodeJS.Timeout | null>(null);
     const speakingTimerRef = useRef<NodeJS.Timeout | null>(null);
     const recognitionRef = useRef<any>(null);
-
+    const completingRef = useRef(false); // 완료 처리 재진입 가드
     const webcamRef = useRef<WebcamHandle>(null);
 
     // ===== 추가: WAV 레코더 인스턴스 & 최신 오디오 Blob 참조 =====
@@ -200,20 +206,57 @@ export default function AiInterviewSessionsPage() {
         `sess_${Math.random().toString(36).slice(2, 10)}_${Date.now()}`,
     );
     const SESSION_ID = sessionIdRef.current as any as string;
-    // 질문ID는 q1/q2/... 형태로 쓸게요.
-    const qid = `q${currentQuestionIndex + 1}`;
-    const qtext = interviewData.questions[currentQuestionIndex];
+    // // 질문ID는 q1/q2/... 형태로 쓸게요.
+    // const qid = `q${currentQuestionIndex + 1}`;
+    // const qtext = interviewData.questions[currentQuestionIndex];
+    // 현재 질문(동적). 아직 로딩 전이면 undefined
+    const currentQuestion = dynamicQuestions[currentQuestionIndex];
+    const qtext = currentQuestion?.text ?? interviewData.questions[currentQuestionIndex] ?? '';
+    // 집계/메트릭 전송에는 q1/q2/... (기존 규칙 유지)
+    const aggQid = `q${currentQuestionIndex + 1}`;
+    // 웹캠 startQuestion에는 실제 질문 ID를 전달(없으면 aggQid)
+    const currentQuestionId = currentQuestion?.id ?? aggQid;
 
     // react-query hook
     const interviewAnalysisMutation = useInterviewAnalysis();
 
-    const completingRef = useRef(false); // ⬅️ 완료 처리 중인지
+    const AI_API_BASE = `${process.env.NEXT_PUBLIC_API_BASE_URL}/ai`;
+
+    // ===== API 클라이언트 유틸 =====
+    async function fetchFirstQuestion(): Promise<QuestionDto> {
+        if (!AI_API_BASE) throw new Error('NEXT_PUBLIC_API_BASE_URL 미설정');
+        // 이력서 요약은 로컬/서버 등에서 가져오도록. 없으면 프롬프트용 기본값
+        const resumeSummary =
+            localStorage.getItem('resumeSummary') ||
+            '프론트엔드 경력 3년, Next.js/React, 크래프톤 정글 (부트캠프) 수료, Pintos 운영체제 프로젝트 수행 경험';
+        const res = await axios.post(
+            `${AI_API_BASE}/question`,
+            { resumeSummary },
+            { timeout: 60000 },
+        );
+        const data = res.data as { question: QuestionDto };
+        return data.question;
+    }
+
+    async function fetchFollowup(original: QuestionDto, answer: string): Promise<QuestionDto> {
+        if (!AI_API_BASE) throw new Error('NEXT_PUBLIC_API_BASE_URL 미설정');
+        const res = await axios.post(
+            `${AI_API_BASE}/followups`,
+            { originalQuestion: original, answer },
+            { timeout: 60000 },
+        );
+        const data = res.data as {
+            followups: Array<{ id: string; parentId: string; text: string; reason: string }>;
+        };
+        return { id: data.followups[0].id, text: data.followups[0].text };
+    }
+
     const [isCompleting, setIsCompleting] = useState(false); // (선택) UI에서 버튼 비활성화 등에 사용
 
     // 기존: Web Speech API 사용 여부 플래그 (원하면 true 유지)
     const USE_LOCAL_INTERIM_CAPTIONS = true;
 
-    const STT_API_BASE = `${process.env.NEXT_PUBLIC_API_BASE_URL}/stt`; // 예: https://api.example.com/stt
+    const STT_API_BASE = `${process.env.NEXT_PUBLIC_API_BASE_URL}/stt`;
 
     async function transcribeWithGoogleSTT(wavBlob: Blob): Promise<string> {
         if (!STT_API_BASE) throw new Error('NEXT_PUBLIC_STT_API_BASE_URL 미설정');
@@ -436,16 +479,19 @@ ${qaList
     };
 
     // 면접 완료 처리 (API 호출 포함)
-    const handleInterviewCompletion = async () => {
+    const handleInterviewCompletion = async (finalSessions?: InterviewSession[]) => {
         // 최신 qaList를 가져오기 위해 sessions에서 재구성
-        const latestQAList = sessions.map((session) => ({
+        const sessionsToUse = finalSessions || sessions;
+        const latestQAList = sessionsToUse.map((session) => ({
             question: session.question,
             answer: session.answer,
         }));
 
         // (선택) 오디오 종합 평균 같은 간단 요약 만들기
         const audioAgg = (() => {
-            const feats = sessions.map((s) => s.audioFeatures).filter(Boolean) as AudioFeatures[];
+            const feats = sessionsToUse
+                .map((s) => s.audioFeatures)
+                .filter(Boolean) as AudioFeatures[];
             const mean = (arr: number[]) =>
                 arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
             return {
@@ -462,7 +508,7 @@ ${qaList
         localStorage.setItem(
             'interviewAudioPerQuestion',
             JSON.stringify(
-                sessions.map((s) => ({
+                sessionsToUse.map((s) => ({
                     questionNumber: s.questionNumber,
                     question: s.question,
                     audioFeatures: s.audioFeatures,
@@ -596,7 +642,7 @@ ${qaList
         // 새로운 세션 시작
         const newSession: InterviewSession = {
             questionNumber: currentQuestionIndex + 1,
-            question: interviewData.questions[currentQuestionIndex],
+            question: qtext,
             answer: '',
             timeSpent: 0,
             detectionData: [],
@@ -604,8 +650,11 @@ ${qaList
         };
         setCurrentSession(newSession);
 
-        // ▼ 문항 시작: 웹캠에 문항 메타 전달
-        webcamRef.current?.startQuestion(qid, { orderNo: currentQuestionIndex + 1, text: qtext });
+        // ▼ 문항 시작: 웹캠에 문항 메타 전달 (id는 실제 질문 ID 사용, 없으면 aggQid)
+        webcamRef.current?.startQuestion(currentQuestionId, {
+            orderNo: currentQuestionIndex + 1,
+            text: qtext,
+        });
 
         if (USE_LOCAL_INTERIM_CAPTIONS) {
             startSpeechRecognition(); // 유지 시
@@ -625,11 +674,12 @@ ${qaList
     };
 
     // 답변 완료
-    // ↓↓↓ 여기를 통째로 교체
     const handleCompleteAnswer = async () => {
         // 재진입/중복 호출 가드 (타이머 만료와 버튼 클릭이 겹칠 수 있음)
         if (completingRef.current) return;
         completingRef.current = true;
+
+        let completedSession: InterviewSession | null = null;
 
         try {
             stopTimer();
@@ -641,12 +691,11 @@ ${qaList
             } catch {}
 
             // ▼ 문항 종료: 집계 결과 받기 & 서버로 전송
-            const qid = `q${currentQuestionIndex + 1}`;
             const agg = webcamRef.current?.endQuestion();
             if (agg) {
                 try {
                     await axios.post(
-                        `${process.env.NEXT_PUBLIC_API_BASE_URL}/metrics/${SESSION_ID}/${qid}/aggregate`,
+                        `${process.env.NEXT_PUBLIC_API_BASE_URL}/metrics/${SESSION_ID}/${aggQid}/aggregate`,
                         agg,
                         { timeout: 10000 },
                     );
@@ -703,7 +752,7 @@ ${qaList
                     (transcribedText && transcribedText.trim()) ||
                     `답변 ${currentSession.questionNumber}번 완료`;
 
-                const completedSession = {
+                completedSession = {
                     ...currentSession,
                     answer: finalAnswer,
                     timeSpent: 60 - timeLeft,
@@ -711,18 +760,49 @@ ${qaList
                     audioFeatures,
                 };
 
-                setSessions((prev) => [...prev, completedSession]);
+                setSessions((prev) => [...prev, completedSession!]);
                 setQaList((prev) => [
                     ...prev,
                     { question: currentSession.question, answer: finalAnswer },
                 ]);
                 setCurrentSession(null);
+
+                // ===== 문항 종료 시: STT 답변으로 꼬리질문 생성 =====
+                if (currentQuestionIndex < MAX_QUESTIONS - 1) {
+                    try {
+                        // 현재 질문 객체(동적) 기준
+                        const original: QuestionDto = currentQuestion
+                            ? { id: currentQuestion.id, text: currentQuestion.text }
+                            : { id: aggQid, text: currentSession.question };
+                        message.loading('다음 질문을 생성 중...', 0);
+                        const nextQ = await fetchFollowup(original, finalAnswer);
+                        setDynamicQuestions((prev) => [...prev, nextQ]);
+                    } catch (e) {
+                        console.warn('꼬리질문 생성 실패. 더미로 폴백:', e);
+                        const fallback: QuestionDto = {
+                            id: `fallback_${Date.now()}`,
+                            text:
+                                interviewData.questions[
+                                    Math.min(
+                                        currentQuestionIndex + 1,
+                                        interviewData.questions.length - 1,
+                                    )
+                                ] ||
+                                '이전 답변에서 수치/성과를 확인할 수 있는 사례를 하나 제시해 주세요.',
+                        };
+                        setDynamicQuestions((prev) => [...prev, fallback]);
+                    } finally {
+                        try {
+                            message.destroy();
+                        } catch {}
+                    }
+                }
             }
 
             setTranscribedText('');
 
-            // 다음 질문으로 이동 또는 면접 완료
-            if (currentQuestionIndex < interviewData.questions.length - 1) {
+            // 다음 질문으로 이동 또는 면접 완료 (동적/고정 문항수 기준)
+            if (currentQuestionIndex < MAX_QUESTIONS - 1) {
                 setTimeout(() => {
                     setCurrentQuestionIndex((prev) => prev + 1);
                     setTimeLeft(60);
@@ -731,7 +811,7 @@ ${qaList
             } else {
                 message.success('모든 답변이 완료되었습니다!');
                 setTimeout(() => {
-                    handleInterviewCompletion();
+                    handleInterviewCompletion([...sessions, completedSession!]);
                 }, 1000);
             }
         } finally {
@@ -756,10 +836,21 @@ ${qaList
         }
     };
 
-    // 컴포넌트 마운트 시 AI 인사말 및 Web Speech API 초기화
+    // 마운트 시 "첫 질문" 준비 + 음성 인식 초기화
     useEffect(() => {
-        simulateAISpeaking(3000);
-        initializeSpeechRecognition();
+        (async () => {
+            try {
+                const q = await fetchFirstQuestion();
+                setDynamicQuestions([q]);
+            } catch (e) {
+                console.warn('첫 질문 생성 실패. 더미 사용:', e);
+                setDynamicQuestions([{ id: 'q1', text: interviewData.questions[0] }]);
+            } finally {
+                simulateAISpeaking(3000);
+                initializeSpeechRecognition();
+            }
+        })();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // 컴포넌트 언마운트 시 정리
@@ -791,12 +882,12 @@ ${qaList
                 />
             </div>
 
-            {/* 질문 */}
-            {currentQuestionIndex < interviewData.questions.length && (
+            {/* 질문: 동적 질문이 준비된 경우에만 렌더 */}
+            {currentQuestion && (
                 <Question
-                    question={interviewData.questions[currentQuestionIndex]}
+                    question={qtext}
                     questionNumber={currentQuestionIndex + 1}
-                    totalQuestions={interviewData.questions.length}
+                    totalQuestions={MAX_QUESTIONS}
                     isRecording={isRecording}
                     timeLeft={timeLeft}
                     onStartAnswer={handleStartAnswer}
@@ -808,11 +899,7 @@ ${qaList
             <div className='absolute top-4 left-4 bg-white bg-opacity-90 rounded-lg p-4'>
                 <div className='text-sm text-gray-600'>
                     <div>
-                        진행률:{' '}
-                        {Math.round(
-                            ((currentQuestionIndex + 1) / interviewData.questions.length) * 100,
-                        )}
-                        %
+                        진행률: {Math.round(((currentQuestionIndex + 1) / MAX_QUESTIONS) * 100)}%
                     </div>
                     <div>완료된 질문: {sessions.length}</div>
                     <div>감지된 피드백: {detectionHistory.length}</div>
