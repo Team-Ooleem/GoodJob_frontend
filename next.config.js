@@ -23,12 +23,12 @@ const nextConfig = {
         ];
     },
     // HTTPS 설정
-    server: {
-        https: {
-            key: fs.readFileSync(path.join(__dirname, 'ssl/localhost-key.pem')),
-            cert: fs.readFileSync(path.join(__dirname, 'ssl/localhost.pem')),
-        },
-    },
+    // server: {
+    //     https: {
+    //         key: fs.readFileSync(path.join(__dirname, 'ssl/localhost-key.pem')),
+    //         cert: fs.readFileSync(path.join(__dirname, 'ssl/localhost.pem')),
+    //     },
+    // },
 };
 
 module.exports = nextConfig;
