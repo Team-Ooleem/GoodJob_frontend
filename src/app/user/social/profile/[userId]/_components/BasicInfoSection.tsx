@@ -9,7 +9,6 @@ import {
     RiseOutlined,
 } from '@ant-design/icons';
 import { UserProfileInfo } from '../../../_apis/social.api';
-import { formatSalary } from '@/utils/utils';
 import { PROFILE_SECTIONS } from '../_constants/profile.const';
 
 const { Text } = Typography;
@@ -101,9 +100,7 @@ export default function BasicInfoSection({ userInfo }: BasicInfoSectionProps) {
                             {userInfo?.desiredSalary && (
                                 <div className='flex items-center space-x-2'>
                                     <DollarOutlined className='text-gray-400' />
-                                    <Text className='text-sm'>
-                                        {formatSalary(userInfo?.desiredSalary)}
-                                    </Text>
+                                    <Text className='text-sm'>{userInfo?.desiredSalary}</Text>
                                 </div>
                             )}
                         </div>

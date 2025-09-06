@@ -5,6 +5,12 @@ import { Flex, Button } from 'antd';
 // local stores
 import { useCanvasStore } from '../_stores';
 
+// local hooks
+import { useVoiceRecorder } from '../_hooks';
+
+// local components
+import { ReplayButton } from './ReplayButton';
+
 export function FabricToolbar() {
     const isDrawingMode = useCanvasStore((store) => store.isDrawingMode);
     const setDrawingMode = useCanvasStore((store) => store.setDrawingMode);
@@ -12,6 +18,7 @@ export function FabricToolbar() {
     const hasCanvas = useCanvasStore((store) => !!store.canvasInstance);
     const setEraserMode = useCanvasStore((store) => store.setEraserMode);
     const setStickyMode = useCanvasStore((store) => store.setStickyMode);
+    const { isRecordingRef, handleRecord } = useVoiceRecorder({ canvasIdx: 0 });
 
     // TODO: 툴바 버튼 컴포넌트 분리 및 스타일링 필요
     return (
@@ -55,6 +62,10 @@ export function FabricToolbar() {
             <Button disabled={!hasCanvas} onClick={() => setEraserMode(true)}>
                 지우개
             </Button>
+            <Button type='default' onClick={handleRecord}>
+                {isRecordingRef.current ? '녹음 중' : '녹음'}
+            </Button>
+            <ReplayButton canvasIdx={0} />
         </Flex>
     );
 }

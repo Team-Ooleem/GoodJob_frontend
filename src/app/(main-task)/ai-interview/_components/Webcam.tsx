@@ -1,149 +1,141 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { RealMediaPipeAnalyzer } from './RealMediaPipeAnalyzer';
+import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import { RealMediaPipeAnalyzer, VisualAggregatePayload } from './RealMediaPipeAnalyzer';
 
 interface IWebcam {
     css?: string;
     onDetection?: (data: any) => void;
+    onAggregate?: (agg: VisualAggregatePayload) => void;
 }
 
-export function Webcam({ css, onDetection }: IWebcam) {
+export interface WebcamHandle {
+    startQuestion: (questionId: string, opts?: { orderNo?: number; text?: string }) => void;
+    endQuestion: () => VisualAggregatePayload | null;
+}
+
+export const Webcam = forwardRef<WebcamHandle, IWebcam>(function Webcam(
+    { css, onDetection, onAggregate },
+    ref,
+) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isStreaming, setIsStreaming] = useState(false);
     const [detectionData, setDetectionData] = useState<any>(null);
     const mediaPipeAnalyzerRef = useRef<RealMediaPipeAnalyzer | null>(null);
-    const isInitializedRef = useRef(false); // 초기화 상태 추적
+    const isInitializedRef = useRef(false);
 
-    // MediaPipe 감지 결과 처리 (useCallback으로 메모이제이션)
-    const handleMediaPipeDetection = useCallback((detection: any) => {
-        console.log('🎥 MediaPipe 실시간 감지:', {
-            timestamp: new Date().toISOString(),
-            detection: detection,
-            videoElement: {
-                width: videoRef.current?.videoWidth || 0,
-                height: videoRef.current?.videoHeight || 0,
-                readyState: videoRef.current?.readyState || 0,
-            },
-            streamInfo: {
-                active: videoRef.current?.srcObject ? true : false,
-                tracks: videoRef.current?.srcObject
-                    ? (videoRef.current.srcObject as MediaStream).getTracks().map((track) => ({
-                          kind: track.kind,
-                          label: track.label,
-                          enabled: track.enabled,
-                          readyState: track.readyState,
-                      }))
-                    : [],
-            },
-        });
+    // 1) onDetection을 ref로 보관 → 부모가 함수를 바꿔도 초기화 트리거 안 됨
+    const onDetectionRef = useRef<IWebcam['onDetection']>(onDetection);
+    useEffect(() => {
+        onDetectionRef.current = onDetection;
+    }, [onDetection]);
 
+    // 2) 안정적인 핸들러 (ref를 통해 최신 콜백을 부름)
+    const handleMediaPipeDetection = (detection: any) => {
+        // 로그/표시
         setDetectionData(detection);
-        onDetection?.(detection);
+        onDetectionRef.current?.(detection);
 
-        // 3초 후 감지 데이터 초기화 (MediaPipe 5초 간격과 겹치지 않도록)
-        setTimeout(() => {
-            setDetectionData(null);
-        }, 3000);
-    }, []); // 의존성 배열을 빈 배열로 수정!
+        // 3초 후 오버레이 숨김
+        window.setTimeout(() => setDetectionData(null), 3000);
+    };
 
-    // 웹캠 스트림 시작 (useCallback으로 메모이제이션)
-    const startWebcam = useCallback(async () => {
-        // 이미 초기화되었다면 중복 실행 방지
-        if (isInitializedRef.current) {
-            console.log('⚠️ MediaPipe가 이미 초기화되어 있습니다. 중복 실행을 방지합니다.');
-            return;
-        }
+    // 웹캠/MediaPipe 초기화: 의존성 없이 "한 번"만
+    useEffect(() => {
+        let stopped = false;
 
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    width: { ideal: 640 },
-                    height: { ideal: 480 },
-                },
-                audio: false,
-            });
+        (async () => {
+            if (isInitializedRef.current) return;
 
-            if (videoRef.current) {
-                videoRef.current.srcObject = stream;
-                setIsStreaming(true);
-                isInitializedRef.current = true; // 초기화 완료 표시
-
-                // 웹캠 스트림 시작 정보 콘솔 출력
-                console.log('📹 웹캠 스트림 시작:', {
-                    timestamp: new Date().toISOString(),
-                    streamId: stream.id,
-                    tracks: stream.getTracks().map((track) => ({
-                        kind: track.kind,
-                        label: track.label,
-                        enabled: track.enabled,
-                        readyState: track.readyState,
-                        settings: track.getSettings(),
-                    })),
-                    constraints: {
-                        video: {
-                            width: { ideal: 640 },
-                            height: { ideal: 480 },
-                        },
-                        audio: false,
-                    },
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 640 }, height: { ideal: 480 } },
+                    audio: false,
                 });
+                if (stopped) return;
 
-                // 실제 MediaPipe 분석기 초기화 및 시작
+                const video = videoRef.current;
+                if (!video) return;
+
+                video.srcObject = stream;
+                setIsStreaming(true);
+                isInitializedRef.current = true;
+
                 if (canvasRef.current && !mediaPipeAnalyzerRef.current) {
-                    console.log('🚀 MediaPipe Face Landmarker 초기화 시작...');
                     mediaPipeAnalyzerRef.current = new RealMediaPipeAnalyzer(
                         videoRef,
                         canvasRef,
-                        handleMediaPipeDetection,
+                        handleMediaPipeDetection, // ref 기반이므로 안정적
                     );
 
-                    // 비디오가 로드된 후 분석 시작
-                    videoRef.current.onloadedmetadata = async () => {
-                        if (mediaPipeAnalyzerRef.current) {
-                            await mediaPipeAnalyzerRef.current.startAnalysis();
-                            console.log('✅ MediaPipe Face Landmarker 초기화 완료');
-                        }
+                    // onloadedmetadata는 여러 번 불리지 않도록 단발성 실행
+                    const startOnce = async () => {
+                        // 이미 해제되었으면 무시
+                        if (!mediaPipeAnalyzerRef.current) return;
+                        await mediaPipeAnalyzerRef.current.startAnalysis();
                     };
-                }
-            }
-        } catch (error) {
-            console.error('웹캠 접근 실패:', error);
-            console.error('웹캠에 접근할 수 없습니다.');
-            isInitializedRef.current = false; // 실패 시 초기화 상태 리셋
-        }
-    }, []); // 의존성 배열을 빈 배열로 수정!
 
-    useEffect(() => {
-        startWebcam();
+                    if (video.readyState >= 1 /* HAVE_METADATA */) {
+                        // 이미 메타데이터가 준비된 상태
+                        void startOnce();
+                    } else {
+                        video.onloadedmetadata = () => {
+                            void startOnce();
+                            // 한 번 실행 후 핸들 제거(중복 방지)
+                            video.onloadedmetadata = null;
+                        };
+                    }
+                }
+            } catch (err) {
+                console.error('웹캠 접근 실패:', err);
+                isInitializedRef.current = false;
+            }
+        })();
 
         return () => {
-            console.log('🧹 Webcam 컴포넌트 정리 시작...');
+            // 실제 언마운트에서만 정리
+            stopped = true;
 
-            // MediaPipe 분석기 정리
+            // MediaPipe 정리
             if (mediaPipeAnalyzerRef.current) {
-                console.log('🔄 MediaPipe 분석기 정리 중...');
                 mediaPipeAnalyzerRef.current.dispose();
                 mediaPipeAnalyzerRef.current = null;
             }
 
-            // 웹캠 스트림 정리
-            if (videoRef.current?.srcObject) {
-                const stream = videoRef.current.srcObject as MediaStream;
-                stream.getTracks().forEach((track) => track.stop());
-                console.log('📹 웹캠 스트림 정리 완료');
+            // 스트림 정리
+            const video = videoRef.current;
+            const stream = video?.srcObject as MediaStream | null;
+            if (stream) {
+                stream.getTracks().forEach((t) => t.stop());
             }
 
-            // 초기화 상태 리셋
             isInitializedRef.current = false;
-            console.log('✅ Webcam 컴포넌트 정리 완료');
         };
-    }, []); // 의존성 배열을 빈 배열로 수정!
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // ★ 의존성 비워서 mount/unmount에만 실행
+
+    // 부모에 start/end 핸들 노출
+    useImperativeHandle(
+        ref,
+        () => ({
+            startQuestion: (questionId: string, opts?: { orderNo?: number; text?: string }) => {
+                if (!mediaPipeAnalyzerRef.current) return;
+                mediaPipeAnalyzerRef.current.startQuestion(questionId, opts);
+            },
+            endQuestion: () => {
+                if (!mediaPipeAnalyzerRef.current) return null;
+                const agg = mediaPipeAnalyzerRef.current.endQuestion();
+                onAggregate?.(agg);
+                return agg;
+            },
+        }),
+        [onAggregate],
+    );
 
     return (
         <div className={`text-end ${css}`}>
-            <div className='mt-4 mr-4 w-[384px] h-[216px] rounded-2xl overflow-hidden bg-gray-400'>
+            <div className='mt-4 mr-4 w-[384px] h-[216px] rounded-2xl overflow-hidden bg-gray-400 relative'>
                 <video
                     ref={videoRef}
                     autoPlay
@@ -151,15 +143,11 @@ export function Webcam({ css, onDetection }: IWebcam) {
                     playsInline
                     className='w-full h-full object-cover'
                 />
-
-                {/* MediaPipe 분석용 캔버스 (투명 오버레이) */}
                 <canvas
                     ref={canvasRef}
                     className='absolute top-0 left-0 w-full h-full pointer-events-none'
                     style={{ zIndex: 1 }}
                 />
-
-                {/* 감지 상태 오버레이 */}
                 {detectionData && (
                     <div className='absolute bottom-2 left-2 right-2 z-10'>
                         <div
@@ -190,8 +178,6 @@ export function Webcam({ css, onDetection }: IWebcam) {
                         </div>
                     </div>
                 )}
-
-                {/* 스트리밍 상태 표시 */}
                 {isStreaming && (
                     <div className='absolute top-2 right-2 z-10'>
                         <div className='w-3 h-3 bg-green-500 rounded-full animate-pulse'></div>
@@ -200,4 +186,4 @@ export function Webcam({ css, onDetection }: IWebcam) {
             </div>
         </div>
     );
-}
+});

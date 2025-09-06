@@ -2,6 +2,8 @@ import { Space } from 'antd';
 
 // global components
 import { Header, Footer, JobCardList } from '@/components';
+import { ZustandTest } from '@/components/zustand-test';
+import { ReactQueryTest } from '@/components/react-query-test';
 
 export default function Home() {
     const jobList = [
@@ -48,7 +50,7 @@ export default function Home() {
     ];
 
     return (
-        <>
+        <div>
             <Header />
             <div className='w-full h-[237px] bg-blue-500'></div>
             <div className='max-w-[1400px] w-full mx-auto px-4 md:px-6 pt-32 pb-52'>
@@ -64,6 +66,6 @@ export default function Home() {
                 </Space>
             </div>
             <Footer />
-        </>
+        </div>
     );
 }
