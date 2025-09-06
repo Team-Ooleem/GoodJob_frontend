@@ -66,7 +66,21 @@ export function useVoiceRecorder({ onRecordingChange, canvasIdx }: RecorderOptio
                     const arrayBuffer = await audioBlob.arrayBuffer();
                     const base64Data = Buffer.from(arrayBuffer).toString('base64');
 
-                    // 3. STT + DB + S3 서버 전송
+                    // 3. 오디오 duration 계산
+                    const audioElement = new Audio();
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    audioElement.src = audioUrl;
+
+                    const duration = await new Promise<number>((resolve) => {
+                        audioElement.onloadedmetadata = () => {
+                            resolve(audioElement.duration);
+                            URL.revokeObjectURL(audioUrl);
+                        };
+                    });
+
+                    console.log('오디오 duration:', duration);
+
+                    // 4. STT + DB + S3 서버 전송
                     const sttResponse = await axios.post(
                         'http://localhost:4000/api/stt/transcribe-with-context',
                         {
@@ -75,6 +89,7 @@ export function useVoiceRecorder({ onRecordingChange, canvasIdx }: RecorderOptio
                             canvasIdx: canvasIdx,
                             mentorIdx: mentorIdx,
                             menteeIdx: menteeIdx,
+                            duration: duration, // duration 추가
                         },
                     );
 
