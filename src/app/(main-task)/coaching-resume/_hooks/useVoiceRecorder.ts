@@ -50,11 +50,15 @@ export function useVoiceRecorder({ onRecordingChange, canvasIdx }: RecorderOptio
                 const audioBlob = new Blob(audioChunksRef.current, { type: selectedType });
 
                 try {
-                    // 1. DB에서 현재 세션의 사용자 정보 조회
-                    const userResponse = await axios.get(`/api/stt/session-users/${canvasIdx}`);
-                    const { mentor, mentee } = userResponse.data;
-                    const mentorIdx = mentor.idx;
-                    const menteeIdx = mentee.idx;
+                    // // 1. DB에서 현재 세션의 사용자 정보 조회
+                    // const userResponse = await axios.get(
+                    //     `http://localhost:4000/api/stt/session-users/${canvasIdx}`,
+                    // );
+                    // const { mentor, mentee } = userResponse.data;
+                    // const mentorIdx = mentor.idx;
+                    // const menteeIdx = mentee.idx;
+                    const mentorIdx = 1;
+                    const menteeIdx = 2;
 
                     console.log('사용자 정보 조회:', { mentorIdx, menteeIdx });
 
