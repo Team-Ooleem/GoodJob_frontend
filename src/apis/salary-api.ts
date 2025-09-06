@@ -1,5 +1,11 @@
 import { api } from './api';
-import { SalaryRangesResponse, SalaryRangeResponse, SalarySearchResponse } from '@/types/types';
+import {
+    SalaryRangesResponse,
+    SalaryRangeResponse,
+    SalarySearchResponse,
+    UserSalaryPreference,
+    UserSalaryPreferenceResponse,
+} from '@/types/types';
 
 /**
  * 모든 연봉 구간을 조회합니다.
@@ -53,6 +59,25 @@ export const searchSalaryRangesByMax = async (maxSalary: number): Promise<Salary
     try {
         const response = await api.get<SalarySearchResponse>(
             `/salaries/search/max?max=${maxSalary}`,
+        );
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+};
+
+/**
+ * 사용자의 희망 연봉을 저장합니다.
+ * @param preference 사용자 희망 연봉 선호도
+ * @returns 저장 결과 응답
+ */
+export const saveUserSalaryPreference = async (
+    preference: UserSalaryPreference,
+): Promise<UserSalaryPreferenceResponse> => {
+    try {
+        const response = await api.post<UserSalaryPreferenceResponse>(
+            '/user/salary-preference',
+            preference,
         );
         return response.data;
     } catch (error) {

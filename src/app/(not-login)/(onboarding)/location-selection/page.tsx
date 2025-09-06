@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Card, Spin, message, Typography, Space, Alert, Select } from 'antd';
 import { EnvironmentOutlined, InfoCircleOutlined } from '@ant-design/icons';
-import { getSidoList, getGuList } from '@/apis/location-api';
+import { getSidoList, getGuList, saveUserLocationPreference } from '@/apis/location-api';
 import { Sido, Gu } from '@/types/types';
 
 const { Title, Text } = Typography;
@@ -18,6 +18,7 @@ export default function LocationSelectionPage() {
     const [selectedGu, setSelectedGu] = useState<string | null>(null);
     const [loadingSido, setLoadingSido] = useState(true);
     const [loadingGu, setLoadingGu] = useState(false);
+    const [saving, setSaving] = useState(false);
 
     // 시도 목록 로드
     useEffect(() => {
@@ -73,20 +74,39 @@ export default function LocationSelectionPage() {
         setSelectedGu(guCode);
     };
 
-    const handleNext = () => {
+    const handleNext = async () => {
         if (!selectedSido || !selectedGu) {
             message.warning('시도와 구/군을 모두 선택해주세요.');
             return;
         }
 
-        const selectedSidoName = sidoList.find(
-            (sido) => sido.sido_code === selectedSido,
-        )?.sido_name;
-        const selectedGuName = guList.find((gu) => gu.gu_code === selectedGu)?.gu_name;
+        try {
+            setSaving(true);
 
-        message.success(`선택 완료: ${selectedSidoName} ${selectedGuName}`);
-        // 희망 연봉 선택 페이지로 이동
-        router.push('/salary-selection');
+            // 서버에 희망 근무지 선호도 저장
+            const response = await saveUserLocationPreference({
+                sidoCode: selectedSido,
+                guCode: selectedGu,
+            });
+
+            if (response.success) {
+                const selectedSidoName = sidoList.find(
+                    (sido) => sido.sido_code === selectedSido,
+                )?.sido_name;
+                const selectedGuName = guList.find((gu) => gu.gu_code === selectedGu)?.gu_name;
+
+                message.success(`선택 완료: ${selectedSidoName} ${selectedGuName}`);
+                // 희망 연봉 선택 페이지로 이동
+                router.push('/salary-selection');
+            } else {
+                message.error('희망 근무지 선택 저장에 실패했습니다.');
+            }
+        } catch (error) {
+            console.error('Error saving location preference:', error);
+            message.error('네트워크 연결을 확인해주세요.');
+        } finally {
+            setSaving(false);
+        }
     };
 
     const handlePrevious = () => {
@@ -213,9 +233,10 @@ export default function LocationSelectionPage() {
                         size='large'
                         className='px-8 h-12 bg-blue-600 hover:bg-blue-700 border-blue-600'
                         onClick={handleNext}
-                        disabled={!selectedSido || !selectedGu}
+                        disabled={!selectedSido || !selectedGu || saving}
+                        loading={saving}
                     >
-                        다음
+                        {saving ? '저장 중...' : '다음'}
                     </Button>
                 </div>
             </div>
