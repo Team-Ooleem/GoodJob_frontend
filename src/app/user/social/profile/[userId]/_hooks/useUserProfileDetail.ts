@@ -1,22 +1,15 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { SocialApi } from '../../../_apis/social.api';
-import { useEffect, useState } from 'react';
+import { useAuth } from '@/hooks';
 
 export function useUserProfileDetail(
     targetUserId: string,
     postsLimit: number = 10,
     postsCursor?: number,
 ) {
-    const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+    const { user } = useAuth();
+    const currentUserId = user?.idx || null;
     const queryClient = useQueryClient();
-
-    // localStorage에서 현재 사용자 ID 가져오기
-    useEffect(() => {
-        const userId = localStorage.getItem('user_idx');
-        if (userId) {
-            setCurrentUserId(parseInt(userId, 10));
-        }
-    }, []);
 
     const query = useQuery({
         queryKey: ['userProfileDetail', targetUserId, currentUserId, postsLimit, postsCursor],

@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { Button, Empty, Spin } from 'antd';
 import { ReloadOutlined } from '@ant-design/icons';
 import PostItem from '../../../_components/PostItem';
+import { useAuth } from '@/hooks';
 
 interface UserPostsListProps {
     posts: Post[];
@@ -23,19 +24,12 @@ export default function UserPostsList({
     onPostDeleted,
     onPostUpdated,
 }: UserPostsListProps) {
-    const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+    const { user } = useAuth();
+    const currentUserId = user?.idx || null;
     const [allPosts, setAllPosts] = useState<Post[]>(posts);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [hasMore, setHasMore] = useState(initialHasMore);
     const [nextCursor, setNextCursor] = useState(initialNextCursor);
-
-    // localStorage에서 현재 사용자 ID 가져오기
-    useEffect(() => {
-        const userId = localStorage.getItem('user_idx');
-        if (userId) {
-            setCurrentUserId(parseInt(userId, 10));
-        }
-    }, []);
 
     // 초기 포스트 설정
     useEffect(() => {

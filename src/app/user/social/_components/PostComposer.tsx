@@ -8,28 +8,23 @@ import Image from 'next/image';
 import { useSocialProfile, usePostMutations } from '../_hooks';
 import { validateImageFile } from '../_utils';
 
-export default function PostComposer() {
+interface PostComposerProps {
+    currentUserId: number;
+}
+
+export default function PostComposer({ currentUserId }: PostComposerProps) {
     const [mediaFile, setMediaFile] = useState<File | null>(null);
     const [mediaPreview, setMediaPreview] = useState<string | undefined>();
-    const [currentUserId, setCurrentUserId] = useState<string>('');
-
-    // localStorage에서 user_idx 가져오기
-    useEffect(() => {
-        const userId = localStorage.getItem('user_idx');
-        if (userId) {
-            setCurrentUserId(userId);
-        }
-    }, []);
 
     // 사용자 프로필 데이터 가져오기
     const {
         data: profile,
         isLoading: profileLoading,
         error: profileError,
-    } = useSocialProfile(currentUserId);
+    } = useSocialProfile(currentUserId.toString());
 
     // 포스트 뮤테이션 훅
-    const { createPost } = usePostMutations(parseInt(currentUserId));
+    const { createPost } = usePostMutations(currentUserId);
 
     // React Hook Form 설정
     const {
