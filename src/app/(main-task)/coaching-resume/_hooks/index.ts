@@ -3,4 +3,7 @@ export * from './useFabricDotGrid';
 export * from './useCollaborativeCanvas';
 export * from './useVoiceRecorder';
 export * from './useZoomPan';
-
+export * from './useCanvasShortCut';
+export * from './useEraser';
+export * from './useStickyNote';
+export * from './useLockTransform';
