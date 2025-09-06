@@ -50,7 +50,7 @@ export default function UserProfileHeader({
     };
 
     const handleSendMessage = () => {
-        if (profile && !isCurrentUserProfile) {
+        if (profile && !isCurrentUserProfile && currentUserId) {
             // profile 정보를 ChatUser 형태로 변환
             const chatUser: ChatUser = {
                 user_id: parseInt(targetUserId),
@@ -65,7 +65,7 @@ export default function UserProfileHeader({
             };
 
             // 채팅 시작
-            startChatWithUser(chatUser);
+            startChatWithUser(chatUser, currentUserId);
         }
     };
 

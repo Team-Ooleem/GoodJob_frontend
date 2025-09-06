@@ -26,7 +26,7 @@ export const useWebSocket = ({
         if (!userId) return;
 
         try {
-            const serverUrl = 'http://localhost:4000/api/chat';
+            const serverUrl = `${process.env.NEXT_PUBLIC_CHAT_WEBSOCKET_URL}`;
 
             const socket = io(serverUrl, {
                 transports: ['websocket', 'polling'],

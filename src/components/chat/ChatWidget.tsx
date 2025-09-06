@@ -24,9 +24,11 @@ export const ChatWidget = () => {
     // Zustand 함수들을 useCallback으로 메모이제이션
     const handleMessage = useCallback(
         (message: WebSocketMessage) => {
-            addMessage(message);
+            if (userId) {
+                addMessage(message, userId);
+            }
         },
-        [addMessage],
+        [addMessage, userId],
     );
 
     const handleUnreadCountUpdate = useCallback(
