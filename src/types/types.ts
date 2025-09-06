@@ -32,6 +32,21 @@ export interface JobRolesResponse {
     };
 }
 
+// 사용자 직군/직무 선호도 관련 타입
+export interface UserJobPreference {
+    categoryId: number;
+    roleId: number;
+}
+
+export interface UserJobPreferenceResponse {
+    success: boolean;
+    message: string;
+    data?: {
+        categoryId: number;
+        roleId: number;
+    };
+}
+
 export interface ApiErrorResponse {
     success: false;
     error: {

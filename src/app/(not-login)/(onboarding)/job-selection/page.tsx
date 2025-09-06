@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Card, Spin, message, Typography, Space, Alert } from 'antd';
 import { FolderOutlined, InfoCircleOutlined } from '@ant-design/icons';
-import { getJobCategories, getJobRoles } from '@/apis/job-api';
+import { getJobCategories, getJobRoles, saveUserJobPreference } from '@/apis/job-api';
 import { JobCategory, JobRole } from '@/types/types';
 
 const { Title, Text } = Typography;
@@ -17,6 +17,7 @@ export default function JobSelectionPage() {
     const [selectedRole, setSelectedRole] = useState<number | null>(null);
     const [loadingCategories, setLoadingCategories] = useState(true);
     const [loadingRoles, setLoadingRoles] = useState(false);
+    const [saving, setSaving] = useState(false);
 
     // 직군 목록 로드
     useEffect(() => {
@@ -72,18 +73,39 @@ export default function JobSelectionPage() {
         setSelectedRole(roleId);
     };
 
-    const handleNext = () => {
+    const handleNext = async () => {
         if (!selectedCategory || !selectedRole) {
             message.warning('직군과 직무를 모두 선택해주세요.');
             return;
         }
 
-        const selectedCategoryName = categories.find((cat) => cat.id === selectedCategory)?.name;
-        const selectedRoleName = roles.find((role) => role.id === selectedRole)?.name;
+        try {
+            setSaving(true);
 
-        message.success(`선택 완료: ${selectedCategoryName} - ${selectedRoleName}`);
-        // 희망 근무지 선택 페이지로 이동
-        router.push('/location-selection');
+            // 서버에 직군/직무 선호도 저장
+            const response = await saveUserJobPreference({
+                categoryId: selectedCategory,
+                roleId: selectedRole,
+            });
+
+            if (response.success) {
+                const selectedCategoryName = categories.find(
+                    (cat) => cat.id === selectedCategory,
+                )?.name;
+                const selectedRoleName = roles.find((role) => role.id === selectedRole)?.name;
+
+                message.success(`선택 완료: ${selectedCategoryName} - ${selectedRoleName}`);
+                // 희망 근무지 선택 페이지로 이동
+                router.push('/location-selection');
+            } else {
+                message.error('직군/직무 선택 저장에 실패했습니다.');
+            }
+        } catch (error) {
+            console.error('Error saving job preference:', error);
+            message.error('네트워크 연결을 확인해주세요.');
+        } finally {
+            setSaving(false);
+        }
     };
 
     const handlePrevious = () => {
@@ -195,9 +217,10 @@ export default function JobSelectionPage() {
                         size='large'
                         className='px-8 h-12 bg-green-600 hover:bg-green-700 border-green-600'
                         onClick={handleNext}
-                        disabled={!selectedCategory || !selectedRole}
+                        disabled={!selectedCategory || !selectedRole || saving}
+                        loading={saving}
                     >
-                        다음
+                        {saving ? '저장 중...' : '다음'}
                     </Button>
                 </div>
             </div>
