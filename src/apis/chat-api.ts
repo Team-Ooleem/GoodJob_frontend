@@ -13,7 +13,7 @@ const CHAT_BASE_URL = '/chat';
 // 1. 내 채팅방 목록 조회
 export const getConversations = async (userId: number): Promise<ChatConversation[]> => {
     const response = await api.get<ChatApiResponse<ChatConversation[]>>(
-        `${CHAT_BASE_URL}/conversations/${userId}`,
+        `${CHAT_BASE_URL}/conversations`,
     );
 
     if (!response.data.success) {
@@ -58,7 +58,6 @@ export const sendMessage = async (
     });
 
     const response = await api.post<ChatApiResponse>(`${CHAT_BASE_URL}/messages`, {
-        sender_id: senderId,
         receiver_id: receiverId,
         content,
     });
@@ -92,7 +91,6 @@ export const markMessageAsRead = async (
     const response = await api.post<ChatApiResponse>(
         `${CHAT_BASE_URL}/messages/${conversationId}/read`,
         {
-            user_id: userId,
             last_message_id: lastMessageId,
         },
     );
@@ -114,7 +112,6 @@ export const searchUsers = async (
             {
                 params: {
                     q,
-                    user_id: userId,
                     limit,
                 },
             },
@@ -132,9 +129,7 @@ export const searchUsers = async (
 
 // 6. 읽지 않은 메시지가 있는 채팅방 조회
 export const getUnreadConversations = async (userId: number): Promise<ChatConversation[]> => {
-    const response = await api.get<ChatApiResponse<ChatConversation[]>>(
-        `${CHAT_BASE_URL}/unread/${userId}`,
-    );
+    const response = await api.get<ChatApiResponse<ChatConversation[]>>(`${CHAT_BASE_URL}/unread`);
 
     if (!response.data.success) {
         throw new Error(response.data.message || '읽지 않은 채팅방 조회에 실패했습니다.');
@@ -145,7 +140,7 @@ export const getUnreadConversations = async (userId: number): Promise<ChatConver
 
 // 7. 채팅 통계 조회
 export const getChatStats = async (userId: number): Promise<ChatStats> => {
-    const response = await api.get<ChatApiResponse<ChatStats>>(`${CHAT_BASE_URL}/stats/${userId}`);
+    const response = await api.get<ChatApiResponse<ChatStats>>(`${CHAT_BASE_URL}/stats`);
 
     if (!response.data.success) {
         throw new Error(response.data.message || '채팅 통계 조회에 실패했습니다.');
@@ -163,7 +158,6 @@ export const getChatStats = async (userId: number): Promise<ChatStats> => {
 // 8. 채팅방 삭제
 export const deleteConversation = async (user1Id: number, user2Id: number): Promise<void> => {
     const response = await api.post<ChatApiResponse>(`${CHAT_BASE_URL}/conversations/delete`, {
-        user1_id: user1Id,
         user2_id: user2Id,
     });
 
@@ -178,7 +172,7 @@ export const getConversationId = async (
     user2Id: number,
 ): Promise<number | null> => {
     const response = await api.get<ChatApiResponse<ChatConversationId>>(
-        `${CHAT_BASE_URL}/conversation-id/${user1Id}/${user2Id}`,
+        `${CHAT_BASE_URL}/conversation-id/${user2Id}`,
     );
 
     if (!response.data.success) {

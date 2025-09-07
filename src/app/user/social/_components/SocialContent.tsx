@@ -8,17 +8,17 @@ import { useAuth } from '@/hooks/use-auth';
 
 export default function SocialContent() {
     const [currentUserId, setCurrentUserId] = useState<number | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const { user } = useAuth();
+    const { user, isLoading: authLoading } = useAuth();
 
     useEffect(() => {
-        setCurrentUserId(user?.idx || null);
-        setIsLoading(false);
-    }, []);
+        if (user?.idx) {
+            setCurrentUserId(user.idx);
+        }
+    }, [user]);
 
-    // currentUserId가 없으면 아무것도 렌더링하지 않음
-    if (!currentUserId) {
-        return null;
+    // 로딩 중이거나 currentUserId가 없으면 아무것도 렌더링하지 않음
+    if (authLoading || !currentUserId) {
+        return <div>Loading...</div>;
     }
 
     return (

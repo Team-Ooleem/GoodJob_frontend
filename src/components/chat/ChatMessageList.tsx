@@ -98,7 +98,7 @@ export const ChatMessageList = ({
 
         try {
             // API를 통해 메시지 전송
-            await sendMessageToStore(otherUserId, messageContent);
+            await sendMessageToStore(otherUserId, messageContent, userId);
         } catch (error) {
             console.error('❌ [COMPONENT] sendMessageToStore 에러:', error);
             alert('메시지 전송에 실패했습니다.');
@@ -131,7 +131,7 @@ export const ChatMessageList = ({
                     const coachingUrl = `${window.location.origin}/coaching-resume/${response.id}`;
                     const coachingMessage = `📝 이력서 코칭에 참여하시겠습니까?\n\n링크: ${coachingUrl}`;
 
-                    await sendMessageToStore(otherUserId, coachingMessage);
+                    await sendMessageToStore(otherUserId, coachingMessage, userId);
                     antdMessage.success('이력서 코칭 요청을 전송했습니다.');
                 },
                 onError: (error) => {
