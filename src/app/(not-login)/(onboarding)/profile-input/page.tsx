@@ -11,6 +11,7 @@ import {
     completeOnboarding,
 } from '@/apis/(onboarding)/profile-api';
 import { Profile } from '@/types/types';
+import { Header, Footer } from '@/components';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -149,148 +150,146 @@ export default function ProfileInputPage() {
     };
 
     return (
-        <div className='min-h-screen bg-gray-50 py-8'>
-            <div className='max-w-2xl mx-auto px-4'>
-                {/* Header */}
-                <div className='flex justify-between items-center mb-8'>
-                    <div className='text-2xl font-bold'>Logo</div>
-                    <Space size='large'>
-                        <Button type='text'>채용 정보</Button>
-                        <Button type='text'>인맥 관리</Button>
-                        <Button type='text'>이력서 코칭</Button>
-                    </Space>
-                </div>
+        <div>
+            <Header />
+            <div className='min-h-screen bg-gray-50 py-8'>
+                <div className='max-w-2xl mx-auto px-4'>
+                    {/* 프로필 입력 섹션 */}
+                    <Card className='mb-8'>
+                        <div className='text-center mb-8'>
+                            <Title level={3}>프로필을 입력해주세요</Title>
+                        </div>
 
-                {/* 프로필 입력 섹션 */}
-                <Card className='mb-8'>
-                    <div className='text-center mb-8'>
-                        <Title level={3}>프로필을 입력해주세요</Title>
-                    </div>
-
-                    <div className='flex gap-8'>
-                        {/* 왼쪽: 프로필 사진 업로드 */}
-                        <div className='flex-shrink-0 text-center'>
-                            <Text strong className='text-lg block mb-4'>
-                                프로필 사진
-                            </Text>
-                            <div className='relative'>
-                                {profileImg ? (
-                                    <div className='flex flex-col items-center'>
-                                        <Avatar
-                                            size={120}
-                                            src={profileImg}
-                                            className='border-2 border-blue-600'
-                                        />
-                                        <Button
-                                            type='text'
-                                            danger
-                                            icon={<DeleteOutlined />}
-                                            size='small'
-                                            className='mt-2 bg-white rounded-full shadow-md'
-                                            onClick={handleImageRemove}
-                                        />
-                                    </div>
-                                ) : (
-                                    <Upload
-                                        accept='image/jpeg,image/jpg,image/png,image/gif,image/webp'
-                                        showUploadList={false}
-                                        beforeUpload={() => false}
-                                        onChange={handleImageUpload}
-                                        disabled={uploading}
-                                    >
-                                        <div
-                                            className={`w-30 h-30 border-2 border-dashed border-gray-300 rounded-full flex items-center justify-center cursor-pointer hover:border-blue-600 transition-colors ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                            style={{ width: '120px', height: '120px' }}
-                                        >
-                                            {uploading ? (
-                                                <div className='text-center'>
-                                                    <div className='animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-1'></div>
-                                                    <div className='text-xs text-gray-500'>
-                                                        업로드 중...
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div className='text-center'>
-                                                    <UserOutlined className='text-4xl text-gray-400' />
-                                                </div>
-                                            )}
+                        <div className='flex gap-8'>
+                            {/* 왼쪽: 프로필 사진 업로드 */}
+                            <div className='flex-shrink-0 text-center'>
+                                <Text strong className='text-lg block mb-4'>
+                                    프로필 사진
+                                </Text>
+                                <div className='relative'>
+                                    {profileImg ? (
+                                        <div className='flex flex-col items-center'>
+                                            <Avatar
+                                                size={120}
+                                                src={profileImg}
+                                                className='border-2 border-blue-600'
+                                            />
+                                            <Button
+                                                type='text'
+                                                danger
+                                                icon={<DeleteOutlined />}
+                                                size='small'
+                                                className='mt-2 bg-white rounded-full shadow-md'
+                                                onClick={handleImageRemove}
+                                            />
                                         </div>
-                                    </Upload>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* 오른쪽: 텍스트 입력 */}
-                        <div className='flex-1 space-y-6'>
-                            {/* 한 줄 소개 */}
-                            <div>
-                                <Text strong className='text-lg block mb-3'>
-                                    한 줄 소개
-                                </Text>
-                                <div className='relative'>
-                                    <Input
-                                        placeholder='예: 안녕하세요! 긍정의 스위치, 김조이입니다.'
-                                        value={shortBio}
-                                        onChange={handleShortBioChange}
-                                        className='w-full h-12 text-base'
-                                        maxLength={40}
-                                    />
-                                    <div className='absolute bottom-2 right-3 text-xs text-gray-500'>
-                                        <span
-                                            className={shortBio.length > 40 ? 'text-red-500' : ''}
+                                    ) : (
+                                        <Upload
+                                            accept='image/jpeg,image/jpg,image/png,image/gif,image/webp'
+                                            showUploadList={false}
+                                            beforeUpload={() => false}
+                                            onChange={handleImageUpload}
+                                            disabled={uploading}
                                         >
-                                            {shortBio.length}/40
-                                        </span>
-                                    </div>
+                                            <div
+                                                className={`w-30 h-30 border-2 border-dashed border-gray-300 rounded-full flex items-center justify-center cursor-pointer hover:border-blue-600 transition-colors ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                style={{ width: '120px', height: '120px' }}
+                                            >
+                                                {uploading ? (
+                                                    <div className='text-center'>
+                                                        <div className='animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-1'></div>
+                                                        <div className='text-xs text-gray-500'>
+                                                            업로드 중...
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className='text-center'>
+                                                        <UserOutlined className='text-4xl text-gray-400' />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </Upload>
+                                    )}
                                 </div>
                             </div>
 
-                            {/* 간단 소개글 */}
-                            <div>
-                                <Text strong className='text-lg block mb-3'>
-                                    간단 소개글
-                                </Text>
-                                <div className='relative'>
-                                    <TextArea
-                                        placeholder='자신을 어필할 수 있는 간단한 소개글을 작성해주세요.'
-                                        value={bio}
-                                        onChange={handleBioChange}
-                                        className='w-full min-h-[100px] text-base resize-none'
-                                        maxLength={300}
-                                        rows={4}
-                                    />
-                                    <div className='absolute bottom-2 right-3 text-xs text-gray-500'>
-                                        <span className={bio.length > 300 ? 'text-red-500' : ''}>
-                                            {bio.length}/300
-                                        </span>
+                            {/* 오른쪽: 텍스트 입력 */}
+                            <div className='flex-1 space-y-6'>
+                                {/* 한 줄 소개 */}
+                                <div>
+                                    <Text strong className='text-lg block mb-3'>
+                                        한 줄 소개
+                                    </Text>
+                                    <div className='relative'>
+                                        <Input
+                                            placeholder='예: 안녕하세요! 긍정의 스위치, 김조이입니다.'
+                                            value={shortBio}
+                                            onChange={handleShortBioChange}
+                                            className='w-full h-12 text-base'
+                                            maxLength={40}
+                                        />
+                                        <div className='absolute bottom-2 right-3 text-xs text-gray-500'>
+                                            <span
+                                                className={
+                                                    shortBio.length > 40 ? 'text-red-500' : ''
+                                                }
+                                            >
+                                                {shortBio.length}/40
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* 간단 소개글 */}
+                                <div>
+                                    <Text strong className='text-lg block mb-3'>
+                                        간단 소개글
+                                    </Text>
+                                    <div className='relative'>
+                                        <TextArea
+                                            placeholder='자신을 어필할 수 있는 간단한 소개글을 작성해주세요.'
+                                            value={bio}
+                                            onChange={handleBioChange}
+                                            className='w-full min-h-[100px] text-base resize-none'
+                                            maxLength={300}
+                                            rows={4}
+                                        />
+                                        <div className='absolute bottom-2 right-3 text-xs text-gray-500'>
+                                            <span
+                                                className={bio.length > 300 ? 'text-red-500' : ''}
+                                            >
+                                                {bio.length}/300
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </Card>
+                    </Card>
 
-                {/* 네비게이션 버튼 */}
-                <div className='flex justify-between'>
-                    <Button
-                        size='large'
-                        className='px-8 h-12 bg-gray-100 text-gray-700 border-gray-300'
-                        onClick={handlePrevious}
-                    >
-                        이전
-                    </Button>
-                    <Button
-                        type='primary'
-                        size='large'
-                        className='px-8 h-12 bg-blue-600 hover:bg-blue-700 border-blue-600'
-                        onClick={handleSave}
-                        loading={loading}
-                        disabled={loading}
-                    >
-                        완료
-                    </Button>
+                    {/* 네비게이션 버튼 */}
+                    <div className='flex justify-between'>
+                        <Button
+                            size='large'
+                            className='px-8 h-12 bg-gray-100 text-gray-700 border-gray-300'
+                            onClick={handlePrevious}
+                        >
+                            이전
+                        </Button>
+                        <Button
+                            type='primary'
+                            size='large'
+                            className='px-8 h-12 bg-blue-600 hover:bg-blue-700 border-blue-600'
+                            onClick={handleSave}
+                            loading={loading}
+                            disabled={loading}
+                        >
+                            완료
+                        </Button>
+                    </div>
                 </div>
             </div>
+            <Footer />
         </div>
     );
 }
