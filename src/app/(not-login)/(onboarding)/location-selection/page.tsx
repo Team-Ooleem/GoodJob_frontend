@@ -4,7 +4,11 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Card, Spin, message, Typography, Space, Alert, Select } from 'antd';
 import { EnvironmentOutlined, InfoCircleOutlined } from '@ant-design/icons';
-import { getSidoList, getGuList, saveUserLocationPreference } from '@/apis/location-api';
+import {
+    getSidoList,
+    getGuList,
+    saveUserLocationPreference,
+} from '@/apis/(onboarding)/location-api';
 import { Sido, Gu } from '@/types/types';
 
 const { Title, Text } = Typography;

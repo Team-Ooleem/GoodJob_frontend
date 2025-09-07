@@ -1,4 +1,4 @@
-import { api } from './api';
+import { api } from '../api';
 import { ProfileResponse, ProfileUpdateRequest, ProfileUpdateResponse } from '@/types/types';
 
 /**
@@ -23,7 +23,27 @@ export const updateProfile = async (
     profileData: ProfileUpdateRequest,
 ): Promise<ProfileUpdateResponse> => {
     try {
-        const response = await api.put<ProfileUpdateResponse>('/profile', profileData);
+        const response = await api.put<ProfileUpdateResponse>('/profile/me', profileData);
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+};
+
+/**
+ * 프로필 이미지를 업로드합니다.
+ * @param file 업로드할 이미지 파일
+ * @returns 업로드 결과 응답
+ */
+export const uploadProfileImage = async (
+    file: File,
+): Promise<{ success: boolean; imageUrl?: string; message?: string }> => {
+    try {
+        const formData = new FormData();
+        formData.append('image', file);
+
+        const response = await api.post('/profile/upload-image', formData);
+
         return response.data;
     } catch (error) {
         throw error;

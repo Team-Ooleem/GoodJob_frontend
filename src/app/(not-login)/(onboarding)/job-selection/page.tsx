@@ -108,11 +108,6 @@ export default function JobSelectionPage() {
         }
     };
 
-    const handlePrevious = () => {
-        // TODO: 이전 단계로 이동하는 로직 구현
-        message.info('이전 단계로 이동합니다.');
-    };
-
     return (
         <div className='min-h-screen bg-gray-50 py-8'>
             <div className='max-w-4xl mx-auto px-4'>
@@ -204,14 +199,7 @@ export default function JobSelectionPage() {
                 />
 
                 {/* 네비게이션 버튼 */}
-                <div className='flex justify-between'>
-                    <Button
-                        size='large'
-                        className='px-8 h-12 bg-gray-100 text-gray-700 border-gray-300'
-                        onClick={handlePrevious}
-                    >
-                        이전
-                    </Button>
+                <div className='flex justify-end'>
                     <Button
                         type='primary'
                         size='large'

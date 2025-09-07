@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Card, Spin, message, Typography, Space, Alert, Select } from 'antd';
 import { DollarOutlined, InfoCircleOutlined } from '@ant-design/icons';
-import { getSalaryRanges, saveUserSalaryPreference } from '@/apis/salary-api';
+import { getSalaryRanges, saveUserSalaryPreference } from '@/apis/(onboarding)/salary-api';
 import { SalaryRange } from '@/types/types';
 
 const { Title, Text } = Typography;
