@@ -227,11 +227,51 @@ export default function AiInterviewSessionsPage() {
     // ===== API 클라이언트 유틸 =====
     async function fetchFirstQuestion(): Promise<QuestionDto> {
         //if (!AI_API_BASE) throw new Error('NEXT_PUBLIC_API_BASE_URL 미설정');
-        // 이력서 요약은 로컬/서버 등에서 가져오도록. 없으면 프롬프트용 기본값
-        const resumeSummary =
-            localStorage.getItem('resumeSummary') ||
-            '프론트엔드 경력 3년, Next.js/React, 크래프톤 정글 (부트캠프) 수료, Pintos 운영체제 프로젝트 수행 경험';
-        const res = await api.post(`ai/question`, { resumeSummary }, { timeout: 60000 });
+        // select/page.tsx에서 저장한 선택 이력서/채용공고 URL 활용
+        type SelectedResume = {
+            id: number;
+            title?: string;
+            position?: string;
+            company?: string;
+            createdAt?: string;
+            experience?: string;
+            skills?: string[];
+        };
+
+        let resumeSummary: string | null = null;
+        try {
+            const raw = sessionStorage.getItem('selectedResume');
+            if (raw) {
+                const r = JSON.parse(raw) as SelectedResume;
+                const parts = [
+                    r.title,
+                    r.position ? `포지션: ${r.position}` : undefined,
+                    r.company ? `회사: ${r.company}` : undefined,
+                    r.experience ? `경력: ${r.experience}` : undefined,
+                    Array.isArray(r.skills) && r.skills.length
+                        ? `기술: ${r.skills.join(', ')}`
+                        : undefined,
+                ].filter(Boolean) as string[];
+                if (parts.length) {
+                    resumeSummary = parts.join(' | ');
+                }
+            }
+        } catch (e) {
+            console.warn('selectedResume 파싱 실패:', e);
+        }
+
+        // 폴백: 예전 로컬 저장 요약 또는 기본값
+        if (!resumeSummary) {
+            resumeSummary =
+                localStorage.getItem('resumeSummary') ||
+                '프론트엔드 경력 3년, Next.js/React, 크래프톤 정글 (부트캠프) 수료, Pintos 운영체제 프로젝트 수행 경험';
+        }
+
+        const jobPostUrl = sessionStorage.getItem('jobPostUrl') || undefined;
+        const payload: any = { resumeSummary };
+        if (jobPostUrl) payload.jobPostUrl = jobPostUrl;
+
+        const res = await api.post(`ai/question`, payload, { timeout: 60000 });
         const data = res.data as { question: QuestionDto };
         return data.question;
     }
