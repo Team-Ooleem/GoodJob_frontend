@@ -49,3 +49,48 @@ export const uploadProfileImage = async (
         throw error;
     }
 };
+
+/**
+ * 사용자의 온보딩 데이터를 조회합니다.
+ * @returns 온보딩 데이터 응답
+ */
+export const getOnboardingData = async (): Promise<{
+    success: boolean;
+    data?: {
+        desired_job: number;
+        desired_sido: string;
+        desired_gu: string;
+        desired_salary: number;
+    };
+    message?: string;
+}> => {
+    try {
+        const response = await api.get('/profile/onboarding-data');
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+};
+
+/**
+ * 온보딩을 완료합니다.
+ * @param onboardingData 온보딩 데이터
+ * @returns 온보딩 완료 응답
+ */
+export const completeOnboarding = async (onboardingData: {
+    desired_job: number;
+    desired_sido: string;
+    desired_gu: string;
+    desired_salary: number;
+}): Promise<{ success: boolean; message?: string }> => {
+    try {
+        const response = await api.post('/profile/complete-onboarding', onboardingData, {
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+};

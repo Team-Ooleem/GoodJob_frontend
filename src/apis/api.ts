@@ -30,14 +30,22 @@ api.interceptors.response.use(
             // 이 때 프론트는 직접 httpOnly 쿠키를 지울 수 없으므로
             // /auth/logout 호출해서 서버 측에서 clearCookie('session', ...)로 쿠키를 제거
             try {
-                await api.post('/auth/logout');
+                await api.get('/auth/logout');
             } catch {}
 
-            // 사용자에게 알림 메시지 표시
+            // 현재 페이지가 로그인 관련 페이지가 아닐 때만 알림 표시
             if (typeof window !== 'undefined') {
-                alert('세션이 만료되었습니다. 다시 로그인해주세요.');
-                // 이후 /login 페이지로 리다이렉트하여 사용자에게 재로그인을 유도
-                window.location.href = '/login';
+                const currentPath = window.location.pathname;
+                const isAuthPage = currentPath.includes('/login');
+                // currentPath.includes('/signup') ||
+                // currentPath.includes('/auth');
+
+                // 로그인 관련 페이지가 아닐 때만 alert 표시
+                if (!isAuthPage) {
+                    alert('세션이 만료되었습니다. 다시 로그인해주세요.');
+                    // 이후 /login 페이지로 리다이렉트하여 사용자에게 재로그인을 유도
+                    window.location.href = '/login';
+                }
             }
         }
         throw err;
@@ -54,7 +62,7 @@ export const authApi = {
 
     // 로그아웃
     logout: async () => {
-        const response = await api.post('/auth/logout');
+        const response = await api.get('/auth/logout');
         return response.data;
     },
 };

@@ -6,6 +6,7 @@ import { Button, Card, Spin, message, Typography, Space, Alert } from 'antd';
 import { FolderOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { getJobCategories, getJobRoles, saveUserJobPreference } from '@/apis/job-api';
 import { JobCategory, JobRole } from '@/types/types';
+import { Header, Footer } from '@/components';
 
 const { Title, Text } = Typography;
 
@@ -109,109 +110,107 @@ export default function JobSelectionPage() {
     };
 
     return (
-        <div className='min-h-screen bg-gray-50 py-8'>
-            <div className='max-w-4xl mx-auto px-4'>
-                {/* Header */}
-                <div className='flex justify-between items-center mb-8'>
-                    <div className='text-2xl font-bold'>Logo</div>
-                    <Space size='large'>
-                        <Button type='text'>채용 정보</Button>
-                        <Button type='text'>인맥 관리</Button>
-                        <Button type='text'>이력서 코칭</Button>
-                    </Space>
-                </div>
+        <div>
+            <Header />
+            <div className='min-h-screen bg-gray-50 py-8'>
+                <div className='max-w-4xl mx-auto px-4'>
+                    {/* 직군 선택 섹션 */}
+                    <Card className='mb-8'>
+                        <div className='text-center mb-6'>
+                            <FolderOutlined className='text-4xl text-amber-600 mb-4' />
+                            <Title level={3}>원하는 직군을 알려주세요.</Title>
+                        </div>
 
-                {/* 직군 선택 섹션 */}
-                <Card className='mb-8'>
-                    <div className='text-center mb-6'>
-                        <FolderOutlined className='text-4xl text-amber-600 mb-4' />
-                        <Title level={3}>원하는 직군을 알려주세요.</Title>
+                        {loadingCategories ? (
+                            <div className='text-center py-8'>
+                                <Spin size='large' />
+                            </div>
+                        ) : (
+                            <div className='grid grid-cols-3 gap-4'>
+                                {categories.map((category) => (
+                                    <Button
+                                        key={category.id}
+                                        size='large'
+                                        type={
+                                            selectedCategory === category.id ? 'primary' : 'default'
+                                        }
+                                        className={`h-12 text-sm ${
+                                            selectedCategory === category.id
+                                                ? '!border-blue-600 !bg-blue-600 !text-white'
+                                                : 'border-gray-300 hover:border-blue-400'
+                                        }`}
+                                        onClick={() => handleCategorySelect(category.id)}
+                                    >
+                                        {category.name}
+                                    </Button>
+                                ))}
+                            </div>
+                        )}
+                    </Card>
+
+                    {/* 직무 선택 섹션 */}
+                    <Card className='mb-8'>
+                        <div className='text-center mb-6'>
+                            <Title level={3}>원하는 직무를 알려주세요.</Title>
+                        </div>
+
+                        {loadingRoles ? (
+                            <div className='text-center py-8'>
+                                <Spin size='large' />
+                            </div>
+                        ) : roles.length > 0 ? (
+                            <div className='grid grid-cols-3 gap-4'>
+                                {roles.map((role) => (
+                                    <Button
+                                        key={role.id}
+                                        size='large'
+                                        type={selectedRole === role.id ? 'primary' : 'default'}
+                                        className={`h-12 text-sm ${
+                                            selectedRole === role.id
+                                                ? '!border-blue-600 !bg-blue-600 !text-white'
+                                                : 'border-gray-300 hover:border-blue-400'
+                                        }`}
+                                        onClick={() => handleRoleSelect(role.id)}
+                                    >
+                                        {role.name}
+                                    </Button>
+                                ))}
+                            </div>
+                        ) : selectedCategory ? (
+                            <div className='text-center py-8 text-gray-500'>
+                                해당 직군에 등록된 직무가 없습니다.
+                            </div>
+                        ) : (
+                            <div className='text-center py-8 text-gray-500'>
+                                직군을 먼저 선택해주세요.
+                            </div>
+                        )}
+                    </Card>
+
+                    {/* 정보 메시지 */}
+                    <Alert
+                        message='정확한 선호정보와 경력입력으로 매칭경험을 받아보세요.'
+                        type='info'
+                        icon={<InfoCircleOutlined />}
+                        className='mb-8'
+                    />
+
+                    {/* 네비게이션 버튼 */}
+                    <div className='flex justify-end'>
+                        <Button
+                            type='primary'
+                            size='large'
+                            className='px-8 h-12 bg-green-600 hover:bg-green-700 border-green-600'
+                            onClick={handleNext}
+                            disabled={!selectedCategory || !selectedRole || saving}
+                            loading={saving}
+                        >
+                            {saving ? '저장 중...' : '다음'}
+                        </Button>
                     </div>
-
-                    {loadingCategories ? (
-                        <div className='text-center py-8'>
-                            <Spin size='large' />
-                        </div>
-                    ) : (
-                        <div className='grid grid-cols-3 gap-4'>
-                            {categories.map((category) => (
-                                <Button
-                                    key={category.id}
-                                    size='large'
-                                    className={`h-12 text-sm ${
-                                        selectedCategory === category.id
-                                            ? 'border-green-600 text-green-600 bg-green-50'
-                                            : 'border-gray-300 hover:border-green-400'
-                                    }`}
-                                    onClick={() => handleCategorySelect(category.id)}
-                                >
-                                    {category.name}
-                                </Button>
-                            ))}
-                        </div>
-                    )}
-                </Card>
-
-                {/* 직무 선택 섹션 */}
-                <Card className='mb-8'>
-                    <div className='text-center mb-6'>
-                        <Title level={3}>원하는 직무를 알려주세요.</Title>
-                    </div>
-
-                    {loadingRoles ? (
-                        <div className='text-center py-8'>
-                            <Spin size='large' />
-                        </div>
-                    ) : roles.length > 0 ? (
-                        <div className='grid grid-cols-3 gap-4'>
-                            {roles.map((role) => (
-                                <Button
-                                    key={role.id}
-                                    size='large'
-                                    className={`h-12 text-sm ${
-                                        selectedRole === role.id
-                                            ? 'border-green-600 text-green-600 bg-green-50'
-                                            : 'border-gray-300 hover:border-green-400'
-                                    }`}
-                                    onClick={() => handleRoleSelect(role.id)}
-                                >
-                                    {role.name}
-                                </Button>
-                            ))}
-                        </div>
-                    ) : selectedCategory ? (
-                        <div className='text-center py-8 text-gray-500'>
-                            해당 직군에 등록된 직무가 없습니다.
-                        </div>
-                    ) : (
-                        <div className='text-center py-8 text-gray-500'>
-                            직군을 먼저 선택해주세요.
-                        </div>
-                    )}
-                </Card>
-
-                {/* 정보 메시지 */}
-                <Alert
-                    message='정확한 선호정보와 경력입력으로 매칭경험을 받아보세요.'
-                    type='info'
-                    icon={<InfoCircleOutlined />}
-                    className='mb-8'
-                />
-
-                {/* 네비게이션 버튼 */}
-                <div className='flex justify-end'>
-                    <Button
-                        type='primary'
-                        size='large'
-                        className='px-8 h-12 bg-green-600 hover:bg-green-700 border-green-600'
-                        onClick={handleNext}
-                        disabled={!selectedCategory || !selectedRole || saving}
-                        loading={saving}
-                    >
-                        {saving ? '저장 중...' : '다음'}
-                    </Button>
                 </div>
             </div>
+            <Footer />
         </div>
     );
 }
