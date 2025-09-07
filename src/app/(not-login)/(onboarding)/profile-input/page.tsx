@@ -4,7 +4,12 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Card, message, Typography, Space, Input, Upload, Avatar } from 'antd';
 import { UserOutlined, CameraOutlined, DeleteOutlined } from '@ant-design/icons';
-import { updateProfile, uploadProfileImage } from '@/apis/(onboarding)/profile-api';
+import {
+    updateProfile,
+    uploadProfileImage,
+    getOnboardingData,
+    completeOnboarding,
+} from '@/apis/(onboarding)/profile-api';
 import { Profile } from '@/types/types';
 
 const { Title, Text } = Typography;
@@ -89,22 +94,50 @@ export default function ProfileInputPage() {
 
         try {
             setLoading(true);
-            const response = await updateProfile({
+
+            // 1. 프로필 정보 저장
+            const profileResponse = await updateProfile({
                 short_bio: shortBio,
                 bio: bio,
-                profile_img: profileImg, // 프로필 이미지 URL 추가
+                profile_img: profileImg,
             });
 
-            if (response.success) {
-                message.success('프로필이 저장되었습니다.');
-                // 메인 페이지로 이동
+            if (!profileResponse.success) {
+                message.error('프로필 저장에 실패했습니다.');
+                return;
+            }
+
+            // 2. 온보딩 데이터 조회
+            const onboardingDataResponse = await getOnboardingData();
+
+            if (!onboardingDataResponse.success || !onboardingDataResponse.data) {
+                message.error('온보딩 데이터를 불러올 수 없습니다.');
+                return;
+            }
+
+            // 3. 온보딩 완료 API 호출
+            const onboardingResponse = await completeOnboarding(onboardingDataResponse.data);
+
+            if (onboardingResponse.success) {
+                message.success('온보딩이 완료되었습니다!');
+                // 온보딩 완료 후 메인 페이지로 이동
                 router.push('/');
             } else {
-                message.error('프로필 저장에 실패했습니다.');
+                message.error('온보딩 완료 처리에 실패했습니다.');
             }
-        } catch (error) {
-            console.error('Error updating profile:', error);
-            message.error('네트워크 연결을 확인해주세요.');
+        } catch (error: any) {
+            console.error('Error during onboarding completion:', error);
+
+            // 에러 타입에 따른 처리
+            if (error instanceof TypeError && error.message.includes('fetch')) {
+                message.error('네트워크 연결을 확인해주세요.');
+            } else if (error.response?.status >= 500) {
+                message.error('서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+            } else if (error.response?.status >= 400) {
+                message.error('잘못된 요청입니다. 입력 정보를 확인해주세요.');
+            } else {
+                message.error('예상치 못한 오류가 발생했습니다.');
+            }
         } finally {
             setLoading(false);
         }
