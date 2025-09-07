@@ -1,0 +1,33 @@
+name: Deploy to EC2
+
+on:
+    push:
+        branches:
+            - main
+
+jobs:
+    deploy:
+        runs-on: ubuntu-latest
+
+        steps:
+            # 1. git hub main 코드 가져오기
+            - name: Checkout code
+              uses: actions/checkout@v3
+
+            # 2. SSH 설정
+            - name: Setup SSH
+              uses: webfactory/ssh-agent@v0.5.4
+              with:
+                  ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+            # 3. EC2 서버에 접속해서 배포
+            - name: Deploy to EC2
+              run: |
+                  ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+                      cd ~/GoodJob_frontend
+                      git reset --hard
+                      git pull origin main
+                      pnpm install
+                      pnpm build
+                      pm2 restart goodjob || pm2 start pnpm --name goodjob -- start
+                   EOF
