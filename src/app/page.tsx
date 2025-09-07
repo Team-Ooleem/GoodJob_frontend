@@ -2,8 +2,6 @@ import { Space } from 'antd';
 
 // global components
 import { Header, Footer, JobCardList } from '@/components';
-import { ZustandTest } from '@/components/zustand-test';
-import { ReactQueryTest } from '@/components/react-query-test';
 
 export default function Home() {
     const jobList = [
