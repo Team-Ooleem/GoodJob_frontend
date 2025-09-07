@@ -25,7 +25,7 @@ export function FabricToolbar() {
     return (
         <div className='absolute bottom-[20px] left-1/2 -translate-x-1/2 transform z-[10] bg-white shadow-[0_2px_6px_rgba(0,0,0,0.25)] rounded-full px-4 py-1 flex items-center gap-1'>
             {/* 선택 */}
-            <button className='p-2 rounded hover:bg-gray-100'>
+            <button className='p-2 rounded hover:bg-gray-100' onClick={() => setDrawingMode(false)}>
                 <Image src='/assets/selector.svg' width={20} height={20} alt='selector' />
             </button>
 
@@ -33,7 +33,13 @@ export function FabricToolbar() {
 
             {/* 펜 / 형광펜 / 지우개 */}
             <Flex gap={2} align='center'>
-                <button className='p-2 rounded hover:bg-gray-100'>
+                <button
+                    className='p-2 rounded hover:bg-gray-100'
+                    onClick={() => {
+                        setDrawingMode(true);
+                        setBrushOptions({ type: 'pencil', color: '#000000', width: 3 });
+                    }}
+                >
                     <Image
                         src='/assets/pencel.svg'
                         width={24}
@@ -42,7 +48,13 @@ export function FabricToolbar() {
                         className='object-contain'
                     />
                 </button>
-                <button className='p-2 rounded hover:bg-gray-100'>
+                <button
+                    className='p-2 rounded hover:bg-gray-100'
+                    onClick={() => {
+                        setDrawingMode(true);
+                        setBrushOptions({ type: 'highlighter', width: 20 });
+                    }}
+                >
                     <Image
                         src='/assets/highlighter.svg'
                         width={24}
@@ -51,7 +63,28 @@ export function FabricToolbar() {
                         className='object-contain'
                     />
                 </button>
-                <button className='p-2 rounded hover:bg-gray-100'>
+                <button
+                    className='p-2 rounded hover:bg-gray-100'
+                    onClick={() => {
+                        setStickyMode(true);
+                        setDrawingMode(false);
+                        setEraserMode(false);
+                    }}
+                >
+                    <Image
+                        src='/assets/sticky.svg'
+                        width={30}
+                        height={20}
+                        alt='sticky'
+                        className='object-contain'
+                    />
+                </button>
+                <button
+                    className='p-2 rounded hover:bg-gray-100'
+                    onClick={() => {
+                        setEraserMode(true);
+                    }}
+                >
                     <Image
                         src='/assets/eraser.svg'
                         width={15}
