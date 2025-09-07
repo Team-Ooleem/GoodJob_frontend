@@ -25,9 +25,9 @@ jobs:
               run: |
                   ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
                       cd ~/GoodJob_frontend
-                      git reset --hard
-                      git pull origin main
-                      pnpm install
-                      pnpm build
-                      pm2 restart goodjob || pm2 start pnpm --name goodjob -- start
+                      /usr/bin/git reset --hard
+                      /usr/bin/git pull origin main
+                      /home/ubuntu/.nvm/versions/node/v22.19.0/bin/pnpm install
+                      /home/ubuntu/.nvm/versions/node/v22.19.0/bin/pnpm run build:prod
+                      /home/ubuntu/.local/share/pnpm/pm2 restart goodjob || /home/ubuntu/.local/share/pnpm/pm2 start "/home/ubuntu/.nvm/versions/node/v22.19.0/bin/pnpm run start:prod" --name goodjob
                    EOF
