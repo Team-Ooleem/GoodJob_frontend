@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import Link from 'next/link';
 import { Flex, Button } from 'antd';
 
 // global components
@@ -18,7 +19,9 @@ export function Header() {
                     <HeaderNavigation />
                 </Flex>
                 <Flex justify='center' align='center' gap={6}>
-                    <Button type='primary'>로그인</Button>
+                    <Link href='/login'>
+                        <Button type='primary'>로그인</Button>
+                    </Link>
                     <Button>기업 서비스</Button>
                 </Flex>
             </div>
