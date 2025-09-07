@@ -1,18 +1,19 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useCanvasStore } from '../_stores';
 import * as Y from 'yjs';
 import io from 'socket.io-client';
 import * as fabric from 'fabric';
 
-// fabric v6 기준
-type FabricObject = fabric.Object & { id?: string; __fromRemote?: boolean };
+type FabricObject = fabric.Object & {
+    id?: string;
+    __fromRemote?: boolean;
+    __lastModified?: number;
+};
 
-// 가벼운 고유ID
 const makeId = () => `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 
-// 서버 payload → Uint8Array
 const toU8 = (payload: unknown): Uint8Array => {
     if (payload instanceof Uint8Array) return payload;
     if (payload instanceof ArrayBuffer) return new Uint8Array(payload);
@@ -25,189 +26,334 @@ const toU8 = (payload: unknown): Uint8Array => {
     throw new Error('Unknown binary format from server');
 };
 
-// v6: enlivenObjects는 Promise 반환 (콜백 X)
 const enlivenObjects = (arr: any[]): Promise<fabric.Object[]> =>
     (fabric.util.enlivenObjects as unknown as (a: any[]) => Promise<fabric.Object[]>)(arr);
 
+const ensureId = (obj: FabricObject) => {
+    if (!obj.id) obj.id = makeId();
+    return obj.id;
+};
+
+// 객체 비교를 위한 해시 함수
+const getObjectHash = (obj: FabricObject): string => {
+    return `${obj.left || 0}_${obj.top || 0}_${obj.angle || 0}_${obj.scaleX || 1}_${obj.scaleY || 1}`;
+};
+
 export function useCollaborativeCanvas(room: string) {
     const canvas = useCanvasStore((s) => s.canvasInstance);
+    const syncTimeoutRef = useRef<NodeJS.Timeout>();
+    const lastSyncHashRef = useRef<Map<string, string>>(new Map());
+    const isApplyingRemoteRef = useRef(false);
 
     useEffect(() => {
         if (!canvas) return;
 
-        // --- 상태 플래그 ---
-        let isApplyingRemote = false;
-        let suppressNextAddedId: string | null = null;
-
-        // --- Socket.IO ---
-        const socket = io('http://localhost:3000', {
+        // --- Socket 연결 ---
+        const socket = io('http://localhost:4000', {
             withCredentials: true,
             transports: ['websocket', 'polling'],
+            reconnection: true,
+            reconnectionDelay: 1000,
+            reconnectionAttempts: 5,
         });
 
         socket.on('connect', () => {
-            // 연결된 후에 join (연결 전에 emit하면 드물게 누락될 수 있음)
+            console.log('Socket connected, joining room:', room);
             socket.emit('join', room);
-            // console.log('[socket] connected', socket.id);
         });
-        socket.on('connect_error', (e) => console.error('[socket] connect_error', e));
-        socket.on('error', (e) => console.error('[socket] error', e));
 
-        // --- Y.Doc ---
+        socket.on('disconnect', () => {
+            console.log('Socket disconnected');
+        });
+
+        // --- Y.Doc 설정 ---
         const ydoc = new Y.Doc();
-        const yObjects = ydoc.getMap<any>('objects'); // id -> fabric JSON
+        const yObjects = ydoc.getMap<any>('objects');
 
-        // 로컬 Y 업데이트 → 서버로 브로드캐스트
-        const onLocalYUpdate = (u8: Uint8Array) => {
-            if (isApplyingRemote) return; // 원격 적용 중에는 송신 금지
+        const onLocalYUpdate = (u8: Uint8Array, origin: any) => {
+            // 원격에서 온 업데이트는 다시 전송하지 않음
+            if (isApplyingRemoteRef.current || origin === 'remote') return;
+
             socket.emit('sync', { room, update: Array.from(u8) });
         };
+
         ydoc.on('update', onLocalYUpdate);
 
-        // 원격 업데이트 적용 래퍼
-        const applyRemote = (u8: Uint8Array) => {
-            isApplyingRemote = true;
+        const applyRemoteUpdate = async (u8: Uint8Array) => {
+            isApplyingRemoteRef.current = true;
             try {
-                Y.applyUpdate(ydoc, u8);
-                void reconcileFromY();
+                Y.applyUpdate(ydoc, u8, 'remote');
+                await syncFromY();
             } finally {
-                isApplyingRemote = false;
+                setTimeout(() => {
+                    isApplyingRemoteRef.current = false;
+                }, 50); // 약간의 딜레이로 중복 업데이트 방지
             }
         };
 
-        // 초기/증분
-        socket.on('init', (payload: unknown) => applyRemote(toU8(payload)));
-        socket.on('update', (payload: unknown) => applyRemote(toU8(payload)));
+        socket.on('init', (payload: unknown) => {
+            console.log('Received initial state');
+            applyRemoteUpdate(toU8(payload));
+        });
 
-        // --- 유틸 ---
-        const getAll = () =>
-            canvas.getObjects().filter((o) => !(o as any).excludeFromExport) as FabricObject[];
+        socket.on('update', (payload: unknown) => {
+            console.log('Received update');
+            applyRemoteUpdate(toU8(payload));
+        });
 
-        const toSerializable = (obj: FabricObject) => {
-            // id가 JSON에 포함되도록 최소한 'id'만 지정
-            // 나머지는 fabric v6의 기본 toObject가 충분히 포함합니다.
-            return obj.toObject(['id']);
-        };
+        // Y.js → Canvas 동기화 (개선된 버전)
+        const syncFromY = async () => {
+            if (isApplyingRemoteRef.current === false) return;
 
-        const enlivenAndAdd = async (json: any): Promise<FabricObject> => {
-            const [obj] = (await enlivenObjects([json])) as FabricObject[];
-            obj.__fromRemote = true;
-            canvas.add(obj);
-            obj.__fromRemote = false;
-            return obj;
-        };
+            const canvasObjects = new Map<string, FabricObject>();
+            canvas.getObjects().forEach((obj) => {
+                const fo = obj as FabricObject;
+                if (fo.id) canvasObjects.set(fo.id, fo);
+            });
 
-        // --- Y → Fabric 동기화 ---
-        const reconcileFromY = async () => {
-            const yIds = Array.from(yObjects.keys());
-            const current = getAll();
+            const updatedObjects: FabricObject[] = [];
 
-            // 로컬 객체에 id 없으면 부여
-            for (const o of current) if (!o.id) o.id = makeId();
+            // Y.js의 모든 객체 처리
+            for (const [id, data] of yObjects.entries()) {
+                if (data.type instanceof fabric.ActiveSelection) continue;
 
-            // 생성/업데이트
-            for (const id of yIds) {
-                const json = yObjects.get(id);
-                if (!json) continue;
+                const existing = canvasObjects.get(id);
+                const newHash = `${data.left || 0}_${data.top || 0}_${data.angle || 0}_${data.scaleX || 1}_${data.scaleY || 1}`;
+                const lastHash = lastSyncHashRef.current.get(id);
 
-                const existing = current.find((o) => o.id === id);
-                if (!existing) {
-                    const obj = await enlivenAndAdd(json);
-                    obj.id = id;
+                if (existing) {
+                    // 변경사항이 있는 경우에만 업데이트
+                    if (lastHash !== newHash) {
+                        existing.__fromRemote = true;
+                        existing.__lastModified = Date.now();
+
+                        existing.set({
+                            left: data.left,
+                            top: data.top,
+                            angle: data.angle || 0,
+                            scaleX: data.scaleX || 1,
+                            scaleY: data.scaleY || 1,
+                        });
+                        existing.setCoords();
+                        updatedObjects.push(existing);
+                        lastSyncHashRef.current.set(id, newHash);
+                    }
+                    canvasObjects.delete(id);
                 } else {
-                    // 교체(간단 전략). 필요 시 속성별 머지로 바꿔도 됨.
-                    existing.__fromRemote = true;
-                    canvas.remove(existing);
-                    const newObj = await enlivenAndAdd(json);
-                    newObj.id = id;
-                    existing.__fromRemote = false;
+                    // 새 객체 추가
+                    try {
+                        const [obj] = (await enlivenObjects([data])) as FabricObject[];
+                        obj.id = id;
+                        obj.__fromRemote = true;
+                        obj.__lastModified = Date.now();
+
+                        // 객체 제어 설정
+                        obj.set({
+                            hasControls: false,
+                            lockScalingX: true,
+                            lockScalingY: true,
+                            lockRotation: true,
+                            lockSkewingX: true,
+                            lockSkewingY: true,
+                        });
+
+                        canvas.add(obj);
+                        lastSyncHashRef.current.set(id, newHash);
+                        updatedObjects.push(obj);
+                    } catch (error) {
+                        console.error('Failed to enliven object:', error, data);
+                    }
                 }
             }
 
-            // Y에 없는 로컬 객체 제거
-            for (const obj of getAll()) {
-                if (!obj.id) continue;
-                if (!yObjects.has(obj.id)) {
-                    obj.__fromRemote = true;
-                    canvas.remove(obj);
+            // Y.js에 없는 객체 제거
+            canvasObjects.forEach((obj) => {
+                obj.__fromRemote = true;
+                canvas.remove(obj);
+                if (obj.id) {
+                    lastSyncHashRef.current.delete(obj.id);
+                }
+            });
+
+            // __fromRemote 플래그 리셋 (객체별로 개별 처리)
+            updatedObjects.forEach((obj) => {
+                setTimeout(() => {
                     obj.__fromRemote = false;
-                }
-            }
+                }, 100);
+            });
 
+            // 렌더링 요청
             canvas.requestRenderAll();
         };
 
-        // --- Fabric → Y 반영 ---
-        const upsertToY = (obj: FabricObject) => {
-            if (obj.__fromRemote) return;
-            if (!obj.id) obj.id = makeId();
-            const json = toSerializable(obj);
-            Y.transact(ydoc, () => {
-                yObjects.set(obj.id!, json);
-            });
-        };
+        // Canvas → Y.js 동기화 (디바운스 적용)
+        const syncToY = () => {
+            if (isApplyingRemoteRef.current) return;
 
-        const removeFromY = (obj: FabricObject) => {
-            if (obj.__fromRemote) return;
-            if (!obj.id) return;
-            Y.transact(ydoc, () => {
-                yObjects.delete(obj.id!);
-            });
-        };
-
-        // --- 이벤트 바인딩 ---
-        const onAdded = (e: any) => {
-            const obj = e.target as FabricObject;
-            if (!obj) return;
-
-            // free drawing 직후 object:added가 한 번 더 들어오는 걸 스킵
-            if (suppressNextAddedId && obj.id === suppressNextAddedId) {
-                suppressNextAddedId = null;
-                return;
+            // 기존 타이머 클리어
+            if (syncTimeoutRef.current) {
+                clearTimeout(syncTimeoutRef.current);
             }
-            upsertToY(obj);
+
+            // 디바운스 적용 (50ms 후 실행)
+            syncTimeoutRef.current = setTimeout(() => {
+                Y.transact(ydoc, () => {
+                    const currentIds = new Set<string>();
+
+                    canvas.getObjects().forEach((obj) => {
+                        // ActiveSelection은 무시
+                        if (obj instanceof fabric.ActiveSelection) return;
+
+                        const fo = obj as FabricObject;
+
+                        // 원격에서 온 객체가 아직 업데이트 중인 경우 스킵
+                        if (
+                            fo.__fromRemote &&
+                            fo.__lastModified &&
+                            Date.now() - fo.__lastModified < 200
+                        ) {
+                            return;
+                        }
+
+                        const id = ensureId(fo);
+                        currentIds.add(id);
+
+                        const data = fo.toObject();
+                        data.id = id;
+
+                        // 현재 해시와 비교하여 변경된 경우에만 업데이트
+                        const currentHash = getObjectHash(fo);
+                        const lastHash = lastSyncHashRef.current.get(id);
+
+                        if (lastHash !== currentHash) {
+                            yObjects.set(id, data);
+                            lastSyncHashRef.current.set(id, currentHash);
+                        }
+                    });
+
+                    // Y.js에만 있고 캔버스에 없는 객체 제거
+                    Array.from(yObjects.keys()).forEach((id) => {
+                        if (!currentIds.has(id)) {
+                            yObjects.delete(id);
+                            lastSyncHashRef.current.delete(id);
+                        }
+                    });
+                });
+            }, 50);
         };
 
-        const onModified = (() => {
-            let t: any;
-            return (e: any) => {
-                const obj = e.target as FabricObject;
-                if (!obj) return;
-                clearTimeout(t);
-                t = setTimeout(() => upsertToY(obj), 60); // 과도한 송신 방지
-            };
-        })();
-
-        const onRemoved = (e: any) => {
+        // 이벤트 핸들러들
+        const onObjectAdded = (e: any) => {
             const obj = e.target as FabricObject;
-            if (obj) removeFromY(obj);
+            if (obj.__fromRemote) return;
+
+            console.log('Object added:', obj.type);
+            ensureId(obj);
+
+            obj.set({
+                hasControls: false,
+                lockScalingX: true,
+                lockScalingY: true,
+                lockRotation: true,
+                lockSkewingX: true,
+                lockSkewingY: true,
+            });
+
+            syncToY();
         };
 
-        const onPathCreated = (e: any) => {
-            const obj = e.path as FabricObject;
-            if (!obj) return;
-            if (!obj.id) obj.id = makeId();
-            // 방금 그 path에 이어지는 object:added 한 번은 무시
-            suppressNextAddedId = obj.id;
-            upsertToY(obj);
+        const onObjectModified = (e: any) => {
+            const target = e.target as FabricObject | undefined;
+            if (!target || target.__fromRemote) return;
+
+            console.log('Object modified:', target.type);
+
+            if (target instanceof fabric.ActiveSelection) {
+                const sel = target as fabric.ActiveSelection;
+
+                // Selection 안의 개별 객체들 처리
+                sel.getObjects().forEach((child) => {
+                    ensureId(child as FabricObject);
+                    (child as FabricObject).__fromRemote = false;
+                });
+
+                // Selection 해제
+                sel.forEachObject((child) => canvas.add(child));
+                canvas.remove(sel);
+            }
+
+            syncToY();
+            canvas.requestRenderAll();
         };
 
-        canvas.on('object:added', onAdded);
-        canvas.on('object:modified', onModified);
-        canvas.on('object:removed', onRemoved);
+        const onObjectRemoved = (e: any) => {
+            const obj = e.target as FabricObject;
+            if (obj.__fromRemote) return;
+
+            console.log('Object removed:', obj.type);
+            if (obj.id) {
+                lastSyncHashRef.current.delete(obj.id);
+            }
+            syncToY();
+        };
+
+        const onPathCreated = () => {
+            console.log('Path created');
+            syncToY();
+        };
+
+        // 마우스 이벤트로 실시간 동기화
+        const onObjectMoving = (e: any) => {
+            const obj = e.target as FabricObject;
+            if (obj.__fromRemote) return;
+
+            // 이동 중에는 더 빠른 동기화
+            if (syncTimeoutRef.current) {
+                clearTimeout(syncTimeoutRef.current);
+            }
+            syncTimeoutRef.current = setTimeout(syncToY, 16); // ~60fps
+        };
+
+        // 이벤트 등록
+        canvas.on('object:added', onObjectAdded);
+        canvas.on('object:modified', onObjectModified);
+        canvas.on('object:removed', onObjectRemoved);
         canvas.on('path:created', onPathCreated);
+        canvas.on('object:moving', onObjectMoving);
+        canvas.on('object:rotating', onObjectMoving);
 
-        // init 들어온 뒤 reconcile 되므로 여기서는 강제 호출 안 함
+        // 정기적인 상태 체크 (연결 끊김 방지)
+        const healthCheckInterval = setInterval(() => {
+            if (socket.connected) {
+                socket.emit('ping', { room });
+            } else {
+                console.log('Socket disconnected, attempting reconnect...');
+                socket.connect();
+            }
+        }, 10000);
 
+        // 클린업
         return () => {
-            canvas.off('object:added', onAdded);
-            canvas.off('object:modified', onModified);
-            canvas.off('object:removed', onRemoved);
+            console.log('Cleaning up collaborative canvas');
+
+            if (syncTimeoutRef.current) {
+                clearTimeout(syncTimeoutRef.current);
+            }
+
+            clearInterval(healthCheckInterval);
+
+            canvas.off('object:added', onObjectAdded);
+            canvas.off('object:modified', onObjectModified);
+            canvas.off('object:removed', onObjectRemoved);
             canvas.off('path:created', onPathCreated);
+            canvas.off('object:moving', onObjectMoving);
+            canvas.off('object:rotating', onObjectMoving);
 
             ydoc.off('update', onLocalYUpdate);
-            socket.disconnect(); // 언마운트 시 "WebSocket is closed..." 로그는 정상
+            socket.disconnect();
             ydoc.destroy();
+
+            lastSyncHashRef.current.clear();
         };
     }, [canvas, room]);
 }

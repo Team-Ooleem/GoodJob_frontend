@@ -1,3 +1,6 @@
+const fs = require('fs');
+const path = require('path');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     /* config options here */
@@ -15,10 +18,17 @@ const nextConfig = {
         return [
             {
                 source: '/ws/:path*',
-                destination: 'http://localhost:3000/:path*',
+                destination: 'https://localhost:3000/:path*',
             },
         ];
     },
+    // HTTPS 설정
+    // server: {
+    //     https: {
+    //         key: fs.readFileSync(path.join(__dirname, 'ssl/localhost-key.pem')),
+    //         cert: fs.readFileSync(path.join(__dirname, 'ssl/localhost.pem')),
+    //     },
+    // },
 };
 
 module.exports = nextConfig;

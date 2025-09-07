@@ -2,9 +2,5 @@
 import { FabricWhiteBoard } from '../_components';
 
 export default function CoachingResumePage() {
-    return (
-        <>
-            <FabricWhiteBoard />
-        </>
-    );
+    return <FabricWhiteBoard />;
 }

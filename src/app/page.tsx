@@ -1,23 +1,71 @@
+import { Space } from 'antd';
+
+// global components
+import { Header, Footer, JobCardList } from '@/components';
 import { ZustandTest } from '@/components/zustand-test';
 import { ReactQueryTest } from '@/components/react-query-test';
 
 export default function Home() {
+    const jobList = [
+        {
+            id: 'job-1',
+            imageUrl: '/assets/job-card-temp.webp',
+            title: 'Product Designer',
+            company: '지엔터프라이즈',
+            location: '서울 강남구',
+            experience: '경력 7년 이상',
+        },
+        {
+            id: 'job-2',
+            imageUrl: '/assets/job-card-temp.webp',
+            title: 'Product Designer',
+            company: '지엔터프라이즈',
+            location: '서울 강남구',
+            experience: '경력 7년 이상',
+        },
+        {
+            id: 'job-3',
+            imageUrl: '/assets/job-card-temp.webp',
+            title: 'Product Designer',
+            company: '지엔터프라이즈',
+            location: '서울 강남구',
+            experience: '경력 7년 이상',
+        },
+        {
+            id: 'job-4',
+            imageUrl: '/assets/job-card-temp.webp',
+            title: 'Product Designer',
+            company: '지엔터프라이즈',
+            location: '서울 강남구',
+            experience: '경력 7년 이상',
+        },
+        {
+            id: 'job-5',
+            imageUrl: '/assets/job-card-temp.webp',
+            title: 'Product Designer',
+            company: '지엔터프라이즈',
+            location: '서울 강남구',
+            experience: '경력 7년 이상',
+        },
+    ];
+
     return (
-        <div className='font-sans min-h-screen p-8 pb-20 gap-16 sm:p-20'>
-            <div className='max-w-6xl mx-auto space-y-8'>
-                <div className='text-center'>
-                    <h1 className='text-4xl font-bold text-gray-800 mb-4'>
-                        Good Job - AI Mock Interview Platform
-                    </h1>
-                    <p className='text-xl text-gray-600'>간소화된 테스트 페이지</p>
-                </div>
-
-                {/* Zustand 테스트 */}
-                <ZustandTest />
-
-                {/* React Query 테스트 */}
-                <ReactQueryTest />
+        <div>
+            <Header />
+            <div className='w-full h-[237px] bg-blue-500'></div>
+            <div className='max-w-[1400px] w-full mx-auto px-4 md:px-6 pt-32 pb-52'>
+                <Space direction='vertical' size={100}>
+                    <JobCardList title='모두가 주목하고 있어요!' data={jobList} />
+                    <JobCardList title='리모트 근무 포지션' data={jobList} />
+                    <JobCardList
+                        title='출퇴근 걱정없는 역세권 포지션'
+                        data={jobList.concat([...jobList.slice(1)])}
+                        variant='small'
+                    />
+                    <JobCardList title='요즘 뜨는 포지션' data={jobList} />
+                </Space>
             </div>
+            <Footer />
         </div>
     );
 }

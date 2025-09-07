@@ -2,28 +2,29 @@
 
 import { Avatar, Card, Typography, Divider, Spin, Button } from 'antd';
 import { UserOutlined, EnvironmentOutlined, TeamOutlined } from '@ant-design/icons';
-import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useSocialProfile } from '../_hooks';
 
 const { Text, Title } = Typography;
 
-export default function ProfileSection() {
-    const [currentUserId, setCurrentUserId] = useState<string>('');
+interface ProfileSectionProps {
+    currentUserId: number;
+}
 
-    // localStorage에서 user_idx 가져오기
-    useEffect(() => {
-        const userId = localStorage.getItem('user_idx');
-        if (userId) {
-            setCurrentUserId(userId);
-        }
-    }, []);
+export default function ProfileSection({ currentUserId }: ProfileSectionProps) {
+    const router = useRouter();
+
+    // 내 프로필 클릭 핸들러
+    const handleMyProfileClick = () => {
+        router.push(`/user/social/profile/${currentUserId}`);
+    };
 
     // 사용자 프로필 데이터 가져오기
     const {
         data: profile,
         isLoading: profileLoading,
         error: profileError,
-    } = useSocialProfile(currentUserId);
+    } = useSocialProfile(currentUserId.toString());
 
     // 로딩 상태 처리
     if (profileLoading) {
@@ -74,7 +75,11 @@ export default function ProfileSection() {
                     icon={<UserOutlined />}
                     className='mb-4'
                 />
-                <Title level={4} className='mb-2'>
+                <Title
+                    level={4}
+                    className='mb-2 cursor-pointer hover:text-blue-600 transition-colors'
+                    onClick={handleMyProfileClick}
+                >
                     {profile?.name || '사용자'}
                 </Title>
                 <Text className='text-gray-600 block mb-1'>

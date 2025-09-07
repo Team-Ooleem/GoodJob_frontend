@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Button, Card, Typography, Space, Row, Col, Input, Radio, Form, message } from 'antd';
+import { useState, useEffect } from 'react';
+import { Button, Card, Typography, Space, Row, Col, Input, Radio, Form, message, Spin } from 'antd';
 import {
     FileTextOutlined,
     LinkOutlined,
@@ -9,14 +9,27 @@ import {
     CheckCircleOutlined,
 } from '@ant-design/icons';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks';
+import { api } from '@/apis/api';
 
 const { Title, Paragraph, Text } = Typography;
 
+// 타입 정의
+interface Resume {
+    id: number;
+    title: string;
+    position: string;
+    company: string;
+    createdAt: string;
+    experience: string;
+    skills: string[];
+}
+
 // Dummy 이력서 데이터
-const dummyResumes = [
+const dummyResumes: Resume[] = [
     {
         id: 1,
-        title: '프론트엔드 개발자 이력서',
+        title: '이게보이면 너가짠 코드가 동작하지않는거란다 하하',
         position: 'Frontend Developer',
         company: 'TechCorp',
         createdAt: '2024-01-15',
@@ -53,10 +66,38 @@ const dummyResumes = [
 ];
 
 export default function AiInterviewSelectPage() {
+    const [resumes, setResumes] = useState<Resume[]>([]);
+    const [loading, setLoading] = useState(true);
     const [selectedResume, setSelectedResume] = useState<number | null>(null);
     const [jobPostUrl, setJobPostUrl] = useState('');
     const [form] = Form.useForm();
     const router = useRouter();
+
+    // JWT 쿠키 기반 사용자 정보 조회
+    const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+    const userId = user?.idx ?? null;
+
+    useEffect(() => {
+        if (userId) {
+            fetchResumes(userId);
+        }
+    }, [userId]);
+
+    const fetchResumes = async (uid: number) => {
+        try {
+            setLoading(true);
+            const { data } = await api.get<Resume[]>(`/resumes/user/${uid}`);
+            setResumes(data);
+        } catch (error) {
+            console.error('Error fetching resumes:', error);
+            message.error('이력서를 불러오는데 실패했습니다.');
+
+            // 에러 발생 시 더미 데이터로 폴백
+            setResumes(dummyResumes);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleResumeSelect = (resumeId: number) => {
         setSelectedResume(resumeId);
@@ -82,15 +123,27 @@ export default function AiInterviewSelectPage() {
         }
 
         // 선택된 이력서와 채용공고 URL을 저장하고 설정 페이지로 이동
-        const selectedResumeData = dummyResumes.find((resume) => resume.id === selectedResume);
+        const selectedResumeData = resumes.find((resume) => resume.id === selectedResume);
 
         // 로컬 스토리지에 데이터 저장 (실제로는 상태 관리 라이브러리 사용 권장)
-        localStorage.setItem('selectedResume', JSON.stringify(selectedResumeData));
-        localStorage.setItem('jobPostUrl', jobPostUrl);
+        sessionStorage.setItem('selectedResume', JSON.stringify(selectedResumeData));
+        sessionStorage.setItem('jobPostUrl', jobPostUrl);
 
         message.success('모의면접 설정을 진행합니다.');
         router.push('/ai-interview/setting');
     };
+
+    const formatDate = (dateString: string) => {
+        return new Date(dateString).toLocaleDateString('ko-KR');
+    };
+
+    if (loading || authLoading) {
+        return (
+            <div className='min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 flex items-center justify-center'>
+                <Spin size='large' />
+            </div>
+        );
+    }
 
     return (
         <div className='min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8'>
@@ -123,7 +176,7 @@ export default function AiInterviewSelectPage() {
                                 </Paragraph>
 
                                 <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-                                    {dummyResumes.map((resume) => (
+                                    {resumes.map((resume) => (
                                         <Card
                                             key={resume.id}
                                             className={`cursor-pointer transition-all duration-300 ${
@@ -247,7 +300,7 @@ export default function AiInterviewSelectPage() {
                                 선택 완료
                             </Title>
                             <Text className='!text-green-600'>
-                                {dummyResumes.find((r) => r.id === selectedResume)?.title}이
+                                {resumes.find((r) => r.id === selectedResume)?.title}이
                                 선택되었습니다.
                                 {jobPostUrl && ' 채용공고 URL도 입력되었습니다.'}
                             </Text>
