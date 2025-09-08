@@ -23,6 +23,27 @@ const nextConfig = {
             },
         ],
     },
+    rewrites: async () => {
+        const isDevelopment = process.env.NODE_ENV === 'development';
+
+        if (isDevelopment) {
+            // 개발 환경: 로컬 백엔드로 프록시
+            return [
+                {
+                    source: '/api/:path*',
+                    destination: 'http://localhost:4000/api/:path*',
+                },
+            ];
+        } else {
+            // 프로덕션 환경: 외부 API로 프록시
+            return [
+                {
+                    source: '/api/:path*',
+                    destination: 'https://api-good-job.duckdns.org/api/:path*',
+                },
+            ];
+        }
+    },
     typescript: {
         ignoreBuildErrors: true,
     },
