@@ -27,24 +27,27 @@ api.interceptors.response.use(
     async (err) => {
         // 401 에러 시 토큰 제거 및 로그인 페이지로 리다이렉트
         if (err?.response?.status === 401) {
-            // 이 때 프론트는 직접 httpOnly 쿠키를 지울 수 없으므로
-            // /auth/logout 호출해서 서버 측에서 clearCookie('session', ...)로 쿠키를 제거
-            try {
-                await api.get('/auth/logout');
-            } catch {}
+            // /auth/me API는 로그인 상태 확인용이므로 alert 표시하지 않음
+            const isAuthMeRequest = err?.config?.url?.includes('/auth/me');
 
-            // 현재 페이지가 로그인 관련 페이지가 아닐 때만 알림 표시
-            if (typeof window !== 'undefined') {
-                const currentPath = window.location.pathname;
-                const isAuthPage = currentPath.includes('/login');
-                // currentPath.includes('/signup') ||
-                // currentPath.includes('/auth');
+            if (!isAuthMeRequest) {
+                // 이 때 프론트는 직접 httpOnly 쿠키를 지울 수 없으므로
+                // /auth/logout 호출해서 서버 측에서 clearCookie('session', ...)로 쿠키를 제거
+                try {
+                    await api.get('/auth/logout');
+                } catch {}
 
-                // 로그인 관련 페이지가 아닐 때만 alert 표시
-                if (!isAuthPage) {
-                    alert('세션이 만료되었습니다. 다시 로그인해주세요.');
-                    // 이후 /login 페이지로 리다이렉트하여 사용자에게 재로그인을 유도
-                    window.location.href = '/login';
+                // 현재 페이지가 로그인 관련 페이지가 아닐 때만 알림 표시
+                if (typeof window !== 'undefined') {
+                    const currentPath = window.location.pathname;
+                    const isAuthPage = currentPath.includes('/login');
+
+                    // 로그인 관련 페이지가 아닐 때만 alert 표시
+                    if (!isAuthPage) {
+                        alert('세션이 만료되었습니다. 다시 로그인해주세요.');
+                        // 이후 /login 페이지로 리다이렉트하여 사용자에게 재로그인을 유도
+                        window.location.href = '/login';
+                    }
                 }
             }
         }
