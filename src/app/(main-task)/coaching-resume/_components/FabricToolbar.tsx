@@ -25,6 +25,8 @@ export function FabricToolbar() {
     const toggleMic = useCanvasStore((store) => store.toggleMic);
     const toggleCam = useCanvasStore((store) => store.toggleCam);
     const { isRecordingRef, handleRecord } = useVoiceRecorder({ canvasIdx: 0 });
+    const isRecording = useCanvasStore((store) => store.isRecording);
+    const toggleRecording = useCanvasStore((store) => store.toggleRecording);
     const [hoverMic, setHoverMic] = useState(false);
     const [hoverCam, setHoverCam] = useState(false);
 
@@ -33,111 +35,133 @@ export function FabricToolbar() {
 
     // TODO: 툴바 버튼 컴포넌트 분리 및 스타일링 필요
     return (
-        <div className='absolute bottom-[20px] left-1/2 -translate-x-1/2 transform z-[10] bg-white shadow-[0_2px_6px_rgba(0,0,0,0.25)] rounded-full px-4 py-1 flex items-center gap-1'>
-            {/* 마이크 */}
-            <button
-                className='p-2 rounded hover:bg-gray-100'
-                onClick={toggleMic}
-                onMouseEnter={() => setHoverMic(true)}
-                onMouseLeave={() => setHoverMic(false)}
-                title={previewMicEnabled ? '마이크 끄기' : '마이크 켜기'}
-            >
-                <Image
-                    src={previewMicEnabled ? '/assets/mic-none.svg' : '/assets/mic-off.svg'}
-                    width={20}
-                    height={20}
-                    alt='mic-toggle'
-                />
-            </button>
+        <div className='absolute bottom-[20px] left-1/2 -translate-x-1/2 transform z-[10] flex justify-center items-center gap-3'>
+            <div className='h-[55px] bg-white shadow-[0_2px_6px_rgba(0,0,0,0.25)] rounded-full px-4 py-1 flex items-center gap-1'>
+                {/* 마이크 */}
+                <button
+                    className='p-2 rounded hover:bg-gray-100'
+                    onClick={toggleMic}
+                    onMouseEnter={() => setHoverMic(true)}
+                    onMouseLeave={() => setHoverMic(false)}
+                    title={previewMicEnabled ? '마이크 끄기' : '마이크 켜기'}
+                >
+                    <Image
+                        src={previewMicEnabled ? '/assets/mic-none.svg' : '/assets/mic-off.svg'}
+                        width={20}
+                        height={20}
+                        alt='mic-toggle'
+                    />
+                </button>
 
-            {/* 카메라 */}
-            <button
-                className='p-2 rounded hover:bg-gray-100'
-                onClick={toggleCam}
-                onMouseEnter={() => setHoverCam(true)}
-                onMouseLeave={() => setHoverCam(false)}
-                title={previewCamEnabled ? '카메라 끄기' : '카메라 켜기'}
-            >
-                <Image
-                    src={previewCamEnabled ? '/assets/videocam.svg' : '/assets/videocam-off.svg'}
-                    width={20}
-                    height={20}
-                    alt='camera-toggle'
-                />
-            </button>
+                {/* 카메라 */}
+                <button
+                    className='p-2 rounded hover:bg-gray-100'
+                    onClick={toggleCam}
+                    onMouseEnter={() => setHoverCam(true)}
+                    onMouseLeave={() => setHoverCam(false)}
+                    title={previewCamEnabled ? '카메라 끄기' : '카메라 켜기'}
+                >
+                    <Image
+                        src={
+                            previewCamEnabled ? '/assets/videocam.svg' : '/assets/videocam-off.svg'
+                        }
+                        width={20}
+                        height={20}
+                        alt='camera-toggle'
+                    />
+                </button>
 
-            <div className='w-px h-6 bg-gray-200' />
+                <div className='w-px h-6 bg-gray-200' />
 
-            {/* 펜 / 형광펜 / 지우개 */}
-            <Flex gap={2} align='center'>
-                {/* 선택 */}
+                {/* 펜 / 형광펜 / 지우개 */}
+                <Flex gap={2} align='center'>
+                    {/* 선택 */}
+                    <button
+                        className='p-2 rounded hover:bg-gray-100'
+                        onClick={() => setDrawingMode(false)}
+                    >
+                        <Image src='/assets/selector.svg' width={20} height={20} alt='selector' />
+                    </button>
+                    <button
+                        className='p-2 rounded hover:bg-gray-100'
+                        onClick={() => {
+                            setDrawingMode(true);
+                            setBrushOptions({ type: 'pencil', color: '#000000', width: 3 });
+                        }}
+                    >
+                        <Image
+                            src='/assets/pencel.svg'
+                            width={24}
+                            height={20}
+                            alt='pencil'
+                            className='object-contain'
+                        />
+                    </button>
+                    <button
+                        className='p-2 rounded hover:bg-gray-100'
+                        onClick={() => {
+                            setDrawingMode(true);
+                            setBrushOptions({ type: 'highlighter', width: 20 });
+                        }}
+                    >
+                        <Image
+                            src='/assets/highlighter.svg'
+                            width={24}
+                            height={20}
+                            alt='highlighter'
+                            className='object-contain'
+                        />
+                    </button>
+                    <button
+                        className='p-2 rounded hover:bg-gray-100'
+                        onClick={() => {
+                            setStickyMode(true);
+                            setDrawingMode(false);
+                            setEraserMode(false);
+                        }}
+                    >
+                        <Image
+                            src='/assets/sticky.svg'
+                            width={30}
+                            height={20}
+                            alt='sticky'
+                            className='object-contain'
+                        />
+                    </button>
+                    <button
+                        className='p-2 rounded hover:bg-gray-100'
+                        onClick={() => {
+                            setEraserMode(true);
+                        }}
+                    >
+                        <Image
+                            src='/assets/eraser.svg'
+                            width={15}
+                            height={20}
+                            alt='eraser'
+                            className='object-contain'
+                        />
+                    </button>
+                </Flex>
+            </div>
+            <div className='w-[55px] h-[55px] bg-white shadow-[0_2px_6px_rgba(0,0,0,0.25)] rounded-full px-4 py-1 flex justify-center items-center gap-1'>
+                {/* 녹음 */}
                 <button
-                    className='p-2 rounded hover:bg-gray-100'
-                    onClick={() => setDrawingMode(false)}
-                >
-                    <Image src='/assets/selector.svg' width={20} height={20} alt='selector' />
-                </button>
-                <button
-                    className='p-2 rounded hover:bg-gray-100'
+                    className='rounded'
                     onClick={() => {
-                        setDrawingMode(true);
-                        setBrushOptions({ type: 'pencil', color: '#000000', width: 3 });
+                        toggleRecording();
+                        handleRecord();
                     }}
+                    title={isRecording ? '녹음 중지' : '녹음 시작'}
                 >
                     <Image
-                        src='/assets/pencel.svg'
-                        width={24}
+                        src={isRecording ? '/assets/stop-circle.svg' : '/assets/mic.svg'}
+                        width={20}
                         height={20}
-                        alt='pencil'
-                        className='object-contain'
+                        alt='record-toggle'
                     />
                 </button>
-                <button
-                    className='p-2 rounded hover:bg-gray-100'
-                    onClick={() => {
-                        setDrawingMode(true);
-                        setBrushOptions({ type: 'highlighter', width: 20 });
-                    }}
-                >
-                    <Image
-                        src='/assets/highlighter.svg'
-                        width={24}
-                        height={20}
-                        alt='highlighter'
-                        className='object-contain'
-                    />
-                </button>
-                <button
-                    className='p-2 rounded hover:bg-gray-100'
-                    onClick={() => {
-                        setStickyMode(true);
-                        setDrawingMode(false);
-                        setEraserMode(false);
-                    }}
-                >
-                    <Image
-                        src='/assets/sticky.svg'
-                        width={30}
-                        height={20}
-                        alt='sticky'
-                        className='object-contain'
-                    />
-                </button>
-                <button
-                    className='p-2 rounded hover:bg-gray-100'
-                    onClick={() => {
-                        setEraserMode(true);
-                    }}
-                >
-                    <Image
-                        src='/assets/eraser.svg'
-                        width={15}
-                        height={20}
-                        alt='eraser'
-                        className='object-contain'
-                    />
-                </button>
-            </Flex>
+            </div>
         </div>
         // <Flex
         //     className='absolute bottom-[10px] left-1/2 -translate-x-1/2 transform z-[10]'

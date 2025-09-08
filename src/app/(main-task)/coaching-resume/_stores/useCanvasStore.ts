@@ -26,6 +26,8 @@ type CanvasStoreState = {
     // media
     isMicEnabled: boolean;
     isCamEnabled: boolean;
+    // recording
+    isRecording: boolean;
     stickyNoteConfig: StickyNoteConfig;
 
     // history
@@ -44,6 +46,9 @@ type CanvasStoreState = {
     toggleCam: () => void;
     setMicEnabled: (enabled: boolean) => void;
     setCamEnabled: (enabled: boolean) => void;
+    // recording
+    toggleRecording: () => void;
+    setRecording: (enabled: boolean) => void;
 
     // objects
     deleteActiveObject: () => void;
@@ -69,6 +74,7 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     isStickyMode: false,
     isMicEnabled: true,
     isCamEnabled: true,
+    isRecording: false,
     stickyNoteConfig: {
         width: 200,
         minHeight: 150,
@@ -113,6 +119,8 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     toggleCam: () => set((state) => ({ isCamEnabled: !state.isCamEnabled })),
     setMicEnabled: (enabled: boolean) => set({ isMicEnabled: enabled }),
     setCamEnabled: (enabled: boolean) => set({ isCamEnabled: enabled }),
+    toggleRecording: () => set((state) => ({ isRecording: !state.isRecording })),
+    setRecording: (enabled: boolean) => set({ isRecording: enabled }),
 
     setDrawingMode: (enabled) => {
         const canvas = get().canvasInstance;
