@@ -179,7 +179,7 @@ export default function AiInterviewSettingCalibrationCombined() {
         })();
     }, []);
 
-    const startCalibration = async () => {
+    const startCalibration: () => Promise<void> = async () => {
         try {
             setError(null);
             setVisualAgg(null);
@@ -196,7 +196,7 @@ export default function AiInterviewSettingCalibrationCombined() {
         }
     };
 
-    const stopCalibration = async () => {
+    const stopCalibration: () => Promise<void> = async () => {
         if (phase !== "running") return;
         if (timerRef.current) clearInterval(timerRef.current);
         try {
@@ -207,7 +207,7 @@ export default function AiInterviewSettingCalibrationCombined() {
         }
     };
 
-    const finishCalibration = async () => {
+    const finishCalibration: () => Promise<void> = async () => {
         try {
             const vAgg = webcamRef.current?.endQuestion() ?? null;
             if (vAgg) setVisualAgg(vAgg);
@@ -233,7 +233,7 @@ export default function AiInterviewSettingCalibrationCombined() {
         }
     };
 
-    const resetCalibration = () => {
+    const resetCalibration: () => void = () => {
         setError(null);
         setVisualAgg(null);
         setAudioFeatures(null);
@@ -241,7 +241,7 @@ export default function AiInterviewSettingCalibrationCombined() {
         setTimeLeft(15);
     };
 
-    const goToSession = () => {
+    const goToSession: () => void = () => {
         window.location.href = "/ai-interview/sessions";
     };
 
