@@ -4,3 +4,4 @@ export * from './FabricToolbar';
 export * from './ReplayButton';
 export * from './ReplayChat';
 export * from './CameraBox';
+export * from './ParticipantCamera';

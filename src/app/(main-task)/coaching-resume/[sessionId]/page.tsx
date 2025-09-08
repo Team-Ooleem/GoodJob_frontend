@@ -1,10 +1,10 @@
 // local components
-import { FabricToolbar, FabricCanvas, CameraBox } from '../_components';
+import { FabricToolbar, FabricCanvas, ParticipantCamera } from '../_components';
 
 export default function CoachingResumePage() {
     return (
         <>
-            <CameraBox name='김민규' isLocal isSpeaking />
+            <ParticipantCamera />
             <FabricToolbar />
             <FabricCanvas />
         </>
