@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
     Card,
     Typography,
@@ -14,6 +14,7 @@ import {
     Space,
     Alert,
     Divider,
+    Tooltip,
 } from 'antd';
 import {
     CheckCircleOutlined,
@@ -30,6 +31,7 @@ import {
     AudioOutlined,
     SmileOutlined,
     ThunderboltOutlined,
+    InfoCircleOutlined,
 } from '@ant-design/icons';
 import Link from 'next/link';
 
@@ -75,10 +77,26 @@ interface AudioFeatures {
     f0_std_semitone?: number;
     rms_std: number;
     rms_cv: number;
+    rms_cv_voiced?: number;
+    rms_db_std_voiced?: number;
     jitter_like: number;
     shimmer_like: number;
     silence_ratio: number;
     sr: number;
+    voiced_ratio?: number;
+    voiced_frames?: number;
+    total_frames?: number;
+    // Diagnostics
+    voiced_prob_mean?: number;
+    voiced_prob_median?: number;
+    voiced_prob_p90?: number;
+    voiced_flag_ratio?: number;
+    voiced_prob_ge_025_ratio?: number;
+    voiced_prob_ge_035_ratio?: number;
+    f0_valid_ratio?: number;
+    silence_ratio_db50?: number;
+    voiced_ratio_speech?: number;
+    speech_frames?: number | null;
 }
 interface AudioPerQuestion {
     questionNumber: number;
@@ -216,40 +234,96 @@ export default function AiInterviewResultPage() {
 
     // ▼ ADDED: 간단 점수화(프론트 계산) — 서버에서 준 원시지표를 보기 좋게
     const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
+
+    // === Audio Calibration (from localStorage.aiInterviewCalibration)
+    const audioCalib = useMemo(() => {
+        try {
+            if (typeof window === 'undefined') return null;
+            const raw = localStorage.getItem('aiInterviewCalibration');
+            if (!raw) return null;
+            const data = JSON.parse(raw);
+            const a = data?.audio as AudioFeatures | undefined;
+            if (!a) return null;
+            // derive helpful baselines
+            const baseTalk = 1 - (a.silence_ratio ?? 0);
+            const baseCv = typeof a.f0_cv === 'number' ? a.f0_cv : a.f0_mean ? (a.f0_std ?? 0) / a.f0_mean : undefined;
+            return {
+                baseTalk: typeof baseTalk === 'number' && isFinite(baseTalk) ? baseTalk : 0.6,
+                baseCv: typeof baseCv === 'number' && isFinite(baseCv) && baseCv > 0 ? baseCv : 0.12,
+                baseJitter: typeof a.jitter_like === 'number' ? a.jitter_like : undefined,
+                baseShimmer: typeof a.shimmer_like === 'number' ? a.shimmer_like : undefined,
+            };
+        } catch {
+            return null;
+        }
+    }, []);
     const toneScore = (f: AudioFeatures | undefined) => {
         if (!f) return undefined;
-        if (Number.isFinite(f.f0_std_semitone) && (f.f0_std_semitone as number) > 0) {
-            const st = f.f0_std_semitone as number; // 세미톤 표준편차(강건)
-            const lo = 0.15,
-                hi = 0.9; // 0.15→100점, 0.90→0점
-            const t = Math.min(1, Math.max(0, (st - lo) / (hi - lo)));
-            return Math.round((1 - t) * 100);
-        }
-        if (Number.isFinite(f.f0_cv) && (f.f0_cv as number) > 0) {
-            const cv = f.f0_cv as number; // CV 0.05→100, 0.30→0
-            const lo = 0.05,
-                hi = 0.3;
+
+        // 1) CV 우선: 없으면 f0_std/f0_mean으로 유도
+        const cv =
+            typeof f.f0_cv === 'number' && isFinite(f.f0_cv) && f.f0_cv >= 0
+                ? f.f0_cv
+                : typeof f.f0_mean === 'number' && f.f0_mean > 0
+                  ? (f.f0_std ?? 0) / f.f0_mean
+                  : undefined;
+        if (typeof cv === 'number' && isFinite(cv)) {
+            if (audioCalib?.baseCv) {
+                // 개인 기준 대비 비율 1.0 근처면 100점, 2.0이면 0점으로 스케일
+                const ratio = cv / audioCalib.baseCv;
+                const t = clamp01((ratio - 1) / 1.0); // 1.0→0, 2.0→1
+                return Math.round((1 - t) * 100);
+            }
+            // 공통 기준(lo=0.05, hi=0.35)
+            const lo = 0.05, hi = 0.35;
             const t = Math.min(1, Math.max(0, (cv - lo) / (hi - lo)));
             return Math.round((1 - t) * 100);
         }
-        const std = f.f0_std; // 폴백: 절대 표준편차
-        const t = Math.min(1, std / 120);
+
+        // 2) 세미톤 표준편차 보조: 1.0 → 100, 5.0 → 0
+        if (typeof f.f0_std_semitone === 'number' && f.f0_std_semitone >= 0) {
+            const st = f.f0_std_semitone;
+            const lo = 1.0, hi = 5.0;
+            const t = Math.min(1, Math.max(0, (st - lo) / (hi - lo)));
+            return Math.round((1 - t) * 100);
+        }
+
+        // 3) 폴백: 절대 표준편차(Hz)
+        const std = typeof f.f0_std === 'number' && isFinite(f.f0_std) ? f.f0_std : 0;
+        const t = Math.min(1, std / 80);
         return Math.round((1 - t) * 100);
     };
     const vibratoScore = (f: AudioFeatures | undefined) => {
         if (!f) return undefined;
         const nj = Math.min(1, (f.jitter_like ?? 0) / 1.0);
         const ns = Math.min(1, (f.shimmer_like ?? 0) / 1.0);
-        const nr = Math.min(1, (f.rms_cv ?? 0) / 2.0);
+        const rmsVar =
+            typeof f.rms_cv_voiced === 'number' && isFinite(f.rms_cv_voiced)
+                ? f.rms_cv_voiced
+                : (f.rms_cv ?? 0);
+        const nr = Math.min(1, rmsVar / 2.0);
         const bad = nj * 0.4 + ns * 0.4 + nr * 0.2;
         return Math.round((1 - bad) * 100);
     };
     const paceScore = (f: AudioFeatures | undefined) => {
         if (!f) return undefined;
         const talk = 1 - (f.silence_ratio ?? 0);
-        const target = 0.6;
-        const err = Math.abs(talk - target) / target;
+        const target = audioCalib?.baseTalk ?? 0.6; // 개인 기준 발화비율 사용
+        const denom = target > 0 ? target : 0.6;
+        const err = Math.abs(talk - target) / denom;
         return Math.round((1 - clamp01(err)) * 100);
+    };
+
+    // 말 빠르기 분류: 빠름/느림/적정
+    const paceClass = (f: AudioFeatures | undefined) => {
+        if (!f) return undefined;
+        const talk = 1 - (f.silence_ratio ?? 0); // 발화 비율
+        const target = audioCalib?.baseTalk ?? 0.6; // 개인 기준 발화 비율
+        const tol = 0.1; // 허용 편차(±10%p)
+        const delta = talk - target;
+        if (delta > tol) return { label: '빠름', color: 'warning', talk } as const;
+        if (delta < -tol) return { label: '느림', color: 'warning', talk } as const;
+        return { label: '적정', color: 'success', talk } as const;
     };
 
     const audioScoreColor = (v?: number) => (typeof v === 'number' ? getScoreColor(v) : '#d9d9d9');
@@ -412,13 +486,47 @@ export default function AiInterviewResultPage() {
                                                         <Col xs={24} sm={12} md={6}>
                                                             <Card size='small'>
                                                                 <Statistic
-                                                                    title='rms_cv'
-                                                                    value={item.audioFeatures.rms_cv?.toFixed(
-                                                                        3,
+                                                                    title='f0_cv'
+                                                                    value={item.audioFeatures.f0_cv?.toFixed(
+                                                                        2,
                                                                     )}
                                                                 />
                                                             </Card>
                                                         </Col>
+                                                        <Col xs={24} sm={12} md={6}>
+                                                            <Card size='small'>
+                                                                <Statistic
+                                                                    title='f0_std_semitone'
+                                                                    value={item.audioFeatures.f0_std_semitone?.toFixed(
+                                                                        2,
+                                                                    )}
+                                                                />
+                                                            </Card>
+                                                        </Col>
+                                                        <Col xs={24} sm={12} md={6}>
+                                                            <Card size='small'>
+                                                                <Statistic
+                                                                    title='rms_cv (voiced)'
+                                                                    value={(
+                                                                        item.audioFeatures
+                                                                            .rms_cv_voiced ??
+                                                                        item.audioFeatures.rms_cv ??
+                                                                        0
+                                                                    ).toFixed(3)}
+                                                                />
+                                                            </Card>
+                                                        </Col>
+                                                        {typeof item.audioFeatures.voiced_ratio ===
+                                                            'number' && (
+                                                            <Col xs={24} sm={12} md={6}>
+                                                                <Card size='small'>
+                                                                    <Statistic
+                                                                        title='유성 비율'
+                                                                        value={`${((item.audioFeatures.voiced_ratio ?? 0) * 100).toFixed(1)}%`}
+                                                                    />
+                                                                </Card>
+                                                            </Col>
+                                                        )}
                                                         <Col xs={24} sm={12} md={6}>
                                                             <Card size='small'>
                                                                 <Statistic
@@ -447,6 +555,9 @@ export default function AiInterviewResultPage() {
                                         <div className='text-center mb-8'>
                                             <div className='text-base text-gray-600 mb-2'>
                                                 톤 안정성
+                                                <Tooltip title='기준: f0_cv 0.05→100, 0.35→0. 보조: f0_std_semitone 1.0→100, 5.0→0. 폴백: f0_std/80'>
+                                                    <InfoCircleOutlined className='ml-2 text-gray-400' />
+                                                </Tooltip>
                                             </div>
                                             <div
                                                 className='text-4xl font-bold'
@@ -467,6 +578,10 @@ export default function AiInterviewResultPage() {
                                             title='평균 f0_std (Hz)'
                                             value={(audioOverall.f0_std ?? 0).toFixed(2)}
                                         />
+                                        <Statistic
+                                            title='평균 f0_cv (Hz)'
+                                            value={(audioOverall.f0_cv ?? 0).toFixed(2)}
+                                        />
                                     </Card>
                                 </Col>
                                 <Col xs={24} md={8}>
@@ -474,6 +589,9 @@ export default function AiInterviewResultPage() {
                                         <div className='text-center mb-8'>
                                             <div className='text-base text-gray-600 mb-2'>
                                                 목소리 떨림
+                                                <Tooltip title='기준: 0~1 스케일의 jitter/shimmer/rms_cv(voiced) 가중합(0.4/0.4/0.2). 값이 작을수록 안정, 점수↑'>
+                                                    <InfoCircleOutlined className='ml-2 text-gray-400' />
+                                                </Tooltip>
                                             </div>
                                             <div
                                                 className='text-4xl font-bold'
@@ -501,6 +619,9 @@ export default function AiInterviewResultPage() {
                                         <div className='text-center mb-8'>
                                             <div className='text-base text-gray-600 mb-2'>
                                                 말 빠르기(프록시)
+                                                <Tooltip title='기준: talk=1-침묵비율, 목표 0.6. 오차가 적을수록 점수↑'>
+                                                    <InfoCircleOutlined className='ml-2 text-gray-400' />
+                                                </Tooltip>
                                             </div>
                                             <div
                                                 className='text-4xl font-bold'
@@ -512,18 +633,165 @@ export default function AiInterviewResultPage() {
                                             >
                                                 {paceScore(audioOverall as AudioFeatures) ?? '-'}
                                             </div>
+                                            {(() => {
+                                                const pc = paceClass(audioOverall as AudioFeatures);
+                                                if (!pc) return null;
+                                                return (
+                                                    <div className='mt-2'>
+                                                        <Tag color={pc.color}>
+                                                            <ClockCircleOutlined /> {pc.label} ({
+                                                                Math.round(pc.talk * 100)
+                                                            }% 발화)
+                                                        </Tag>
+                                                    </div>
+                                                );
+                                            })()}
                                         </div>
                                         <Statistic
                                             title='평균 침묵 비율'
                                             value={`${((audioOverall.silence_ratio ?? 0) * 100).toFixed(1)}%`}
                                         />
                                         <Statistic
-                                            title='평균 rms_cv'
-                                            value={(audioOverall.rms_cv ?? 0).toFixed(3)}
+                                            title='평균 rms_cv (voiced)'
+                                            value={(
+                                                audioOverall.rms_cv_voiced ??
+                                                audioOverall.rms_cv ??
+                                                0
+                                            ).toFixed(3)}
                                         />
+                                        {typeof audioOverall.voiced_ratio === 'number' && (
+                                            <Statistic
+                                                title='평균 유성 비율'
+                                                value={`${((audioOverall.voiced_ratio ?? 0) * 100).toFixed(1)}%`}
+                                            />
+                                        )}
                                     </Card>
                                 </Col>
                             </Row>
+                            {/* Diagnostics (overall) */}
+                            <Divider className='!my-4' />
+                            <div className='text-sm text-gray-600 mb-2'>진단 지표(평균)</div>
+                            <Row gutter={[16, 16]}>
+                                {typeof (audioOverall as any).voiced_prob_mean === 'number' && (
+                                    <Col xs={24} sm={12} md={6}>
+                                        <Card size='small'>
+                                            <Statistic
+                                                title='voiced_prob_mean'
+                                                value={(
+                                                    audioOverall as any
+                                                ).voiced_prob_mean.toFixed(2)}
+                                            />
+                                        </Card>
+                                    </Col>
+                                )}
+                                {typeof (audioOverall as any).voiced_prob_median === 'number' && (
+                                    <Col xs={24} sm={12} md={6}>
+                                        <Card size='small'>
+                                            <Statistic
+                                                title='voiced_prob_median'
+                                                value={(
+                                                    audioOverall as any
+                                                ).voiced_prob_median.toFixed(2)}
+                                            />
+                                        </Card>
+                                    </Col>
+                                )}
+                                {typeof (audioOverall as any).voiced_prob_p90 === 'number' && (
+                                    <Col xs={24} sm={12} md={6}>
+                                        <Card size='small'>
+                                            <Statistic
+                                                title='voiced_prob_p90'
+                                                value={(
+                                                    audioOverall as any
+                                                ).voiced_prob_p90.toFixed(2)}
+                                            />
+                                        </Card>
+                                    </Col>
+                                )}
+                                {typeof (audioOverall as any).silence_ratio_db50 === 'number' && (
+                                    <Col xs={24} sm={12} md={6}>
+                                        <Card size='small'>
+                                            <Statistic
+                                                title='침묵 비율(db50) 평균'
+                                                value={`${(((audioOverall as any).silence_ratio_db50 ?? 0) * 100).toFixed(1)}%`}
+                                            />
+                                        </Card>
+                                    </Col>
+                                )}
+                                {typeof (audioOverall as any).voiced_flag_ratio === 'number' && (
+                                    <Col xs={24} sm={12} md={6}>
+                                        <Card size='small'>
+                                            <Statistic
+                                                title='voiced_flag_ratio'
+                                                value={`${(((audioOverall as any).voiced_flag_ratio ?? 0) * 100).toFixed(1)}%`}
+                                            />
+                                        </Card>
+                                    </Col>
+                                )}
+                                {typeof (audioOverall as any).voiced_prob_ge_025_ratio ===
+                                    'number' && (
+                                    <Col xs={24} sm={12} md={6}>
+                                        <Card size='small'>
+                                            <Statistic
+                                                title='voiced_prob≥0.25 비율'
+                                                value={`${(((audioOverall as any).voiced_prob_ge_025_ratio ?? 0) * 100).toFixed(1)}%`}
+                                            />
+                                        </Card>
+                                    </Col>
+                                )}
+                                {typeof (audioOverall as any).voiced_prob_ge_035_ratio ===
+                                    'number' && (
+                                    <Col xs={24} sm={12} md={6}>
+                                        <Card size='small'>
+                                            <Statistic
+                                                title='voiced_prob≥0.35 비율'
+                                                value={`${(((audioOverall as any).voiced_prob_ge_035_ratio ?? 0) * 100).toFixed(1)}%`}
+                                            />
+                                        </Card>
+                                    </Col>
+                                )}
+                                {typeof (audioOverall as any).f0_valid_ratio === 'number' && (
+                                    <Col xs={24} sm={12} md={6}>
+                                        <Card size='small'>
+                                            <Statistic
+                                                title='f0_valid_ratio'
+                                                value={`${(((audioOverall as any).f0_valid_ratio ?? 0) * 100).toFixed(1)}%`}
+                                            />
+                                        </Card>
+                                    </Col>
+                                )}
+                                {typeof (audioOverall as any).voiced_ratio_speech === 'number' && (
+                                    <Col xs={24} sm={12} md={6}>
+                                        <Card size='small'>
+                                            <Statistic
+                                                title='유성 비율(speech) 평균'
+                                                value={`${(((audioOverall as any).voiced_ratio_speech ?? 0) * 100).toFixed(1)}%`}
+                                            />
+                                        </Card>
+                                    </Col>
+                                )}
+                                {typeof (audioOverall as any).speech_frames === 'number' && (
+                                    <Col xs={24} sm={12} md={6}>
+                                        <Card size='small'>
+                                            <Statistic
+                                                title='평균 speech_frames'
+                                                value={`${(audioOverall as any).speech_frames?.toFixed(0)}`}
+                                            />
+                                        </Card>
+                                    </Col>
+                                )}
+                            </Row>
+                            {typeof audioOverall.voiced_ratio === 'number' &&
+                                audioOverall.voiced_ratio < 0.2 && (
+                                    <div className='mt-4'>
+                                        <Alert
+                                            type='warning'
+                                            showIcon
+                                            message='오디오 신뢰도 낮음'
+                                            description='유성(발화) 비율이 낮아 지표 신뢰도가 떨어질 수 있습니다. 마이크/환경을 점검하고 충분히 말이 녹음되었는지 확인하세요.'
+                                        />
+                                    </div>
+                                )}
                         </Card>
                     )}
 
@@ -588,21 +856,42 @@ export default function AiInterviewResultPage() {
                                                         <Col xs={24} sm={12} md={6}>
                                                             <Card size='small'>
                                                                 <Statistic
-                                                                    title='presence: good'
+                                                                    title={
+                                                                        <span>
+                                                                            presence: good
+                                                                            <Tooltip title='존재감 종합지표가 높은 구간 비중 (자신감·집중·긴장완화가 전반적으로 양호)'>
+                                                                                <InfoCircleOutlined className='ml-2 text-gray-400' />
+                                                                            </Tooltip>
+                                                                        </span>
+                                                                    }
                                                                     value={pct(
                                                                         v.presence_dist.good,
                                                                         v.count,
                                                                     )}
                                                                 />
                                                                 <Statistic
-                                                                    title='presence: avg'
+                                                                    title={
+                                                                        <span>
+                                                                            presence: avg
+                                                                            <Tooltip title='존재감 종합지표가 보통 수준인 구간 비중'>
+                                                                                <InfoCircleOutlined className='ml-2 text-gray-400' />
+                                                                            </Tooltip>
+                                                                        </span>
+                                                                    }
                                                                     value={pct(
                                                                         v.presence_dist.average,
                                                                         v.count,
                                                                     )}
                                                                 />
                                                                 <Statistic
-                                                                    title='presence: needs'
+                                                                    title={
+                                                                        <span>
+                                                                            presence: needs
+                                                                            <Tooltip title='존재감 종합지표가 낮은 구간 비중 (긴장↑·시선 이탈·자신감 부족 등)'>
+                                                                                <InfoCircleOutlined className='ml-2 text-gray-400' />
+                                                                            </Tooltip>
+                                                                        </span>
+                                                                    }
                                                                     value={pct(
                                                                         v.presence_dist
                                                                             .needs_improvement,
@@ -614,14 +903,28 @@ export default function AiInterviewResultPage() {
                                                         <Col xs={24} sm={12} md={6}>
                                                             <Card size='small'>
                                                                 <Statistic
-                                                                    title='level: ok'
+                                                                    title={
+                                                                        <span>
+                                                                            level: ok
+                                                                            <Tooltip title='실시간 경고 없이 안정적으로 진행된 구간 비중'>
+                                                                                <InfoCircleOutlined className='ml-2 text-gray-400' />
+                                                                            </Tooltip>
+                                                                        </span>
+                                                                    }
                                                                     value={pct(
                                                                         v.level_dist.ok,
                                                                         v.count,
                                                                     )}
                                                                 />
                                                                 <Statistic
-                                                                    title='level: warn'
+                                                                    title={
+                                                                        <span>
+                                                                            level: warn
+                                                                            <Tooltip title='실시간 경고가 발생한 구간 비중 (주로 긴장/주의 관련)'>
+                                                                                <InfoCircleOutlined className='ml-2 text-gray-400' />
+                                                                            </Tooltip>
+                                                                        </span>
+                                                                    }
                                                                     value={pct(
                                                                         v.level_dist.warning,
                                                                         v.count,
@@ -632,7 +935,14 @@ export default function AiInterviewResultPage() {
                                                         <Col xs={24} sm={12} md={6}>
                                                             <Card size='small'>
                                                                 <Statistic
-                                                                    title='conf_mean'
+                                                                    title={
+                                                                        <span>
+                                                                            conf_mean
+                                                                            <Tooltip title='자신감 평균(0~100). 적당한 미소, 놀람/긴장 억제, 이마 개방감 등을 종합해 산출'>
+                                                                                <InfoCircleOutlined className='ml-2 text-gray-400' />
+                                                                            </Tooltip>
+                                                                        </span>
+                                                                    }
                                                                     value={
                                                                         typeof v.confidence_mean ===
                                                                         'number'
@@ -644,7 +954,14 @@ export default function AiInterviewResultPage() {
                                                                     }
                                                                 />
                                                                 <Statistic
-                                                                    title='smile_mean'
+                                                                    title={
+                                                                        <span>
+                                                                            smile_mean
+                                                                            <Tooltip title='미소 평균(0~100). 양쪽 입꼬리 상승 정도 기반'>
+                                                                                <InfoCircleOutlined className='ml-2 text-gray-400' />
+                                                                            </Tooltip>
+                                                                        </span>
+                                                                    }
                                                                     value={
                                                                         typeof v.smile_mean ===
                                                                         'number'
@@ -1010,14 +1327,28 @@ export default function AiInterviewResultPage() {
                                         </div>
                                     </div>
                                     <Statistic
-                                        title='presence good'
+                                        title={
+                                            <span>
+                                                presence good
+                                                <Tooltip title='존재감 종합지표가 높은 구간 비중 (자신감·집중·긴장완화 양호)'>
+                                                    <InfoCircleOutlined className='ml-2 text-gray-400' />
+                                                </Tooltip>
+                                            </span>
+                                        }
                                         value={pct(
                                             visualOverall.presence_dist.good,
                                             visualOverall.count,
                                         )}
                                     />
                                     <Statistic
-                                        title='level ok'
+                                        title={
+                                            <span>
+                                                level ok
+                                                <Tooltip title='실시간 경고 없이 안정적으로 진행된 구간 비중'>
+                                                    <InfoCircleOutlined className='ml-2 text-gray-400' />
+                                                </Tooltip>
+                                            </span>
+                                        }
                                         value={pct(
                                             visualOverall.level_dist.ok,
                                             visualOverall.count,
@@ -1040,11 +1371,25 @@ export default function AiInterviewResultPage() {
                                         </div>
                                     </div>
                                     <Statistic
-                                        title='경고(warn)'
+                                        title={
+                                            <span>
+                                                경고(warn)
+                                                <Tooltip title='실시간 경고(주의)가 발생한 샘플 수'>
+                                                    <InfoCircleOutlined className='ml-2 text-gray-400' />
+                                                </Tooltip>
+                                            </span>
+                                        }
                                         value={visualOverall.level_dist.warning}
                                     />
                                     <Statistic
-                                        title='치명(critical)'
+                                        title={
+                                            <span>
+                                                치명(critical)
+                                                <Tooltip title='심각 경고가 발생한 샘플 수'>
+                                                    <InfoCircleOutlined className='ml-2 text-gray-400' />
+                                                </Tooltip>
+                                            </span>
+                                        }
                                         value={visualOverall.level_dist.critical}
                                     />
                                 </Card>
@@ -1063,6 +1408,9 @@ export default function AiInterviewResultPage() {
                                     <div className='text-center mb-8'>
                                         <div className='text-base text-gray-600 mb-2'>
                                             톤 안정성
+                                            <Tooltip title='기준: f0_cv 0.05→100, 0.35→0. 보조: f0_std_semitone 1.0→100, 5.0→0. 폴백: f0_std/80'>
+                                                <InfoCircleOutlined className='ml-2 text-gray-400' />
+                                            </Tooltip>
                                         </div>
                                         <div
                                             className='text-4xl font-bold'
@@ -1090,6 +1438,9 @@ export default function AiInterviewResultPage() {
                                     <div className='text-center mb-8'>
                                         <div className='text-base text-gray-600 mb-2'>
                                             목소리 떨림
+                                            <Tooltip title='기준: 0~1 스케일의 jitter/shimmer/rms_cv(voiced) 가중합(0.4/0.4/0.2). 값이 작을수록 안정, 점수↑'>
+                                                <InfoCircleOutlined className='ml-2 text-gray-400' />
+                                            </Tooltip>
                                         </div>
                                         <div
                                             className='text-4xl font-bold'
@@ -1117,6 +1468,9 @@ export default function AiInterviewResultPage() {
                                     <div className='text-center mb-8'>
                                         <div className='text-base text-gray-600 mb-2'>
                                             말 빠르기(프록시)
+                                            <Tooltip title='기준: talk=1-침묵비율, 목표 0.6. 오차가 적을수록 점수↑'>
+                                                <InfoCircleOutlined className='ml-2 text-gray-400' />
+                                            </Tooltip>
                                         </div>
                                         <div
                                             className='text-4xl font-bold'
@@ -1134,12 +1488,33 @@ export default function AiInterviewResultPage() {
                                         value={`${((audioOverall.silence_ratio ?? 0) * 100).toFixed(1)}%`}
                                     />
                                     <Statistic
-                                        title='평균 rms_cv'
-                                        value={(audioOverall.rms_cv ?? 0).toFixed(3)}
+                                        title='평균 rms_cv (voiced)'
+                                        value={(
+                                            audioOverall.rms_cv_voiced ??
+                                            audioOverall.rms_cv ??
+                                            0
+                                        ).toFixed(3)}
                                     />
+                                    {typeof audioOverall.voiced_ratio === 'number' && (
+                                        <Statistic
+                                            title='평균 유성 비율'
+                                            value={`${((audioOverall.voiced_ratio ?? 0) * 100).toFixed(1)}%`}
+                                        />
+                                    )}
                                 </Card>
                             </Col>
                         </Row>
+                        {typeof audioOverall.voiced_ratio === 'number' &&
+                            audioOverall.voiced_ratio < 0.2 && (
+                                <div className='mt-4'>
+                                    <Alert
+                                        type='warning'
+                                        showIcon
+                                        message='오디오 신뢰도 낮음'
+                                        description='유성(발화) 비율이 낮아 지표 신뢰도가 떨어질 수 있습니다. 마이크/환경을 점검하고 충분히 말이 녹음되었는지 확인하세요.'
+                                    />
+                                </div>
+                            )}
                     </Card>
                 )}
 
@@ -1175,6 +1550,22 @@ export default function AiInterviewResultPage() {
                                                             <ClockCircleOutlined /> 말빠르기 {pace}
                                                         </Tag>
                                                     )}
+                                                    {(() => {
+                                                        const pc = paceClass(item.audioFeatures as AudioFeatures);
+                                                        if (!pc) return null;
+                                                        return (
+                                                            <Tag color={pc.color}>
+                                                                <ClockCircleOutlined /> {pc.label}
+                                                            </Tag>
+                                                        );
+                                                    })()}
+                                                    {typeof item.audioFeatures?.voiced_ratio ===
+                                                        'number' &&
+                                                        item.audioFeatures.voiced_ratio < 0.2 && (
+                                                            <Tag color='warning'>
+                                                                <WarningOutlined /> 유성 비율 낮음
+                                                            </Tag>
+                                                        )}
                                                 </Space>
                                             </div>
 
@@ -1211,10 +1602,13 @@ export default function AiInterviewResultPage() {
                                                     <Col xs={24} sm={12} md={6}>
                                                         <Card size='small'>
                                                             <Statistic
-                                                                title='rms_cv'
-                                                                value={item.audioFeatures.rms_cv.toFixed(
-                                                                    3,
-                                                                )}
+                                                                title='rms_cv (voiced)'
+                                                                value={(
+                                                                    item.audioFeatures
+                                                                        .rms_cv_voiced ??
+                                                                    item.audioFeatures.rms_cv ??
+                                                                    0
+                                                                ).toFixed(3)}
                                                             />
                                                         </Card>
                                                     </Col>
@@ -1226,7 +1620,150 @@ export default function AiInterviewResultPage() {
                                                             />
                                                         </Card>
                                                     </Col>
+                                                    {typeof item.audioFeatures
+                                                        .silence_ratio_db50 === 'number' && (
+                                                        <Col xs={24} sm={12} md={6}>
+                                                            <Card size='small'>
+                                                                <Statistic
+                                                                    title='침묵 비율(db50)'
+                                                                    value={`${((item.audioFeatures.silence_ratio_db50 ?? 0) * 100).toFixed(1)}%`}
+                                                                />
+                                                            </Card>
+                                                        </Col>
+                                                    )}
+                                                    {typeof item.audioFeatures
+                                                        .voiced_ratio_speech === 'number' && (
+                                                        <Col xs={24} sm={12} md={6}>
+                                                            <Card size='small'>
+                                                                <Statistic
+                                                                    title='유성 비율(speech)'
+                                                                    value={`${((item.audioFeatures.voiced_ratio_speech ?? 0) * 100).toFixed(1)}%`}
+                                                                />
+                                                            </Card>
+                                                        </Col>
+                                                    )}
                                                 </Row>
+                                            )}
+                                            {item.audioFeatures && (
+                                                <>
+                                                    <Divider className='!my-3' />
+                                                    <div className='text-sm text-gray-600 mb-2'>
+                                                        진단 지표
+                                                    </div>
+                                                    <Row gutter={[16, 16]}>
+                                                        {typeof item.audioFeatures
+                                                            .voiced_prob_mean === 'number' && (
+                                                            <Col xs={24} sm={12} md={6}>
+                                                                <Card size='small'>
+                                                                    <Statistic
+                                                                        title='voiced_prob_mean'
+                                                                        value={item.audioFeatures.voiced_prob_mean.toFixed(
+                                                                            2,
+                                                                        )}
+                                                                    />
+                                                                </Card>
+                                                            </Col>
+                                                        )}
+                                                        {typeof item.audioFeatures
+                                                            .voiced_prob_median === 'number' && (
+                                                            <Col xs={24} sm={12} md={6}>
+                                                                <Card size='small'>
+                                                                    <Statistic
+                                                                        title='voiced_prob_median'
+                                                                        value={item.audioFeatures.voiced_prob_median.toFixed(
+                                                                            2,
+                                                                        )}
+                                                                    />
+                                                                </Card>
+                                                            </Col>
+                                                        )}
+                                                        {typeof item.audioFeatures
+                                                            .voiced_prob_p90 === 'number' && (
+                                                            <Col xs={24} sm={12} md={6}>
+                                                                <Card size='small'>
+                                                                    <Statistic
+                                                                        title='voiced_prob_p90'
+                                                                        value={item.audioFeatures.voiced_prob_p90.toFixed(
+                                                                            2,
+                                                                        )}
+                                                                    />
+                                                                </Card>
+                                                            </Col>
+                                                        )}
+                                                        {typeof item.audioFeatures
+                                                            .voiced_flag_ratio === 'number' && (
+                                                            <Col xs={24} sm={12} md={6}>
+                                                                <Card size='small'>
+                                                                    <Statistic
+                                                                        title='voiced_flag_ratio'
+                                                                        value={`${(item.audioFeatures.voiced_flag_ratio * 100).toFixed(1)}%`}
+                                                                    />
+                                                                </Card>
+                                                            </Col>
+                                                        )}
+                                                        {typeof item.audioFeatures
+                                                            .voiced_prob_ge_025_ratio ===
+                                                            'number' && (
+                                                            <Col xs={24} sm={12} md={6}>
+                                                                <Card size='small'>
+                                                                    <Statistic
+                                                                        title='voiced_prob≥0.25 비율'
+                                                                        value={`${(item.audioFeatures.voiced_prob_ge_025_ratio * 100).toFixed(1)}%`}
+                                                                    />
+                                                                </Card>
+                                                            </Col>
+                                                        )}
+                                                        {typeof item.audioFeatures
+                                                            .voiced_prob_ge_035_ratio ===
+                                                            'number' && (
+                                                            <Col xs={24} sm={12} md={6}>
+                                                                <Card size='small'>
+                                                                    <Statistic
+                                                                        title='voiced_prob≥0.35 비율'
+                                                                        value={`${(item.audioFeatures.voiced_prob_ge_035_ratio * 100).toFixed(1)}%`}
+                                                                    />
+                                                                </Card>
+                                                            </Col>
+                                                        )}
+                                                        {typeof item.audioFeatures
+                                                            .f0_valid_ratio === 'number' && (
+                                                            <Col xs={24} sm={12} md={6}>
+                                                                <Card size='small'>
+                                                                    <Statistic
+                                                                        title='f0_valid_ratio'
+                                                                        value={`${(item.audioFeatures.f0_valid_ratio * 100).toFixed(1)}%`}
+                                                                    />
+                                                                </Card>
+                                                            </Col>
+                                                        )}
+                                                        {typeof item.audioFeatures.voiced_frames ===
+                                                            'number' &&
+                                                            typeof item.audioFeatures
+                                                                .total_frames === 'number' && (
+                                                                <Col xs={24} sm={12} md={6}>
+                                                                    <Card size='small'>
+                                                                        <Statistic
+                                                                            title='frames (voiced/total)'
+                                                                            value={`${item.audioFeatures.voiced_frames}/${item.audioFeatures.total_frames}`}
+                                                                        />
+                                                                    </Card>
+                                                                </Col>
+                                                            )}
+                                                        {typeof item.audioFeatures.speech_frames ===
+                                                            'number' &&
+                                                            typeof item.audioFeatures
+                                                                .total_frames === 'number' && (
+                                                                <Col xs={24} sm={12} md={6}>
+                                                                    <Card size='small'>
+                                                                        <Statistic
+                                                                            title='frames (speech/total)'
+                                                                            value={`${item.audioFeatures.speech_frames}/${item.audioFeatures.total_frames}`}
+                                                                        />
+                                                                    </Card>
+                                                                </Col>
+                                                            )}
+                                                    </Row>
+                                                </>
                                             )}
                                         </div>
                                     </List.Item>
