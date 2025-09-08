@@ -1,6 +1,12 @@
 'use client';
 
-import { Flex, Button, Divider } from 'antd';
+import { Flex } from 'antd';
+import {
+    AudioOutlined,
+    AudioMutedOutlined,
+    VideoCameraOutlined,
+    MinusOutlined,
+} from '@ant-design/icons';
 import Image from 'next/image';
 
 // local stores
@@ -24,15 +30,27 @@ export function FabricToolbar() {
     // TODO: 툴바 버튼 컴포넌트 분리 및 스타일링 필요
     return (
         <div className='absolute bottom-[20px] left-1/2 -translate-x-1/2 transform z-[10] bg-white shadow-[0_2px_6px_rgba(0,0,0,0.25)] rounded-full px-4 py-1 flex items-center gap-1'>
-            {/* 선택 */}
+            {/* 마이크 */}
             <button className='p-2 rounded hover:bg-gray-100' onClick={() => setDrawingMode(false)}>
-                <Image src='/assets/selector.svg' width={20} height={20} alt='selector' />
+                <AudioOutlined />
+            </button>
+
+            {/* 카메라 */}
+            <button className='p-2 rounded hover:bg-gray-100' onClick={() => setDrawingMode(false)}>
+                <VideoCameraOutlined />
             </button>
 
             <div className='w-px h-6 bg-gray-200' />
 
             {/* 펜 / 형광펜 / 지우개 */}
             <Flex gap={2} align='center'>
+                {/* 선택 */}
+                <button
+                    className='p-2 rounded hover:bg-gray-100'
+                    onClick={() => setDrawingMode(false)}
+                >
+                    <Image src='/assets/selector.svg' width={20} height={20} alt='selector' />
+                </button>
                 <button
                     className='p-2 rounded hover:bg-gray-100'
                     onClick={() => {
