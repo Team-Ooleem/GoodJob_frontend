@@ -155,8 +155,16 @@ export interface UserSalaryPreferenceResponse {
 
 // =============Profile Types=============
 export interface Profile {
-    short_bio: string;
-    bio: string;
+    idx: number;
+    name: string;
+    phone: string;
+    email: string;
+    short_bio?: string;
+    bio?: string;
+    profile_img?: string;
+    onboarding_completed: boolean;
+    created_at: string;
+    updated_at: string;
 }
 
 export interface ProfileResponse {
