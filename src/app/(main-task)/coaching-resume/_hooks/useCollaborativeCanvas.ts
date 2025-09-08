@@ -5,6 +5,7 @@ import { useCanvasStore } from '../_stores';
 import * as Y from 'yjs';
 import io from 'socket.io-client';
 import * as fabric from 'fabric';
+import { API_BASE_URL } from '@/constants/config';
 
 type FabricObject = fabric.Object & {
     id?: string;
@@ -49,7 +50,7 @@ export function useCollaborativeCanvas(room: string) {
         if (!canvas) return;
 
         // --- Socket 연결 ---
-        const socket = io('http://localhost:4000', {
+        const socket = io(API_BASE_URL, {
             withCredentials: true,
             transports: ['websocket', 'polling'],
             reconnection: true,

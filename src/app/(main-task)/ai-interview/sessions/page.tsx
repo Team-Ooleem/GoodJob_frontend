@@ -7,6 +7,7 @@ import { useInterviewAnalysis } from '@/hooks/use-interview-analysis';
 import { blobToBase64, resampleTo16kHzMonoWav } from '@/utils/audio';
 import axios from 'axios';
 import { api } from '@/apis/api'; // 경로는 실제 위치에 맞게 조정
+import { AUDIO_API_BASE, API_BASE_URL } from '@/constants/config';
 
 // ===== 추가: WAV 레코더 유틸 =====
 class WavRecorder {
@@ -506,13 +507,11 @@ export default function AiInterviewSessionsPage() {
 
     // 기존: fetch 버전 analyzeAudioBlob
     // -> axios 버전으로 교체
-    const AUDIO_API_BASE = process.env.NEXT_PUBLIC_AUDIO_API_BASE; // 예: http://localhost:8081
-
     const analyzeAudioBlob = async (
         blob: Blob,
         filename = 'answer.wav',
     ): Promise<AudioFeatures> => {
-        if (!AUDIO_API_BASE) throw new Error('NEXT_PUBLIC_AUDIO_API_BASE가 설정되지 않았습니다.');
+        if (!AUDIO_API_BASE) throw new Error('AUDIO_API_BASE가 설정되지 않았습니다.');
         const form = new FormData();
         form.append('file', blob, filename);
 
@@ -704,7 +703,7 @@ ${qaList
             }
         } catch (e: any) {
             console.warn('세션 영상 집계 finalize 실패:', {
-                url: `${process.env.NEXT_PUBLIC_API_BASE_URL}/metrics/${SESSION_ID}/finalize`,
+                url: `${API_BASE_URL}/metrics/${SESSION_ID}/finalize`,
                 status: e?.response?.status,
                 data: e?.response?.data,
             });
@@ -731,10 +730,7 @@ ${qaList
             // 백엔드 개발자용 요청 데이터 로그 출력
             console.log('🚀 백엔드 API 요청 데이터:');
             console.log('=====================================');
-            console.log(
-                '📡 API 엔드포인트:',
-                `${process.env.NEXT_PUBLIC_API_BASE_URL}/interview/analyze`,
-            );
+            console.log('📡 API 엔드포인트:', `${API_BASE_URL}/interview/analyze`);
             console.log('📋 요청 메서드: POST');
             console.log('📦 요청 헤더:', {
                 'Content-Type': 'application/json',
@@ -745,9 +741,7 @@ ${qaList
             // 백엔드 개발자용 cURL 명령어 예시
             console.log('🔧 백엔드 개발자용 cURL 명령어:');
             console.log('=====================================');
-            console.log(
-                `curl -X POST "${process.env.NEXT_PUBLIC_API_BASE_URL}/interview/analyze" \\`,
-            );
+            console.log(`curl -X POST "${API_BASE_URL}/interview/analyze" \\`);
             console.log(`  -H "Content-Type: application/json" \\`);
             console.log(`  -d '${JSON.stringify(requestData)}'`);
             console.log('=====================================');

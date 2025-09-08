@@ -1,6 +1,7 @@
 'use client';
 import { useRef, useCallback } from 'react';
 import axios from 'axios';
+import { API_BASE_URL } from '@/constants/config';
 
 type RecorderOptions = {
     /** 녹음 상태 변경 시 콜백 (true: 녹음 시작, false: 녹음 종료) */
@@ -94,7 +95,7 @@ export function useVoiceRecorder({ onRecordingChange, canvasIdx }: RecorderOptio
 
                     // 4. STT + DB + S3 서버 전송
                     const sttResponse = await axios.post(
-                        'http://localhost:4000/api/stt/transcribe-with-context',
+                        `${API_BASE_URL}/stt/transcribe-with-context`,
                         {
                             audioData: base64Data,
                             mimeType: 'audio/webm',

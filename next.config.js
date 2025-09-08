@@ -23,18 +23,6 @@ const nextConfig = {
             },
         ],
     },
-    async rewrites() {
-        return [
-            {
-                source: '/ws/:path*',
-                destination: 'https://localhost:3000/:path*',
-            },
-            {
-                source: '/pdf.worker.js',
-                destination: '/node_modules/pdfjs-dist/build/pdf.worker.min.js',
-            },
-        ];
-    },
     typescript: {
         ignoreBuildErrors: true,
     },
