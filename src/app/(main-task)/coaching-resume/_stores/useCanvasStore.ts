@@ -23,6 +23,9 @@ type CanvasStoreState = {
     brush: BrushConfig;
     isEraserMode: boolean;
     isStickyMode: boolean;
+    // media
+    isMicEnabled: boolean;
+    isCamEnabled: boolean;
     stickyNoteConfig: StickyNoteConfig;
 
     // history
@@ -36,6 +39,11 @@ type CanvasStoreState = {
     setDrawingMode: (enabled: boolean) => void;
     setBrushOptions: (options: Partial<BrushConfig>) => void;
     setEraserMode: (enabled: boolean) => void;
+    // media
+    toggleMic: () => void;
+    toggleCam: () => void;
+    setMicEnabled: (enabled: boolean) => void;
+    setCamEnabled: (enabled: boolean) => void;
 
     // objects
     deleteActiveObject: () => void;
@@ -59,6 +67,8 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     brush: { color: '#000000', width: 3, type: 'pencil' },
     isEraserMode: false,
     isStickyMode: false,
+    isMicEnabled: true,
+    isCamEnabled: true,
     stickyNoteConfig: {
         width: 200,
         minHeight: 150,
@@ -97,6 +107,12 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
                 isDrawingMode: false,
             };
         }),
+
+    // media toggles
+    toggleMic: () => set((state) => ({ isMicEnabled: !state.isMicEnabled })),
+    toggleCam: () => set((state) => ({ isCamEnabled: !state.isCamEnabled })),
+    setMicEnabled: (enabled: boolean) => set({ isMicEnabled: enabled }),
+    setCamEnabled: (enabled: boolean) => set({ isCamEnabled: enabled }),
 
     setDrawingMode: (enabled) => {
         const canvas = get().canvasInstance;

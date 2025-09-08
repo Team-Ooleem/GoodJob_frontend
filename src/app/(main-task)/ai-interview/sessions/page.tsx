@@ -7,6 +7,7 @@ import { useInterviewAnalysis } from '@/hooks/use-interview-analysis';
 import { blobToBase64, resampleTo16kHzMonoWav } from '@/utils/audio';
 import axios from 'axios';
 import { api } from '@/apis/api'; // 경로는 실제 위치에 맞게 조정
+import { AUDIO_API_BASE, API_BASE_URL } from '@/constants/config';
 
 // ===== 추가: WAV 레코더 유틸 =====
 class WavRecorder {
@@ -159,10 +160,26 @@ interface AudioFeatures {
     f0_std_semitone?: number;
     rms_std: number;
     rms_cv: number;
+    rms_cv_voiced?: number;
+    rms_db_std_voiced?: number;
     jitter_like: number;
     shimmer_like: number;
     silence_ratio: number;
     sr: number;
+    voiced_ratio?: number;
+    voiced_frames?: number;
+    total_frames?: number;
+    // Diagnostics
+    voiced_prob_mean?: number;
+    voiced_prob_median?: number;
+    voiced_prob_p90?: number;
+    voiced_flag_ratio?: number;
+    voiced_prob_ge_025_ratio?: number;
+    voiced_prob_ge_035_ratio?: number;
+    f0_valid_ratio?: number;
+    silence_ratio_db50?: number;
+    voiced_ratio_speech?: number;
+    speech_frames?: number | null;
 }
 
 interface InterviewSession {
@@ -190,7 +207,7 @@ export default function AiInterviewSessionsPage() {
     // 동적 질문 목록 (AI 생성)
     const [dynamicQuestions, setDynamicQuestions] = useState<QuestionDto[]>([]);
     // 전체 문항 수(기존 더미와 동일하게 3로 유지; 필요 시 조정)
-    const MAX_QUESTIONS = 3;
+    const MAX_QUESTIONS = 1;
 
     const timerRef = useRef<NodeJS.Timeout | null>(null);
     const speakingTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -490,13 +507,11 @@ export default function AiInterviewSessionsPage() {
 
     // 기존: fetch 버전 analyzeAudioBlob
     // -> axios 버전으로 교체
-    const AUDIO_API_BASE = process.env.NEXT_PUBLIC_AUDIO_API_BASE; // 예: http://localhost:8081
-
     const analyzeAudioBlob = async (
         blob: Blob,
         filename = 'answer.wav',
     ): Promise<AudioFeatures> => {
-        if (!AUDIO_API_BASE) throw new Error('NEXT_PUBLIC_AUDIO_API_BASE가 설정되지 않았습니다.');
+        if (!AUDIO_API_BASE) throw new Error('AUDIO_API_BASE가 설정되지 않았습니다.');
         const form = new FormData();
         form.append('file', blob, filename);
 
@@ -599,13 +614,60 @@ ${qaList
                 .filter(Boolean) as AudioFeatures[];
             const mean = (arr: number[]) =>
                 arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+            const meanOf = (pick: (f: AudioFeatures) => number | undefined) =>
+                mean(
+                    feats
+                        .map(pick)
+                        .filter((v): v is number => typeof v === 'number' && isFinite(v)),
+                );
+            const safeCv = (f: AudioFeatures) =>
+                typeof f.f0_cv === 'number' && isFinite(f.f0_cv) && f.f0_cv >= 0
+                    ? f.f0_cv
+                    : f.f0_mean > 0
+                      ? (f.f0_std ?? 0) / f.f0_mean
+                      : 0;
+            const approxSemitoneStd = (cv: number) => {
+                // 근사: 세미톤 표준편차 ≈ 12 * log2(1 + CV)
+                return 12 * Math.log2(1 + Math.max(0, cv));
+            };
             return {
                 f0_mean: mean(feats.map((f) => f.f0_mean)),
                 f0_std: mean(feats.map((f) => f.f0_std)),
+                // 종합에도 CV/세미톤 표준편차를 포함해 톤 점수 안정화
+                f0_cv: mean(feats.map((f) => safeCv(f))),
+                f0_std_semitone: mean(feats.map((f) => approxSemitoneStd(safeCv(f)))),
                 rms_cv: mean(feats.map((f) => f.rms_cv)),
+                rms_cv_voiced: mean(
+                    feats.map((f) =>
+                        typeof f.rms_cv_voiced === 'number' ? f.rms_cv_voiced : f.rms_cv || 0,
+                    ),
+                ),
+                rms_db_std_voiced: mean(
+                    feats.map((f) =>
+                        typeof f.rms_db_std_voiced === 'number' ? f.rms_db_std_voiced : 0,
+                    ),
+                ),
                 jitter_like: mean(feats.map((f) => f.jitter_like)),
                 shimmer_like: mean(feats.map((f) => f.shimmer_like)),
                 silence_ratio: mean(feats.map((f) => f.silence_ratio)),
+                silence_ratio_db50: meanOf((f) => f.silence_ratio_db50),
+                voiced_ratio: mean(
+                    feats.map((f) => (typeof f.voiced_ratio === 'number' ? f.voiced_ratio : 0)),
+                ),
+                voiced_ratio_speech: meanOf((f) => f.voiced_ratio_speech),
+                // Diagnostics 평균
+                voiced_prob_mean: meanOf((f) => f.voiced_prob_mean),
+                voiced_prob_median: meanOf((f) => f.voiced_prob_median),
+                voiced_prob_p90: meanOf((f) => f.voiced_prob_p90),
+                voiced_flag_ratio: meanOf((f) => f.voiced_flag_ratio),
+                voiced_prob_ge_025_ratio: meanOf((f) => f.voiced_prob_ge_025_ratio),
+                voiced_prob_ge_035_ratio: meanOf((f) => f.voiced_prob_ge_035_ratio),
+                f0_valid_ratio: meanOf((f) => f.f0_valid_ratio),
+                speech_frames: meanOf((f) =>
+                    typeof f.speech_frames === 'number' && isFinite(f.speech_frames)
+                        ? f.speech_frames
+                        : undefined,
+                ),
             };
         })();
 
@@ -641,7 +703,7 @@ ${qaList
             }
         } catch (e: any) {
             console.warn('세션 영상 집계 finalize 실패:', {
-                url: `${process.env.NEXT_PUBLIC_API_BASE_URL}/metrics/${SESSION_ID}/finalize`,
+                url: `${API_BASE_URL}/metrics/${SESSION_ID}/finalize`,
                 status: e?.response?.status,
                 data: e?.response?.data,
             });
@@ -668,10 +730,7 @@ ${qaList
             // 백엔드 개발자용 요청 데이터 로그 출력
             console.log('🚀 백엔드 API 요청 데이터:');
             console.log('=====================================');
-            console.log(
-                '📡 API 엔드포인트:',
-                `${process.env.NEXT_PUBLIC_API_BASE_URL}/interview/analyze`,
-            );
+            console.log('📡 API 엔드포인트:', `${API_BASE_URL}/interview/analyze`);
             console.log('📋 요청 메서드: POST');
             console.log('📦 요청 헤더:', {
                 'Content-Type': 'application/json',
@@ -682,9 +741,7 @@ ${qaList
             // 백엔드 개발자용 cURL 명령어 예시
             console.log('🔧 백엔드 개발자용 cURL 명령어:');
             console.log('=====================================');
-            console.log(
-                `curl -X POST "${process.env.NEXT_PUBLIC_API_BASE_URL}/interview/analyze" \\`,
-            );
+            console.log(`curl -X POST "${API_BASE_URL}/interview/analyze" \\`);
             console.log(`  -H "Content-Type: application/json" \\`);
             console.log(`  -d '${JSON.stringify(requestData)}'`);
             console.log('=====================================');
@@ -715,7 +772,7 @@ ${qaList
             // 성공/실패 관계없이 결과 페이지로 이동
             setTimeout(() => {
                 window.location.href = '/ai-interview/result';
-            }, 20000); // 테스트 용도로 일단 20초, 원래 2초였음
+            }, 10000); // 테스트 용도로 일단 20초, 원래 2초였음
         } catch (error) {
             message.destroy();
             console.error('❌ 면접 분석 API 호출 오류:', error);
@@ -733,7 +790,7 @@ ${qaList
             // 실패해도 결과 페이지로 이동
             setTimeout(() => {
                 window.location.href = '/ai-interview/result';
-            }, 20000); // 테스트 용도로 일단 20초, 원래 2초였음
+            }, 10000); // 테스트 용도로 일단 20초, 원래 2초였음
         }
     };
 
