@@ -1,6 +1,7 @@
 'use client';
 import axios from 'axios';
 import { API_BASE_URL } from '@/constants/config';
+import { useUserStore } from '@/stores/user-store';
 
 // 전역 ref들
 const isRecordingRef = { current: false };
@@ -57,16 +58,40 @@ export const startRecording = async () => {
                 // Canvas 참여자 정보 가져오기
                 const participants = await getCanvasParticipants(canvasIdxRef.current);
 
+                let mentorIdx: number;
+                let menteeIdx: number;
+
+                // DB 조회 실패 시 fallback
                 if (!participants || participants.length < 2) {
-                    throw new Error('Canvas에 충분한 참여자가 없습니다');
+                    console.warn('Canvas 참여자 조회 실패, 기본값 사용');
+                    mentorIdx = 1; // 김개발
+                    menteeIdx = 2; // 이디자인
+                } else {
+                    // 현재 로그인한 사용자 정보 가져오기
+                    const currentUser = useUserStore.getState().user;
+
+                    if (currentUser && currentUser.idx) {
+                        // 현재 사용자를 멘티로, 다른 사용자를 멘토로 설정
+                        menteeIdx = currentUser.idx;
+                        const mentor = participants.find((p: any) => p.user_id !== currentUser.idx);
+                        mentorIdx = mentor ? mentor.user_id : participants[0].user_id;
+                    } else {
+                        // 사용자 정보가 없으면 첫 번째/두 번째 참여자 사용
+                        mentorIdx = participants[0].user_id;
+                        menteeIdx = participants[1].user_id;
+                    }
                 }
 
-                // 첫 번째 참여자를 멘토, 두 번째를 멘티로 설정 (실제 로직에 맞게 조정 필요)
-                const mentorIdx = participants[0].user_id;
-                const menteeIdx = participants[1].user_id;
-
-                const arrayBuffer = await audioBlob.arrayBuffer();
-                const base64Data = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+                // 메모리 효율적인 Base64 변환 (FileReader 사용)
+                const base64Data = await new Promise<string>((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        const result = reader.result as string;
+                        resolve(result.split(',')[1]);
+                    };
+                    reader.onerror = reject;
+                    reader.readAsDataURL(audioBlob);
+                });
 
                 const blobSizeKB = audioBlob.size / 1024;
                 let duration = Math.max(3, Math.min(30, blobSizeKB * 0.1));
