@@ -82,5 +82,12 @@ export function FabricCanvas() {
     // pdf drag & drop
     usePdfDrop(canvasRef);
 
-    return <canvas ref={canvasRef} />;
+    const isRecording = useCanvasStore((store) => store.isRecording);
+
+    return (
+        <canvas
+            ref={canvasRef}
+            className={isRecording ? 'border border-2 border-red-500' : undefined}
+        />
+    );
 }

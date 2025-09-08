@@ -5,3 +5,6 @@ export * from './ReplayButton';
 export * from './ReplayChat';
 export * from './CameraBox';
 export * from './ParticipantCamera';
+export * from './CanvasTitle';
+export * from './SessionToolbar';
+export * from './RecordingListPopup';
