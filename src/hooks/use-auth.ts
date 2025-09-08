@@ -13,6 +13,10 @@ export interface User {
 export interface AuthState {
     authenticated: boolean;
     user?: User;
+    onboarding?: {
+        isOnboarded: boolean;
+        redirectUrl: string;
+    };
 }
 
 export const useAuth = () => {
@@ -46,6 +50,7 @@ export const useAuth = () => {
     return {
         user: authData?.user,
         isAuthenticated: authData?.authenticated || false,
+        onboarding: authData?.onboarding,
         isLoading,
         error,
         refetch,
