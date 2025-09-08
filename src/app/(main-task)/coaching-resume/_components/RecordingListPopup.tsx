@@ -1,7 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { CloseOutlined } from '@ant-design/icons';
+import { List } from 'antd';
+import Image from 'next/image';
 import { useCanvasStore } from '../_stores';
 
 export function RecordingListPopup() {
@@ -39,6 +41,34 @@ export function RecordingListPopup() {
         };
     }, []);
 
+    // Infinite scroll dataset (mock)
+    const [items, setItems] = useState(() =>
+        Array.from({ length: 20 }).map((_, i) => ({
+            id: `rec-${i + 1}`,
+            title: `음성 메모 ${i + 1}`,
+            durationSec: 60 + (i % 10) * 7,
+            createdAt: new Date(Date.now() - i * 3600_000).toLocaleString(),
+        })),
+    );
+    const [page, setPage] = useState(1);
+    const [loading, setLoading] = useState(false);
+    const loadMore = useCallback(() => {
+        if (loading) return;
+        setLoading(true);
+        const start = page * 20;
+        const next = Array.from({ length: 20 }).map((_, idx) => ({
+            id: `rec-${start + idx + 1}`,
+            title: `음성 메모 ${start + idx + 1}`,
+            durationSec: 60 + ((start + idx) % 10) * 7,
+            createdAt: new Date(Date.now() - (start + idx) * 3600_000).toLocaleString(),
+        }));
+        setTimeout(() => {
+            setItems((prev) => [...prev, ...next]);
+            setPage((p) => p + 1);
+            setLoading(false);
+        }, 400);
+    }, [loading, page]);
+
     if (!isOpen) return null;
 
     return (
@@ -49,7 +79,7 @@ export function RecordingListPopup() {
             aria-modal='false'
             aria-label='녹음 목록'
         >
-            <div className='w-[320px] min-h-[180px] bg-white rounded-xl shadow-[0_8px_24px_rgba(0,0,0,0.2)] border border-slate-200 overflow-hidden'>
+            <div className='w-[340px] min-h-[220px] bg-white rounded-xl shadow-[0_8px_24px_rgba(0,0,0,0.2)] border border-slate-200 overflow-hidden'>
                 <div
                     className='h-10 px-3 flex items-center justify-between bg-slate-50 border-b border-slate-200 cursor-move select-none'
                     onMouseDown={(e) => {
@@ -70,9 +100,45 @@ export function RecordingListPopup() {
                         <CloseOutlined style={{ fontSize: 14, color: '#334155' }} />
                     </button>
                 </div>
-                <div className='p-3 text-sm text-slate-600'>
-                    {/* TODO: 실제 녹음 리스트 렌더링 */}
-                    <p className='text-slate-500'>최근 녹음이 여기에 표시됩니다.</p>
+                <div
+                    className='p-2 max-h-[360px] overflow-auto'
+                    onScroll={(e) => {
+                        const el = e.currentTarget;
+                        if (el.scrollTop + el.clientHeight >= el.scrollHeight - 40) {
+                            loadMore();
+                        }
+                    }}
+                >
+                    <List
+                        size='small'
+                        itemLayout='horizontal'
+                        dataSource={items}
+                        renderItem={(item) => (
+                            <List.Item className='px-2'>
+                                <div className='flex items-start gap-3 w-full py-1'>
+                                    <div className='w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center shrink-0'>
+                                        <Image
+                                            src='/assets/mic.svg'
+                                            alt='mic'
+                                            width={14}
+                                            height={14}
+                                        />
+                                    </div>
+                                    <div className='flex-1'>
+                                        <div className='text-slate-800 text-sm'>{item.title}</div>
+                                        <div className='text-[12px] text-slate-500'>{`${Math.floor(
+                                            item.durationSec / 60,
+                                        )}:${String(item.durationSec % 60).padStart(2, '0')} • ${
+                                            item.createdAt
+                                        }`}</div>
+                                    </div>
+                                </div>
+                            </List.Item>
+                        )}
+                    />
+                    {loading && (
+                        <div className='py-2 text-center text-xs text-slate-500'>불러오는 중…</div>
+                    )}
                 </div>
             </div>
         </div>
