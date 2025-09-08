@@ -84,6 +84,34 @@ export class RealMediaPipeAnalyzer {
     private lastDetectionTime = 0;
     private lastAnalysisLogTime = 0;
     private hasLoggedInitialData = false;
+    
+    // 캘리브레이션 구성(로컬 저장 기반)
+    private calib: {
+        baselineConfidence?: number | null;
+        baselineSmile?: number | null;
+        presenceGoodCut: number;
+        presenceNeedsCut: number;
+        confWarnThreshold: number;
+        confGoodThreshold: number;
+        attentionWarnThreshold: number;
+        stressWarnThreshold: number;
+    } | null = null;
+    // 반복 경고 완화용 쿨다운
+    private lastFeedbackType: string | null = null;
+    private lastFeedbackTime = 0;
+    private readonly feedbackCooldownMs = 5000; // 동일 타입 5초 쿨다운
+    // 지표 스무딩용 버퍼
+    private prevMetrics: {
+        confidence: number;
+        stress: number;
+        attention: number;
+        engagement: number;
+        eyeContact: number;
+        smile: number;
+        nervousness: number;
+        composure: number;
+    } | null = null;
+    private readonly smoothAlpha = 0.3; // EMA 계수(0.0~1.0)
 
     // ▼ 추가: 문항 버퍼링/메타
     private currentQuestionId: string | null = null;
@@ -100,6 +128,60 @@ export class RealMediaPipeAnalyzer {
         this.videoRef = videoRef;
         this.canvasRef = canvasRef;
         this.onDetection = onDetection;
+    }
+
+    private clamp01(v: number) {
+        return Math.max(0, Math.min(1, v));
+    }
+
+    private loadCalibration() {
+        try {
+            if (typeof window === 'undefined') return;
+            const raw = localStorage.getItem('aiInterviewCalibration');
+            if (!raw) {
+                this.calib = {
+                    presenceGoodCut: 0.6,
+                    presenceNeedsCut: 0.4,
+                    confWarnThreshold: 0.3,
+                    confGoodThreshold: 0.65,
+                    attentionWarnThreshold: 0.45,
+                    stressWarnThreshold: 0.6,
+                };
+                return;
+            }
+            const data = JSON.parse(raw) as any;
+            const v = data?.visual as VisualAggregatePayload | undefined;
+            const baselineConfidence = typeof v?.confidence_mean === 'number' ? v.confidence_mean : null;
+            const baselineSmile = typeof v?.smile_mean === 'number' ? v.smile_mean : null;
+
+            const baseConf = baselineConfidence ?? 0.6;
+            const confWarn = Math.max(0.25, baseConf - 0.15);
+            const confGood = Math.min(0.9, baseConf + 0.08);
+            const presGood = this.clamp01(0.6 + (baseConf - 0.6) * 0.5);
+            const presNeeds = this.clamp01(presGood - 0.2);
+
+            this.calib = {
+                baselineConfidence,
+                baselineSmile,
+                presenceGoodCut: presGood,
+                presenceNeedsCut: presNeeds,
+                confWarnThreshold: confWarn,
+                confGoodThreshold: confGood,
+                attentionWarnThreshold: 0.45,
+                stressWarnThreshold: 0.6,
+            };
+            console.log('[Calibration] Loaded visual calibration:', this.calib);
+        } catch (e) {
+            console.warn('[Calibration] Failed to load calibration. Using defaults.', e);
+            this.calib = {
+                presenceGoodCut: 0.6,
+                presenceNeedsCut: 0.4,
+                confWarnThreshold: 0.3,
+                confGoodThreshold: 0.65,
+                attentionWarnThreshold: 0.45,
+                stressWarnThreshold: 0.6,
+            };
+        }
     }
 
     // ===========================
@@ -154,6 +236,8 @@ export class RealMediaPipeAnalyzer {
             });
             this.isInitialized = true;
             console.log('✅ MediaPipe Tasks Vision 모델 초기화 완료');
+            // 초기화 후 캘리브레이션 로드
+            this.loadCalibration();
         } catch (error) {
             console.error('❌ MediaPipe Tasks Vision 모델 초기화 실패:', error);
             this.isInitialized = false;
@@ -188,22 +272,48 @@ export class RealMediaPipeAnalyzer {
         const rightEyeCenter = faceLandmarks[386];
         const noseTip = faceLandmarks[1];
 
-        const interviewMetrics = this.calculateInterviewMetrics(faceBlendshapes, faceLandmarks);
+        const rawMetrics = this.calculateInterviewMetrics(faceBlendshapes, faceLandmarks);
+        // 지표 스무딩(EMA) 적용
+        const mPrev = this.prevMetrics;
+        const a = this.smoothAlpha;
+        const interviewMetrics = mPrev
+            ? {
+                  confidence: a * rawMetrics.confidence + (1 - a) * mPrev.confidence,
+                  stress: a * rawMetrics.stress + (1 - a) * mPrev.stress,
+                  attention: a * rawMetrics.attention + (1 - a) * mPrev.attention,
+                  engagement: a * rawMetrics.engagement + (1 - a) * mPrev.engagement,
+                  eyeContact: a * rawMetrics.eyeContact + (1 - a) * mPrev.eyeContact,
+                  smile: a * rawMetrics.smile + (1 - a) * mPrev.smile,
+                  nervousness: a * rawMetrics.nervousness + (1 - a) * mPrev.nervousness,
+                  composure: a * rawMetrics.composure + (1 - a) * mPrev.composure,
+              }
+            : rawMetrics;
+        this.prevMetrics = interviewMetrics;
 
         // ▼ 실시간 피드백 (기존 유지)
         this.generateInterviewFeedback(interviewMetrics, leftEyeCenter, rightEyeCenter, noseTip);
 
         // ▼ 추가: 5초 간격 분석시 **버퍼에 샘플 기록** (문항 진행중일 때만)
         if (this.currentQuestionId) {
+            // 존재감(presence): 자신감/집중/긴장완화(1-stress) 가중합
+            const presenceScore =
+                0.5 * interviewMetrics.confidence +
+                0.3 * interviewMetrics.attention +
+                0.2 * (1 - interviewMetrics.stress);
+            const goodCut = this.calib?.presenceGoodCut ?? 0.6;
+            const needsCut = this.calib?.presenceNeedsCut ?? 0.4;
             const presence: Presence =
-                interviewMetrics.confidence > 0.7
+                presenceScore >= goodCut
                     ? 'good'
-                    : interviewMetrics.confidence < 0.4
+                    : presenceScore < needsCut
                       ? 'needs_improvement'
                       : 'average';
 
-            // level 매핑: warning만 경고, 나머지는 ok로 단순화(원하면 더 정교화 가능)
-            const level: LevelAgg = interviewMetrics.stress > 0.6 ? 'warning' : 'ok';
+            // level 매핑: 스트레스가 높은 구간만 'warning'
+            const level: LevelAgg =
+                interviewMetrics.stress > (this.calib?.stressWarnThreshold ?? 0.6)
+                    ? 'warning'
+                    : 'ok';
 
             const sample: VisualSampleLite = {
                 timestamp: new Date().toISOString(),
@@ -248,12 +358,22 @@ export class RealMediaPipeAnalyzer {
             blendshapes.find((c: any) => c.categoryName === 'browOuterUpLeft')?.score || 0;
         const browOuterUpRight =
             blendshapes.find((c: any) => c.categoryName === 'browOuterUpRight')?.score || 0;
+        const eyeLookOutLeft =
+            blendshapes.find((c: any) => c.categoryName === 'eyeLookOutLeft')?.score || 0;
+        const eyeLookOutRight =
+            blendshapes.find((c: any) => c.categoryName === 'eyeLookOutRight')?.score || 0;
+        const mouthOpen = blendshapes.find((c: any) => c.categoryName === 'jawOpen')?.score || 0;
+        const eyeWideLeft = blendshapes.find((c: any) => c.categoryName === 'eyeWideLeft')?.score || 0;
+        const eyeWideRight = blendshapes.find((c: any) => c.categoryName === 'eyeWideRight')?.score || 0;
 
         metrics.smile = (smileLeft + smileRight) / 2;
+        // 자신감: 과도한 놀람/긴장(eyeWide, browInnerUp↑)은 감점, 적당한 미소와 시선 고정은 가점
+        // browOuterUp(약간의 개방감)도 소폭 가점
+        const surprise = (eyeWideLeft + eyeWideRight + browInnerUp) / 3;
         metrics.confidence =
-            metrics.smile * 0.4 +
-            (browOuterUpLeft + browOuterUpRight) * 0.3 +
-            (1 - browInnerUp) * 0.3;
+            0.45 * metrics.smile +
+            0.35 * Math.max(0, 1 - surprise) +
+            0.2 * ((browOuterUpLeft + browOuterUpRight) / 2);
 
         const browDownLeft =
             blendshapes.find((c: any) => c.categoryName === 'browDownLeft')?.score || 0;
@@ -264,7 +384,15 @@ export class RealMediaPipeAnalyzer {
         const mouthPressRight =
             blendshapes.find((c: any) => c.categoryName === 'mouthPressRight')?.score || 0;
 
-        metrics.stress = (browDownLeft + browDownRight + mouthPressLeft + mouthPressRight) / 4;
+        // 스트레스: 찡그림/입 꽉 다물기 + 눈 크게 뜸을 종합
+        metrics.stress =
+            (browDownLeft +
+                browDownRight +
+                mouthPressLeft +
+                mouthPressRight +
+                eyeWideLeft +
+                eyeWideRight) /
+            6;
         metrics.nervousness = metrics.stress;
 
         const eyeBlinkLeft =
@@ -276,11 +404,15 @@ export class RealMediaPipeAnalyzer {
         const eyeLookDownRight =
             blendshapes.find((c: any) => c.categoryName === 'eyeLookDownRight')?.score || 0;
 
-        metrics.attention = 1 - (eyeBlinkLeft + eyeBlinkRight) / 2;
-        metrics.eyeContact = 1 - (eyeLookDownLeft + eyeLookDownRight) / 2;
+        const blink = (eyeBlinkLeft + eyeBlinkRight) / 2;
+        const gazeAway =
+            (eyeLookDownLeft + eyeLookDownRight + eyeLookOutLeft + eyeLookOutRight) / 4;
+        metrics.eyeContact = Math.max(0, 1 - gazeAway);
+        metrics.attention = Math.max(0, Math.min(1, 0.6 * metrics.eyeContact + 0.4 * (1 - blink)));
 
         const cheekPuff = blendshapes.find((c: any) => c.categoryName === 'cheekPuff')?.score || 0;
-        metrics.engagement = (metrics.smile + metrics.attention + (1 - cheekPuff)) / 3;
+        // 참여도: 시선/집중 + 적당한 미소 + 발화(입열림) 신호
+        metrics.engagement = (metrics.attention + metrics.smile + mouthOpen) / 3;
         metrics.composure = 1 - metrics.stress;
 
         return metrics;
@@ -293,9 +425,24 @@ export class RealMediaPipeAnalyzer {
             nose: { x: nose.x, y: nose.y },
         };
 
+        const now = Date.now();
+        const emit = (type: DetectionResult['type'], payload: DetectionResult) => {
+            if (this.lastFeedbackType === type && now - this.lastFeedbackTime < this.feedbackCooldownMs) {
+                return; // 동일 유형 메시지 스팸 방지
+            }
+            this.lastFeedbackType = type;
+            this.lastFeedbackTime = now;
+            this.onDetection(payload);
+        };
+
+        const confWarnTh = this.calib?.confWarnThreshold ?? 0.3;
+        const confGoodTh = this.calib?.confGoodThreshold ?? 0.65;
+        const attWarnTh = this.calib?.attentionWarnThreshold ?? 0.45;
+        const stressWarnTh = this.calib?.stressWarnThreshold ?? 0.6;
+
         // 1) 스트레스 높음
-        if (metrics.stress > 0.6) {
-            this.onDetection({
+        if (metrics.stress > stressWarnTh) {
+            emit('stress', {
                 type: 'stress',
                 message: '긴장을 풀고 편안한 마음으로 답변해보세요',
                 level: 'warning',
@@ -311,8 +458,8 @@ export class RealMediaPipeAnalyzer {
         }
 
         // 2) 주의/아이컨택 낮음
-        if (metrics.attention < 0.5 || metrics.eyeContact < 0.5) {
-            this.onDetection({
+        if (metrics.attention < attWarnTh || metrics.eyeContact < attWarnTh) {
+            emit('attention', {
                 type: 'attention',
                 message: '면접관과의 아이컨택을 더 유지해보세요',
                 level: 'warning',
@@ -328,8 +475,8 @@ export class RealMediaPipeAnalyzer {
         }
 
         // 3) 자신감 낮음
-        if (metrics.confidence < 0.4) {
-            this.onDetection({
+        if (metrics.confidence < confWarnTh) {
+            emit('confidence', {
                 type: 'confidence',
                 message: '좀 더 자신감 있는 표정을 지어보세요',
                 level: 'warning',
@@ -345,8 +492,8 @@ export class RealMediaPipeAnalyzer {
         }
 
         // 4) 긍정 피드백
-        if (metrics.confidence > 0.7) {
-            this.onDetection({
+        if (metrics.confidence > confGoodTh) {
+            emit('confidence', {
                 type: 'confidence',
                 message: '자신감 있는 표정이 인상적입니다!',
                 level: 'excellent',
@@ -362,7 +509,7 @@ export class RealMediaPipeAnalyzer {
         }
 
         if (metrics.attention > 0.8 && metrics.eyeContact > 0.7) {
-            this.onDetection({
+            emit('attention', {
                 type: 'attention',
                 message: '훌륭한 집중력과 아이컨택을 보여주고 있습니다',
                 level: 'excellent',
@@ -378,7 +525,7 @@ export class RealMediaPipeAnalyzer {
         }
 
         if (metrics.smile > 0.4) {
-            this.onDetection({
+            emit('smile', {
                 type: 'smile',
                 message: '자연스러운 미소가 좋은 인상을 줍니다',
                 level: 'good',

@@ -7,6 +7,9 @@ interface IWebcam {
     css?: string;
     onDetection?: (data: any) => void;
     onAggregate?: (agg: VisualAggregatePayload) => void;
+    width?: number; // px
+    height?: number; // px
+    overlayGuide?: boolean; // 가이드 렌더링 (캘리브레이션용)
 }
 
 export interface WebcamHandle {
@@ -15,7 +18,7 @@ export interface WebcamHandle {
 }
 
 export const Webcam = forwardRef<WebcamHandle, IWebcam>(function Webcam(
-    { css, onDetection, onAggregate },
+    { css, onDetection, onAggregate, width = 384, height = 216, overlayGuide = false },
     ref,
 ) {
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -135,7 +138,10 @@ export const Webcam = forwardRef<WebcamHandle, IWebcam>(function Webcam(
 
     return (
         <div className={`text-end ${css}`}>
-            <div className='mt-4 mr-4 w-[384px] h-[216px] rounded-2xl overflow-hidden bg-gray-400 relative'>
+            <div
+                className='mt-4 mr-4 rounded-2xl overflow-hidden bg-gray-400 relative'
+                style={{ width: `${width}px`, height: `${height}px` }}
+            >
                 <video
                     ref={videoRef}
                     autoPlay
@@ -148,7 +154,7 @@ export const Webcam = forwardRef<WebcamHandle, IWebcam>(function Webcam(
                     className='absolute top-0 left-0 w-full h-full pointer-events-none'
                     style={{ zIndex: 1 }}
                 />
-                {detectionData && (
+                {detectionData && !overlayGuide && (
                     <div className='absolute bottom-2 left-2 right-2 z-10'>
                         <div
                             className={`px-3 py-2 rounded-lg text-sm font-medium ${
@@ -178,6 +184,58 @@ export const Webcam = forwardRef<WebcamHandle, IWebcam>(function Webcam(
                         </div>
                     </div>
                 )}
+                {overlayGuide &&
+                    (() => {
+                        const innerW = Math.round(width * 0.5);
+                        const innerH = Math.round(height * 0.7);
+                        const topGap = Math.round((height - innerH) / 2);
+                        const sideGap = Math.round((width - innerW) / 2);
+                        return (
+                            <div className='absolute inset-0 pointer-events-none z-10'>
+                                {/* Dimmed regions outside the guide box */}
+                                <div
+                                    className='absolute left-0 top-0 bg-black/25'
+                                    style={{ width: '100%', height: topGap }}
+                                />
+                                <div
+                                    className='absolute left-0'
+                                    style={{
+                                        top: topGap,
+                                        width: sideGap,
+                                        height: innerH,
+                                        background: 'rgba(0,0,0,0.25)',
+                                    }}
+                                />
+                                <div
+                                    className='absolute right-0'
+                                    style={{
+                                        top: topGap,
+                                        width: sideGap,
+                                        height: innerH,
+                                        background: 'rgba(0,0,0,0.25)',
+                                    }}
+                                />
+                                <div
+                                    className='absolute left-0 bottom-0 bg-black/25'
+                                    style={{ width: '100%', height: topGap }}
+                                />
+
+                                {/* Guide rectangle */}
+                                <div
+                                    className='absolute rounded-xl border-2'
+                                    style={{
+                                        left: sideGap,
+                                        top: topGap,
+                                        width: innerW,
+                                        height: innerH,
+                                        borderColor: 'rgba(255,255,255,0.9)',
+                                        boxShadow: '0 0 0 4px rgba(255,255,255,0.3) inset',
+                                        backdropFilter: 'saturate(120%)',
+                                    }}
+                                />
+                            </div>
+                        );
+                    })()}
                 {isStreaming && (
                     <div className='absolute top-2 right-2 z-10'>
                         <div className='w-3 h-3 bg-green-500 rounded-full animate-pulse'></div>
