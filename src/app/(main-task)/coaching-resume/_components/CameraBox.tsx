@@ -13,6 +13,7 @@ interface ICameraBox {
 
 export function CameraBox({ name = '이름없음', isLocal, isSpeaking, profileImg }: ICameraBox) {
     const isCamEnabled = useCanvasStore((s) => s.isCamEnabled);
+    const isMicEnabled = useCanvasStore((s) => s.isMicEnabled);
     const speakingStyle = isSpeaking ? 'ring-2 ring-blue-500' : '';
     const bgClass = 'bg-[#0b1b2b]'; // 어두운 파란색 배경
 
@@ -41,8 +42,19 @@ export function CameraBox({ name = '이름없음', isLocal, isSpeaking, profileI
 
             {/* null 자리에 여기에 video 넣으면 됩니다! */}
 
-            <p className='text-white absolute left-2 bottom-1.5 font-medium text-sm'>
-                {isLocal ? 'You' : name}
+            <p className='text-white absolute left-2 bottom-1.5 font-medium text-sm flex items-center gap-1'>
+                <span>{isLocal ? 'You' : name}</span>
+                {isLocal && !isMicEnabled && (
+                    <span className='inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-500'>
+                        <Image
+                            src='/assets/mic-off.svg'
+                            alt='mic-off'
+                            width={12}
+                            height={12}
+                            className='invert'
+                        />
+                    </span>
+                )}
             </p>
         </div>
     );
