@@ -5,6 +5,7 @@ import {
     FabricToolbar,
     FabricCanvas,
     ParticipantCamera,
+    RecordingListPopup,
 } from '../_components';
 
 export default function CoachingResumePage() {
@@ -15,6 +16,7 @@ export default function CoachingResumePage() {
             <ParticipantCamera />
             <FabricToolbar />
             <FabricCanvas />
+            <RecordingListPopup />
         </>
     );
 }
