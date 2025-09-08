@@ -1,6 +1,12 @@
 // local components
-import { FabricWhiteBoard } from '../_components';
+import { FabricToolbar, FabricCanvas, ParticipantCamera } from '../_components';
 
 export default function CoachingResumePage() {
-    return <FabricWhiteBoard />;
+    return (
+        <>
+            <ParticipantCamera />
+            <FabricToolbar />
+            <FabricCanvas />
+        </>
+    );
 }
