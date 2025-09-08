@@ -34,9 +34,9 @@ export const useAuth = () => {
             await authApi.logout();
             // 쿼리 캐시 무효화
             refetch();
-            // 로그인 페이지로 리다이렉트
+            // 홈페이지로 리다이렉트
             if (typeof window !== 'undefined') {
-                window.location.href = '/login';
+                window.location.href = '/';
             }
         } catch (error) {
             console.error('로그아웃 실패:', error);
