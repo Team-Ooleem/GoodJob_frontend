@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { WebSocketResponse, WebSocketMessage } from '@/types/chat';
+import { SOCKET_CHAT_URL } from '@/constants/config';
 
 interface UseWebSocketProps {
     userId: number | null;
@@ -26,7 +27,7 @@ export const useWebSocket = ({
         if (!userId) return;
 
         try {
-            const serverUrl = `${process.env.NEXT_PUBLIC_CHAT_WEBSOCKET_URL}`;
+            const serverUrl = SOCKET_CHAT_URL;
 
             const socket = io(serverUrl, {
                 transports: ['websocket', 'polling'],

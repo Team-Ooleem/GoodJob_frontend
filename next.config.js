@@ -14,14 +14,6 @@ const nextConfig = {
             },
         ],
     },
-    async rewrites() {
-        return [
-            {
-                source: '/ws/:path*',
-                destination: 'https://localhost:3000/:path*',
-            },
-        ];
-    },
     typescript: {
         ignoreBuildErrors: true,
     },

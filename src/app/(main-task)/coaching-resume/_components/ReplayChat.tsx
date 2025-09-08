@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { Button, Spin, Empty } from 'antd';
 
+import { API_BASE_URL } from '@/constants/config';
+
 interface SpeakerSegment {
     speakerTag: number;
     textContent: string;
@@ -163,14 +165,12 @@ export function ReplayChat({ canvasIdx, isOpen, currentUserId }: ReplayChatProps
         setLoading(true);
         setError(null);
         try {
-            const res = await axios.get(
-                `http://localhost:4000/api/stt/session-messages/${canvasIdx}`,
-            );
+            const res = await axios.get(`${API_BASE_URL}/stt/session-messages/${canvasIdx}`);
             if (res.data.success) {
                 const sessionsWithSegments: ChatSession[] = await Promise.all(
                     res.data.messages.map(async (msg: any) => {
                         const contextRes = await axios.get(
-                            `http://localhost:4000/api/stt/context/${msg.messageId}`,
+                            `${API_BASE_URL}/stt/context/${msg.messageId}`,
                         );
                         const segments: SpeakerSegment[] = contextRes.data.speakers.map(
                             (seg: any) => ({

@@ -1,3 +1,5 @@
+import { API_BASE_URL } from '@/constants/config';
+
 // 면접 분석 API
 export interface InterviewAnalysisRequest {
     messages: Array<{
@@ -34,7 +36,7 @@ export const analyzeInterview = async (
     request: InterviewAnalysisRequest,
 ): Promise<InterviewAnalysisResponse> => {
     // 백엔드 서버 주소로 API 호출
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/interview/analyze`, {
+    const response = await fetch(`${API_BASE_URL}/interview/analyze`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

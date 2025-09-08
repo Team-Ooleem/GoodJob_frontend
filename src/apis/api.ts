@@ -1,10 +1,9 @@
 import axios from 'axios';
-
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000/api';
+import { API_BASE_URL, REQUEST_TIMEOUT } from '@/constants/config';
 
 export const apiConfig = {
     baseURL: API_BASE_URL,
-    timeout: 5000,
+    timeout: REQUEST_TIMEOUT,
     withCredentials: true,
 };
 
