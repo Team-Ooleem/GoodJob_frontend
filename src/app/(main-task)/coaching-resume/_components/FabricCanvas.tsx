@@ -15,6 +15,7 @@ import {
     useEraser,
     useStickyNote,
     useLockTransform,
+    usePdfDrop,
 } from '../_hooks';
 
 // local stores
@@ -77,6 +78,9 @@ export function FabricCanvas() {
 
     // 화면 공유 소켓 접속
     useCollaborativeCanvas('resume-room');
+
+    // pdf drag & drop
+    usePdfDrop(canvasRef);
 
     return <canvas ref={canvasRef} />;
 }

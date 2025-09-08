@@ -34,6 +34,19 @@ export const getJobRoles = async (categoryId: number): Promise<JobRolesResponse>
 };
 
 /**
+ * 사용자의 직군/직무 선호도를 조회합니다.
+ * @returns 사용자 직군/직무 선호도 응답
+ */
+export const getUserJobPreference = async (): Promise<UserJobPreferenceResponse> => {
+    try {
+        const response = await api.get<UserJobPreferenceResponse>('/user/job-preference');
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+};
+
+/**
  * 사용자의 직군/직무 선호도를 저장합니다.
  * @param preference 사용자 직군/직무 선호도
  * @returns 저장 결과 응답
