@@ -27,6 +27,8 @@ export function FabricToolbar() {
     const { isRecordingRef, handleRecord } = useVoiceRecorder({ canvasIdx: 0 });
     const isRecording = useCanvasStore((store) => store.isRecording);
     const toggleRecording = useCanvasStore((store) => store.toggleRecording);
+    const isRecordingListOpen = useCanvasStore((store) => store.isRecordingListOpen);
+    const toggleRecordingList = useCanvasStore((store) => store.toggleRecordingList);
     const [hoverMic, setHoverMic] = useState(false);
     const [hoverCam, setHoverCam] = useState(false);
 
@@ -144,10 +146,10 @@ export function FabricToolbar() {
                     </button>
                 </Flex>
             </div>
-            <div className='w-[55px] h-[55px] bg-white shadow-[0_2px_6px_rgba(0,0,0,0.25)] rounded-full px-4 py-1 flex justify-center items-center gap-1'>
+            <div className='h-[55px] bg-white shadow-[0_2px_6px_rgba(0,0,0,0.25)] rounded-full px-4 py-1 flex justify-center items-center gap-1'>
                 {/* 녹음 */}
                 <button
-                    className='rounded'
+                    className='p-2 rounded hover:bg-gray-100'
                     onClick={() => {
                         toggleRecording();
                         handleRecord();
@@ -159,6 +161,25 @@ export function FabricToolbar() {
                         width={20}
                         height={20}
                         alt='record-toggle'
+                    />
+                </button>
+                <button
+                    className={`p-2 rounded hover:bg-gray-100 ${
+                        isRecordingListOpen ? 'bg-gray-100' : ''
+                    }`}
+                    onClick={toggleRecordingList}
+                    title={isRecordingListOpen ? '녹음 리스트 닫기' : '녹음 리스트 열기'}
+                    aria-pressed={isRecordingListOpen}
+                >
+                    <Image
+                        src={
+                            isRecordingListOpen
+                                ? '/assets/all-inbox-outline.svg'
+                                : '/assets/all-inbox.svg'
+                        }
+                        width={20}
+                        height={20}
+                        alt='record-list'
                     />
                 </button>
             </div>
