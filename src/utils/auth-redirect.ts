@@ -21,9 +21,9 @@ export const handleAuthRedirect = async (maxRetries = 3, baseDelay = 500): Promi
 
             // 온보딩 상태에 따른 경로 결정
             if (authData.onboarding?.isOnboarded) {
-                return '/user/home'; // 메인 페이지
+                return '/'; // 메인 페이지
             } else {
-                return '/profile-input'; // 온보딩 페이지
+                return '/job-selection'; // 온보딩 페이지
             }
         } catch (error) {
             retryCount++;
