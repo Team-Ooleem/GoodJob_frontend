@@ -3,6 +3,15 @@ const path = require('path');
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+    webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
+        // PDF.js worker 파일 복사
+        config.resolve.alias = {
+            ...config.resolve.alias,
+            'pdfjs-dist/build/pdf.worker.entry': 'pdfjs-dist/build/pdf.worker.min.js',
+        };
+
+        return config;
+    },
     /* config options here */
     images: {
         remotePatterns: [
@@ -19,6 +28,10 @@ const nextConfig = {
             {
                 source: '/ws/:path*',
                 destination: 'https://localhost:3000/:path*',
+            },
+            {
+                source: '/pdf.worker.js',
+                destination: '/node_modules/pdfjs-dist/build/pdf.worker.min.js',
             },
         ];
     },
