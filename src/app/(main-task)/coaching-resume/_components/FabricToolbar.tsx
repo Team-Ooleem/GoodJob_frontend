@@ -1,12 +1,6 @@
 'use client';
 
 import { Flex } from 'antd';
-import {
-    AudioOutlined,
-    AudioMutedOutlined,
-    VideoCameraOutlined,
-    MinusOutlined,
-} from '@ant-design/icons';
 import Image from 'next/image';
 
 // local stores
@@ -32,12 +26,12 @@ export function FabricToolbar() {
         <div className='absolute bottom-[20px] left-1/2 -translate-x-1/2 transform z-[10] bg-white shadow-[0_2px_6px_rgba(0,0,0,0.25)] rounded-full px-4 py-1 flex items-center gap-1'>
             {/* 마이크 */}
             <button className='p-2 rounded hover:bg-gray-100' onClick={() => setDrawingMode(false)}>
-                <AudioOutlined />
+                <Image src='/assets/mic-none.svg' width={20} height={20} alt='selector' />
             </button>
 
             {/* 카메라 */}
             <button className='p-2 rounded hover:bg-gray-100' onClick={() => setDrawingMode(false)}>
-                <VideoCameraOutlined />
+                <Image src='/assets/videocam.svg' width={20} height={20} alt='selector' />
             </button>
 
             <div className='w-px h-6 bg-gray-200' />
