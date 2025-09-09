@@ -8,3 +8,4 @@ export * from './ParticipantCamera';
 export * from './CanvasTitle';
 export * from './SessionToolbar';
 export * from './RecordingListPopup';
+export * from './SocketProvider';
