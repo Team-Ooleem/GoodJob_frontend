@@ -156,7 +156,7 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
             roomRef.current = roomId;
             if (!socket) return;
 
-            socket.emit('joinRtc', roomId, (count: number) => {
+            socket.emit('joinRtc', { roomId }, (count: number) => {
                 console.log(`🟢 joinRtc: ${roomId}, 현재 인원 ${count}`);
                 if (count === 1) {
                     console.log('🟡 방에 혼자 있음 → 다른 참가자 기다림');
