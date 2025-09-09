@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useMemo } from 'react';
+import { useMemo, useEffect, useRef } from 'react';
 import { useCanvasStore } from '../_stores';
 
 interface ICameraBox {
@@ -9,9 +9,18 @@ interface ICameraBox {
     isLocal: boolean;
     isSpeaking: boolean;
     profileImg?: string;
+    stream?: MediaStream | null;
 }
 
-export function CameraBox({ name = '이름없음', isLocal, isSpeaking, profileImg }: ICameraBox) {
+export function CameraBox({
+    name = '이름없음',
+    isLocal,
+    isSpeaking,
+    profileImg,
+    stream,
+}: ICameraBox) {
+    const videoRef = useRef<HTMLVideoElement>(null);
+
     const isCamEnabled = useCanvasStore((s) => s.isCamEnabled);
     const isMicEnabled = useCanvasStore((s) => s.isMicEnabled);
     const speakingStyle = isSpeaking ? 'ring-2 ring-blue-500' : '';
@@ -23,6 +32,13 @@ export function CameraBox({ name = '이름없음', isLocal, isSpeaking, profileI
     }, [isLocal, name]);
 
     const showProfileFallback = isLocal && !isCamEnabled;
+
+    // ✅ stream이 바뀔 때 video에 연결
+    useEffect(() => {
+        if (videoRef.current && stream) {
+            videoRef.current.srcObject = stream;
+        }
+    }, [stream]);
 
     return (
         <div
@@ -38,7 +54,16 @@ export function CameraBox({ name = '이름없음', isLocal, isSpeaking, profileI
                         )}
                     </div>
                 </div>
-            ) : null}
+            ) : (
+                <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted={isLocal}
+                    className='w-full h-full object-cover'
+                    style={{ transform: 'scaleX(-1)' }}
+                />
+            )}
 
             {/* null 자리에 여기에 video 넣으면 됩니다! */}
 
