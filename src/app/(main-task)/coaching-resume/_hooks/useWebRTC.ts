@@ -25,7 +25,6 @@ export interface UseWebRTC {
     endCall: () => void;
     toggleMic: () => void;
     toggleCamera: () => void;
-    unmount: () => void;
 
     onRemoteStream?: (stream: MediaStream) => void;
     onConnectionStateChange?: (state: RTCPeerConnectionState) => void;
@@ -236,47 +235,6 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
         setIsCameraOff(!next);
     }, [localStream]);
 
-    // 언마운트 시 정리 작업
-    const unmount = useCallback(() => {
-        console.log('🧹 WebRTC unmount: 정리 작업 시작');
-
-        // 1. 방에서 나가기
-        if (roomRef.current && socket) {
-            socket.emit('leaveRtc', { room: roomRef.current });
-        }
-
-        // 2. WebRTC 연결 종료
-        endCall();
-
-        // 3. 로컬 스트림 정리
-        if (localStream) {
-            localStream.getTracks().forEach((track) => {
-                track.stop();
-                console.log('🎥 미디어 트랙 정리:', track.kind);
-            });
-            setLocalStream(null);
-        }
-
-        // 4. 원격 스트림 정리
-        setRemoteStream(null);
-
-        // 5. 상태 초기화
-        setIsConnected(false);
-        setIsMuted(false);
-        setIsCameraOff(false);
-        setError(null);
-        roomRef.current = null;
-
-        console.log('✅ WebRTC unmount: 정리 작업 완료');
-    }, [socket, endCall, localStream]);
-
-    // 컴포넌트 언마운트 시 자동 정리
-    useEffect(() => {
-        return () => {
-            unmount();
-        };
-    }, [unmount]);
-
     return {
         localStream,
         remoteStream,
@@ -295,7 +253,6 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
         endCall,
         toggleMic,
         toggleCamera,
-        unmount, // 수동 언마운트 함수 추가
         onRemoteStream,
         onConnectionStateChange,
     };
