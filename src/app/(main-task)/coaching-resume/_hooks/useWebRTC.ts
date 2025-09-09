@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useCanvasStore } from '../_stores';
+import { useVoiceDetection } from './useVoiceDetection';
 
 export interface UseWebRTC {
     localStream: MediaStream | null;
@@ -11,6 +12,11 @@ export interface UseWebRTC {
     isMuted: boolean;
     isCameraOff: boolean;
     error: string | null;
+
+    // 음성 감지 관련
+    isLocalSpeaking: boolean;
+    isRemoteSpeaking: boolean;
+    localVolumeLevel: number;
 
     joinRoom: (roomId: string) => void;
     leaveRoom: () => void;
@@ -41,8 +47,22 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
     const [isCameraOff, setIsCameraOff] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // 음성 감지 상태
+    const [isRemoteSpeaking, setIsRemoteSpeaking] = useState(false);
+
     const onRemoteStream = options?.onRemoteStream;
     const onConnectionStateChange = options?.onConnectionStateChange;
+
+    // 로컬 스트림에 대한 음성 감지
+    const { isSpeaking: isLocalSpeaking, volumeLevel: localVolumeLevel } = useVoiceDetection(
+        localStream,
+        {
+            threshold: 0.04, // 음성 감지 임계값 (0.01 → 0.02로 증가)
+            smoothingFactor: 0.8, // 스무딩 팩터
+            minSpeakingDuration: 100, // 최소 말하기 지속 시간 (ms)
+            debounceDelay: 50, // 디바운스 지연 시간 (ms)
+        },
+    );
 
     const ensurePeer = useCallback((): RTCPeerConnection => {
         if (pcRef.current) return pcRef.current;
@@ -214,6 +234,10 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
         isMuted,
         isCameraOff,
         error,
+        // 음성 감지 관련
+        isLocalSpeaking,
+        isRemoteSpeaking,
+        localVolumeLevel,
         joinRoom,
         leaveRoom,
         startCall,
