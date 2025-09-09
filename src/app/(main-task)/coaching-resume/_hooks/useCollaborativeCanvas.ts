@@ -50,7 +50,7 @@ export function useCollaborativeCanvas(room: string) {
         // --- Socket 이벤트 등록 ---
         socket.on('connect', () => {
             console.log('Socket connected, joining room:', room);
-            socket.emit('join', room);
+            socket.emit('joinCanvas', room);
         });
 
         socket.on('disconnect', () => {

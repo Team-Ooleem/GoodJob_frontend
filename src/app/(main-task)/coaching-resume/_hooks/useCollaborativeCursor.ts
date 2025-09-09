@@ -72,7 +72,7 @@ export function useCollaborativeCursor(room: string) {
 
         const handleConnect = () => {
             console.log('✅ connected for cursor, joining room:', room);
-            socket.emit('join', { room, clientUUID });
+            socket.emit('joinCursor', { room, clientUUID });
             window.addEventListener('mousemove', handleMouseMove);
         };
 
