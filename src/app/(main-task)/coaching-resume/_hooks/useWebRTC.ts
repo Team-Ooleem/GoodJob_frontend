@@ -1,0 +1,236 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { io, Socket } from 'socket.io-client';
+import { BACKEND_ORIGIN } from '@/constants/config';
+
+export interface UseWebRTC {
+    localStream: MediaStream | null;
+    remoteStream: MediaStream | null;
+
+    isConnected: boolean;
+    isMuted: boolean;
+    isCameraOff: boolean;
+    error: string | null;
+
+    joinRoom: (roomId: string) => void;
+    leaveRoom: () => void;
+    startCall: () => Promise<void>;
+    endCall: () => void;
+    toggleMic: () => void;
+    toggleCamera: () => void;
+
+    onRemoteStream?: (stream: MediaStream) => void;
+    onConnectionStateChange?: (state: RTCPeerConnectionState) => void;
+}
+
+type Options = {
+    onRemoteStream?: (stream: MediaStream) => void;
+    onConnectionStateChange?: (state: RTCPeerConnectionState) => void;
+};
+
+export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
+    const socketRef = useRef<Socket | null>(null);
+    const pcRef = useRef<RTCPeerConnection | null>(null);
+    const roomRef = useRef<string | null>(room ?? null);
+
+    const localStreamRef = useRef<MediaStream | null>(null);
+    const remoteStreamRef = useRef<MediaStream | null>(null);
+
+    const [isConnected, setIsConnected] = useState(false);
+    const [isMuted, setIsMuted] = useState(false);
+    const [isCameraOff, setIsCameraOff] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const onRemoteStream = options?.onRemoteStream;
+    const onConnectionStateChange = options?.onConnectionStateChange;
+
+    const ensureSocket = useCallback((): Socket => {
+        if (socketRef.current) return socketRef.current;
+        const socket = io(BACKEND_ORIGIN, {
+            transports: ['websocket', 'polling'],
+            withCredentials: true,
+        });
+        socketRef.current = socket;
+        return socket;
+    }, []);
+
+    const ensurePeer = useCallback((): RTCPeerConnection => {
+        if (pcRef.current) return pcRef.current;
+        const pc = new RTCPeerConnection({
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' },
+            ],
+        });
+
+        pc.onicecandidate = (e) => {
+            if (e.candidate && roomRef.current) {
+                ensureSocket().emit('ice-candidate', {
+                    room: roomRef.current,
+                    candidate: e.candidate.toJSON(),
+                });
+            }
+        };
+
+        pc.ontrack = (e) => {
+            const [stream] = e.streams;
+            remoteStreamRef.current = stream;
+            onRemoteStream?.(stream);
+        };
+
+        pc.onconnectionstatechange = () => {
+            setIsConnected(pc.connectionState === 'connected');
+            onConnectionStateChange?.(pc.connectionState);
+        };
+
+        pcRef.current = pc;
+        return pc;
+    }, [ensureSocket, onConnectionStateChange, onRemoteStream]);
+
+    const attachLocalMedia = useCallback(async () => {
+        if (localStreamRef.current) return localStreamRef.current;
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: true,
+                video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+            });
+            localStreamRef.current = stream;
+            const pc = ensurePeer();
+            stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+            return stream;
+        } catch (e: any) {
+            setError(e?.message || 'Failed to get user media');
+            throw e;
+        }
+    }, [ensurePeer]);
+
+    // Socket listeners
+    useEffect(() => {
+        const socket = ensureSocket();
+
+        const handleConnect = () => {
+            if (roomRef.current) socket.emit('join', roomRef.current);
+        };
+
+        const handleOffer = async (payload: { sdp: RTCSessionDescriptionInit; from: string }) => {
+            try {
+                await attachLocalMedia();
+                const pc = ensurePeer();
+                await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+                if (roomRef.current) {
+                    socket.emit('answer', { room: roomRef.current, sdp: answer });
+                }
+            } catch (e: any) {
+                setError(e?.message || 'Failed handling offer');
+            }
+        };
+
+        const handleAnswer = async (payload: { sdp: RTCSessionDescriptionInit; from: string }) => {
+            try {
+                const pc = ensurePeer();
+                await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+            } catch (e: any) {
+                setError(e?.message || 'Failed handling answer');
+            }
+        };
+
+        const handleIce = async (payload: { candidate: RTCIceCandidateInit; from: string }) => {
+            try {
+                const pc = ensurePeer();
+                await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
+            } catch (e: any) {
+                // Ignore errors due to timing
+            }
+        };
+
+        socket.on('connect', handleConnect);
+        socket.on('offer', handleOffer);
+        socket.on('answer', handleAnswer);
+        socket.on('ice-candidate', handleIce);
+
+        return () => {
+            socket.off('connect', handleConnect);
+            socket.off('offer', handleOffer);
+            socket.off('answer', handleAnswer);
+            socket.off('ice-candidate', handleIce);
+        };
+    }, [attachLocalMedia, ensurePeer, ensureSocket]);
+
+    const joinRoom = useCallback(
+        (roomId: string) => {
+            roomRef.current = roomId;
+            ensureSocket().emit('join', roomId);
+        },
+        [ensureSocket],
+    );
+
+    const leaveRoom = useCallback(() => {
+        roomRef.current = null;
+        // no dedicated leave event in backend sample; rely on disconnect/cleanup
+    }, []);
+
+    const startCall = useCallback(async () => {
+        try {
+            await attachLocalMedia();
+            const pc = ensurePeer();
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            if (roomRef.current) {
+                ensureSocket().emit('offer', { room: roomRef.current, sdp: offer });
+            }
+        } catch (e: any) {
+            setError(e?.message || 'Failed to start call');
+        }
+    }, [attachLocalMedia, ensurePeer, ensureSocket]);
+
+    const endCall = useCallback(() => {
+        pcRef.current?.getSenders().forEach((s) => pcRef.current?.removeTrack(s));
+        pcRef.current?.close();
+        pcRef.current = null;
+        remoteStreamRef.current = null;
+        setIsConnected(false);
+    }, []);
+
+    const toggleMic = useCallback(() => {
+        const tracks = localStreamRef.current?.getAudioTracks() || [];
+        const next = !tracks[0]?.enabled;
+        tracks.forEach((t) => (t.enabled = next));
+        setIsMuted(!next);
+    }, []);
+
+    const toggleCamera = useCallback(() => {
+        const tracks = localStreamRef.current?.getVideoTracks() || [];
+        const next = !tracks[0]?.enabled;
+        tracks.forEach((t) => (t.enabled = next));
+        setIsCameraOff(!next);
+    }, []);
+
+    // Auto-connect socket and optionally join on mount if room provided
+    useEffect(() => {
+        const socket = ensureSocket();
+        return () => {
+            socket.disconnect();
+            socketRef.current = null;
+        };
+    }, [ensureSocket]);
+
+    return {
+        localStream: localStreamRef.current,
+        remoteStream: remoteStreamRef.current,
+        isConnected,
+        isMuted,
+        isCameraOff,
+        error,
+        joinRoom,
+        leaveRoom,
+        startCall,
+        endCall,
+        toggleMic,
+        toggleCamera,
+        onRemoteStream,
+        onConnectionStateChange,
+    };
+};
