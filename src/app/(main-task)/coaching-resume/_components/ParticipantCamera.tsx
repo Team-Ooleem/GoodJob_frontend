@@ -5,12 +5,18 @@ import { CameraBox } from './CameraBox';
 import { useWebRTC } from '../_hooks';
 
 export function ParticipantCamera() {
-    const { localStream, remoteStream, joinRoom, isLocalSpeaking, isRemoteSpeaking } =
+    const { localStream, remoteStream, joinRoom, isLocalSpeaking, isRemoteSpeaking, unmount } =
         useWebRTC('resume-room');
 
     useEffect(() => {
         joinRoom('resume-room');
-    }, [joinRoom]);
+
+        // 컴포넌트 언마운트 시 정리 작업
+        return () => {
+            console.log('🧹 ParticipantCamera 언마운트: WebRTC 정리 시작');
+            unmount();
+        };
+    }, [joinRoom, unmount]);
 
     return (
         <div className='flex justify-center items-center gap-3 absolute top-5 left-1/2 -translate-x-1/2 z-10'>
