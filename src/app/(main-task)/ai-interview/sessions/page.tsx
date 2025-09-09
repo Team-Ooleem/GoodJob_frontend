@@ -209,7 +209,7 @@ export default function AiInterviewSessionsPage() {
     // 동적 질문 목록 (AI 생성)
     const [dynamicQuestions, setDynamicQuestions] = useState<QuestionDto[]>([]);
     // 전체 문항 수(기존 더미와 동일하게 3로 유지; 필요 시 조정)
-    const MAX_QUESTIONS = 1;
+    const MAX_QUESTIONS = 2;
 
     const timerRef = useRef<NodeJS.Timeout | null>(null);
     const speakingTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -233,7 +233,9 @@ export default function AiInterviewSessionsPage() {
     // const qtext = interviewData.questions[currentQuestionIndex];
     // 현재 질문(동적). 아직 로딩 전이면 undefined
     const currentQuestion = dynamicQuestions[currentQuestionIndex];
-    const qtext = currentQuestion?.text ?? interviewData.questions[currentQuestionIndex] ?? '';
+    // 초기 렌더에서 더미 질문이 화면에 잠깐 보였다가 바뀌는 문제를 막기 위해,
+    // 동적 질문이 준비되기 전엔 질문 텍스트를 비워둔다.
+    const qtext = currentQuestion?.text || '';
     // 집계/메트릭 전송에는 q1/q2/... (기존 규칙 유지)
     const aggQid = `q${currentQuestionIndex + 1}`;
     // 웹캠 startQuestion에는 실제 질문 ID를 전달(없으면 aggQid)
@@ -324,7 +326,7 @@ export default function AiInterviewSessionsPage() {
         const form = new FormData();
         form.append('file', wav16k, 'answer.wav'); // 필드명은 서버의 FileInterceptor('file')와 동일해야 함
 
-        const res = await api.post(`/stt/transcribe-file`, form, {
+        const res = await api.post(`stt/transcribe-file`, form, {
             timeout: 120000,
             // ❗️Content-Type 수동 지정 금지(axios가 boundary 자동 설정)
             // headers: { 'Content-Type': 'multipart/form-data' }
@@ -335,6 +337,30 @@ export default function AiInterviewSessionsPage() {
         return data.result.transcript || '';
     }
 
+    // Axios 오류에서 Blob 본문을 텍스트로 디코드해 자세한 원인을 로깅
+    const logAxiosBlobError = async (ctx: string, err: any) => {
+        try {
+            const status = err?.response?.status;
+            const headers = err?.response?.headers;
+            const data = err?.response?.data;
+            if (data instanceof Blob) {
+                const ct = data.type || headers?.['content-type'] || '';
+                if (ct.includes('application/json') || ct.includes('text/')) {
+                    const text = await data.text();
+                    console.error(`[${ctx}] 서버 오류 본문(${status}):`, text);
+                } else {
+                    console.error(`[${ctx}] 서버가 Blob(${status}, ${ct})을 반환했습니다.`);
+                }
+            } else if (data) {
+                console.error(`[${ctx}] 오류 응답(${status}):`, data);
+            } else {
+                console.error(`[${ctx}] 오류:`, err?.message || err);
+            }
+        } catch (e) {
+            console.error(`[${ctx}] 오류 본문 디코딩 실패:`, e);
+        }
+    };
+
     const synthesizeSpeech = async (text: string): Promise<string> => {
         //const TTS_API_BASE = `${process.env.NEXT_PUBLIC_API_BASE_URL}/tts`;
         //if (!TTS_API_BASE) throw new Error('NEXT_PUBLIC_API_BASE_URL 미설정');
@@ -343,22 +369,55 @@ export default function AiInterviewSessionsPage() {
             const response = await api.post(
                 `tts/synthesize`,
                 {
-                    text: text,
-                    languageCode: 'ko-KR',
-                    voiceName: 'ko-KR-Chirp3-HD-Charon',
-                    audioEncoding: 'MP3',
+                    // 우선 최소 필드로 요청 (백엔드 기본값 사용)
+                    text,
+                    // 언어/보이스는 서버가 지원하지 않을 수 있어 기본은 생략
+                    // 필요 시 환경변수로 덮어쓰기
+                    ...(process.env.NEXT_PUBLIC_TTS_LANGUAGE_CODE
+                        ? { languageCode: process.env.NEXT_PUBLIC_TTS_LANGUAGE_CODE }
+                        : {}),
+                    ...(process.env.NEXT_PUBLIC_TTS_VOICE_NAME
+                        ? { voiceName: process.env.NEXT_PUBLIC_TTS_VOICE_NAME }
+                        : { voiceName: 'ko-KR-Chirp3-HD-Charon' }),
+                    ...(process.env.NEXT_PUBLIC_TTS_AUDIO_ENCODING
+                        ? { audioEncoding: process.env.NEXT_PUBLIC_TTS_AUDIO_ENCODING }
+                        : { audioEncoding: 'MP3' }),
                 },
                 {
                     timeout: 30000,
                     responseType: 'blob',
+                    // 일부 서버에서 쿠키가 필요 없다면 크로스도메인 이슈를 줄이기 위해 비활성화 가능
+                    // withCredentials: false,
                 },
             );
 
             const audioUrl = URL.createObjectURL(response.data);
             return audioUrl;
-        } catch (error) {
+        } catch (error: any) {
             console.error('TTS 요청 실패:', error);
-            throw error;
+            await logAxiosBlobError('TTS', error);
+
+            // 400 등 유효성 실패 시, 안전한 한국어 표준 보이스로 1회 재시도
+            try {
+                const fallbackVoice =
+                    process.env.NEXT_PUBLIC_TTS_FALLBACK_VOICE_NAME || 'ko-KR-Standard-A';
+                const response2 = await api.post(
+                    `tts/synthesize`,
+                    {
+                        text,
+                        languageCode: process.env.NEXT_PUBLIC_TTS_LANGUAGE_CODE || 'ko-KR',
+                        voiceName: fallbackVoice,
+                        audioEncoding: process.env.NEXT_PUBLIC_TTS_AUDIO_ENCODING || 'MP3',
+                    },
+                    { timeout: 30000, responseType: 'blob' },
+                );
+                const audioUrl2 = URL.createObjectURL(response2.data);
+                console.warn('TTS 재시도: 표준 보이스로 성공', fallbackVoice);
+                return audioUrl2;
+            } catch (retryErr) {
+                await logAxiosBlobError('TTS(retry)', retryErr);
+                throw error; // 최초 오류를 유지해 상위에서 처리
+            }
         }
     };
 
@@ -429,6 +488,8 @@ export default function AiInterviewSessionsPage() {
         if (!currentQuestionId || !qtext) return;
         // 첫 렌더 시 더미 문항(qtext 기본값)으로 발화되는 문제 방지: 실제 동적 질문이 로드된 뒤에만 동작
         if (dynamicQuestions.length === 0) return;
+        // 첫 질문은 명시적으로만 발화: 자동 발화는 2번째 질문부터
+        if (currentQuestionIndex === 0) return;
         if (lastSpokenQuestionIdRef.current === currentQuestionId) return;
         if (isSpeakingRef.current) return;
 
@@ -441,7 +502,7 @@ export default function AiInterviewSessionsPage() {
             }
         })();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentQuestionId]);
+    }, [currentQuestionId, currentQuestionIndex]);
 
     // AI가 말하는 시뮬레이션
     const simulateAISpeaking = (duration: number = 3000) => {
@@ -716,18 +777,36 @@ ${qaList
         })();
 
         // 결과를 로컬에 보관(결과 페이지에서 활용)
-        localStorage.setItem(
-            'interviewAudioPerQuestion',
-            JSON.stringify(
-                sessionsToUse.map((s) => ({
-                    questionNumber: s.questionNumber,
-                    question: s.question,
-                    audioFeatures: s.audioFeatures,
-                    audioUrl: s.audioUrl,
-                })),
-            ),
-        );
-        localStorage.setItem('interviewAudioOverall', JSON.stringify(audioAgg));
+        // 주의: audioUrl(data URL/Blob URL)은 매우 커서 quota를 초과할 수 있음.
+        // 1차 시도: 전체 저장, 실패 시 audioUrl 제거 후 축소 저장으로 폴백
+        const audioPerQuestionFull = sessionsToUse.map((s) => ({
+            questionNumber: s.questionNumber,
+            question: s.question,
+            audioFeatures: s.audioFeatures,
+            audioUrl: s.audioUrl,
+        }));
+        try {
+            localStorage.setItem(
+                'interviewAudioPerQuestion',
+                JSON.stringify(audioPerQuestionFull),
+            );
+        } catch (e) {
+            // QuotaExceededError 등 발생 시 audioUrl 제거하고 재시도
+            try {
+                const reduced = audioPerQuestionFull.map(({ audioUrl, ...rest }) => rest);
+                localStorage.setItem('interviewAudioPerQuestion', JSON.stringify(reduced));
+                console.warn(
+                    'localStorage quota exceeded: stored audioPerQuestion without audioUrl',
+                );
+            } catch (e2) {
+                console.warn('Failed to store interviewAudioPerQuestion:', e2);
+            }
+        }
+        try {
+            localStorage.setItem('interviewAudioOverall', JSON.stringify(audioAgg));
+        } catch (e) {
+            console.warn('Failed to store interviewAudioOverall:', e);
+        }
 
         try {
             const finalizeRes = await api.post(
@@ -897,7 +976,7 @@ ${qaList
             const agg = webcamRef.current?.endQuestion();
             if (agg) {
                 try {
-                    await api.post(`/metrics/${SESSION_ID}/${aggQid}/aggregate`, agg, {
+                    await api.post(`metrics/${SESSION_ID}/${aggQid}/aggregate`, agg, {
                         timeout: 10000,
                     });
                 } catch (e) {
