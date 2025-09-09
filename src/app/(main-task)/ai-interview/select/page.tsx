@@ -300,8 +300,8 @@ export default function AiInterviewSelectPage() {
                                 선택 완료
                             </Title>
                             <Text className='!text-green-600'>
-                                {resumes.find((r) => r.id === selectedResume)?.title}이
-                                선택되었습니다.
+                                {resumes.find((r) => r.id === selectedResume)?.title}를
+                                선택했습니다.
                                 {jobPostUrl && ' 채용공고 URL도 입력되었습니다.'}
                             </Text>
                         </div>
