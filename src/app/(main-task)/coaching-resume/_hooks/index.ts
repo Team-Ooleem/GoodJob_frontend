@@ -8,4 +8,8 @@ export * from './useEraser';
 export * from './useStickyNote';
 export * from './useLockTransform';
 export * from './usePdfDrop';
+
+export * from './useAudioPlayer'
 export * from './useCollaborativeCursor';
+export * from './useWebRTC';
+

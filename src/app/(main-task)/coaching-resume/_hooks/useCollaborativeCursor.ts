@@ -9,22 +9,56 @@ type RemoteCursor = {
     y: number;
 };
 
-function getClientUUID() {
-    let id = localStorage.getItem('clientUUID');
-    if (!id) {
-        id = crypto.randomUUID();
-        localStorage.setItem('clientUUID', id);
+function safeRandomUUID(): string {
+    const c = (globalThis as any)?.crypto as Crypto | undefined;
+    if (c?.randomUUID) {
+        return c.randomUUID();
     }
-    return id;
+    if (c?.getRandomValues) {
+        const bytes = new Uint8Array(16);
+        c.getRandomValues(bytes);
+        // Per RFC 4122 v4
+        bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+        bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant 10xx
+        const toHex = (n: number) => n.toString(16).padStart(2, '0');
+        const hex = Array.from(bytes, toHex).join('');
+        return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+    }
+    // Last-resort fallback (lower entropy)
+    let d = Date.now();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (ch) => {
+        const r = (d + Math.random() * 16) % 16 | 0;
+        d = Math.floor(d / 16);
+        return (ch === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+    });
+}
+
+function getClientUUID() {
+    if (typeof window === 'undefined') {
+        // SSR/Node fallback (non-persistent)
+        return safeRandomUUID();
+    }
+    try {
+        let id = window.localStorage.getItem('clientUUID');
+        if (!id) {
+            id = safeRandomUUID();
+            window.localStorage.setItem('clientUUID', id);
+        }
+        return id;
+    } catch {
+        // Access to localStorage might throw (privacy mode). Fall back to non-persistent.
+        return safeRandomUUID();
+    }
 }
 
 export function useCollaborativeCursor(room: string) {
     const socket = useCanvasStore((s) => s.socket);
     const cursorsRef = useRef<Map<string, HTMLImageElement>>(new Map());
-    const clientUUID = getClientUUID();
 
     useEffect(() => {
         if (!socket) return;
+
+        const clientUUID = getClientUUID();
 
         // --- 내 커서 위치 전송 ---
         const handleMouseMove = (e: MouseEvent) => {
@@ -87,6 +121,11 @@ export function useCollaborativeCursor(room: string) {
         socket.on('cursor', handleCursor);
         socket.on('user-left', handleUserLeft);
 
+        // 이미 연결되어 있다면 즉시 참여
+        if (socket.connected) {
+            handleConnect();
+        }
+
         return () => {
             window.removeEventListener('mousemove', handleMouseMove);
 
@@ -98,5 +137,5 @@ export function useCollaborativeCursor(room: string) {
             socket.off('cursor', handleCursor);
             socket.off('user-left', handleUserLeft);
         };
-    }, [socket, room, clientUUID]);
+    }, [socket, room]);
 }
