@@ -8,6 +8,7 @@ import { blobToBase64, resampleTo16kHzMonoWav } from '@/utils/audio';
 import axios from 'axios';
 import { api } from '@/apis/api'; // 경로는 실제 위치에 맞게 조정
 import { AUDIO_API_BASE, API_BASE_URL } from '@/constants/config';
+import { speakSync, type SpeakSyncResponse } from '@/apis/avatar-api';
 
 // ===== 추가: WAV 레코더 유틸 =====
 class WavRecorder {
@@ -199,6 +200,7 @@ export default function AiInterviewSessionsPage() {
     const [isRecording, setIsRecording] = useState(false);
     const [timeLeft, setTimeLeft] = useState(60);
     const [isSpeaking, setIsSpeaking] = useState(false);
+    const [avatarVideoUrl, setAvatarVideoUrl] = useState<string | null>(null);
     const [sessions, setSessions] = useState<InterviewSession[]>([]);
     const [currentSession, setCurrentSession] = useState<InterviewSession | null>(null);
     const [detectionHistory, setDetectionHistory] = useState<any[]>([]);
@@ -215,6 +217,7 @@ export default function AiInterviewSessionsPage() {
     const completingRef = useRef(false); // 완료 처리 재진입 가드
     const webcamRef = useRef<WebcamHandle>(null);
     const isSpeakingRef = useRef(false);
+    const lastSpokenQuestionIdRef = useRef<string | null>(null);
 
     // ===== 추가: WAV 레코더 인스턴스 & 최신 오디오 Blob 참조 =====
     const recorderRef = useRef<WavRecorder | null>(null);
@@ -342,7 +345,7 @@ export default function AiInterviewSessionsPage() {
                 {
                     text: text,
                     languageCode: 'ko-KR',
-                    voiceName: 'ko-KR-Standard-A',
+                    voiceName: 'ko-KR-Chirp3-HD-Charon',
                     audioEncoding: 'MP3',
                 },
                 {
@@ -359,45 +362,86 @@ export default function AiInterviewSessionsPage() {
         }
     };
 
-    // 실제 TTS로 질문 읽기
-    const speakQuestion = async (questionText: string) => {
-        // 이미 TTS가 진행 중이면 무시
+    // 질문 읽기: 동기식 아바타 비디오 → 실패 시 TTS 폴백
+    const speakQuestion = async (questionText: string, overrideQuestionId?: string) => {
         if (isSpeakingRef.current) {
-            console.log('TTS가 이미 진행 중입니다. 중복 요청 무시.');
+            console.log('발화가 이미 진행 중입니다. 중복 요청 무시.');
             return;
         }
 
+        const useTalkingAvatar = process.env.NEXT_PUBLIC_TALKING_AVATAR === 'true';
+        const defaultAvatarId = process.env.NEXT_PUBLIC_DEFAULT_AVATAR_ID;
+
         isSpeakingRef.current = true;
         setIsSpeaking(true);
+        // 현재 질문을 마지막 발화 대상으로 기록(중복 트리거 방지)
+        try {
+            lastSpokenQuestionIdRef.current = overrideQuestionId ?? currentQuestionId;
+        } catch {}
+
+        if (useTalkingAvatar && defaultAvatarId) {
+            try {
+                const res: SpeakSyncResponse = await speakSync({
+                    avatarId: defaultAvatarId,
+                    text: questionText,
+                    resolution: 256,
+                    stillMode: true,
+                });
+                if (res?.success) {
+                    setAvatarVideoUrl(res.videoUrl);
+                    // onEnded 핸들러에서 speakingRef 해제
+                    return;
+                }
+                console.warn('speak-sync 폴백 발생, TTS로 대체');
+            } catch (e) {
+                console.warn('speak-sync 실패, TTS로 폴백', e);
+            }
+        }
 
         try {
             const audioUrl = await synthesizeSpeech(questionText);
-
             const audio = new Audio(audioUrl);
-
             audio.onended = () => {
                 setIsSpeaking(false);
-                isSpeakingRef.current = false; // 완료 시 플래그 해제
+                isSpeakingRef.current = false;
                 URL.revokeObjectURL(audioUrl);
             };
-
             audio.onerror = () => {
                 console.error('오디오 재생 실패');
                 setIsSpeaking(false);
-                isSpeakingRef.current = false; // 에러 시 플래그 해제
+                isSpeakingRef.current = false;
                 URL.revokeObjectURL(audioUrl);
             };
-
             await audio.play();
         } catch (error) {
             console.error('TTS 처리 실패:', error);
             setIsSpeaking(false);
-            isSpeakingRef.current = false; // 에러 시 플래그 해제
-
-            // TTS 실패 시 기존 시뮬레이션으로 폴백
+            isSpeakingRef.current = false;
+            // 최종 폴백: 시뮬레이션
             simulateAISpeaking(3000);
         }
     };
+
+    // 질문이 준비되면 자동으로 읽어주는 트리거 (중복 방지 가드 포함)
+    useEffect(() => {
+        const autoSpeak = process.env.NEXT_PUBLIC_AUTO_SPEAK_ON_QUESTION_READY !== 'false';
+        if (!autoSpeak) return;
+        if (!currentQuestionId || !qtext) return;
+        // 첫 렌더 시 더미 문항(qtext 기본값)으로 발화되는 문제 방지: 실제 동적 질문이 로드된 뒤에만 동작
+        if (dynamicQuestions.length === 0) return;
+        if (lastSpokenQuestionIdRef.current === currentQuestionId) return;
+        if (isSpeakingRef.current) return;
+
+        // 비동기 호출(실패는 콘솔 경고만)
+        (async () => {
+            try {
+                await speakQuestion(qtext);
+            } catch (e) {
+                console.warn('자동 질문 읽기 실패:', e);
+            }
+        })();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentQuestionId]);
 
     // AI가 말하는 시뮬레이션
     const simulateAISpeaking = (duration: number = 3000) => {
@@ -946,7 +990,7 @@ ${qaList
                             setTimeLeft(60);
                             // nextQ를 직접 사용 (상태 업데이트를 기다리지 않음)
                             if (nextQ?.text) {
-                                await speakQuestion(nextQ.text);
+                                await speakQuestion(nextQ.text, nextQ.id);
                             } else {
                                 simulateAISpeaking(1500);
                             }
@@ -971,7 +1015,7 @@ ${qaList
                             setCurrentQuestionIndex((prev) => prev + 1);
                             setTimeLeft(60);
                             if (fallback?.text) {
-                                await speakQuestion(fallback.text);
+                                await speakQuestion(fallback.text, fallback.id);
                             } else {
                                 simulateAISpeaking(1500);
                             }
@@ -1022,14 +1066,15 @@ ${qaList
 
                 // 첫 질문을 TTS로 읽기
                 if (q.text) {
-                    await speakQuestion(q.text);
+                    await speakQuestion(q.text, q.id);
                 }
             } catch (e) {
                 console.warn('첫 질문 생성 실패. 더미 사용:', e);
                 const fallbackQuestion = interviewData.questions[0];
-                setDynamicQuestions([{ id: 'q1', text: interviewData.questions[0] }]);
+                const fbId = 'q1';
+                setDynamicQuestions([{ id: fbId, text: interviewData.questions[0] }]);
                 if (fallbackQuestion) {
-                    await speakQuestion(fallbackQuestion);
+                    await speakQuestion(fallbackQuestion, fbId);
                 }
             } finally {
                 simulateAISpeaking(3000);
@@ -1065,6 +1110,12 @@ ${qaList
                     name={interviewData.interviewer.name}
                     title={interviewData.interviewer.title}
                     isSpeaking={isSpeaking}
+                    videoUrl={avatarVideoUrl}
+                    onEnded={() => {
+                        setAvatarVideoUrl(null);
+                        setIsSpeaking(false);
+                        isSpeakingRef.current = false;
+                    }}
                 />
             </div>
 
