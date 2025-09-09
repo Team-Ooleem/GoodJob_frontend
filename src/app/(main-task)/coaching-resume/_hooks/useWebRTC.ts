@@ -65,7 +65,7 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
 
         pc.ontrack = (e) => {
             const [stream] = e.streams;
-            setRemoteStream(stream); // ✅ state 업데이트
+            setRemoteStream(stream);
             onRemoteStream?.(stream);
         };
 
@@ -85,7 +85,7 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
                 audio: true,
                 video: { width: { ideal: 1280 }, height: { ideal: 720 } },
             });
-            setLocalStream(stream); // ✅ state 업데이트
+            setLocalStream(stream);
             const pc = ensurePeer();
             stream.getTracks().forEach((t) => pc.addTrack(t, stream));
             return stream;
@@ -95,13 +95,9 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
         }
     }, [ensurePeer, localStream]);
 
-    // Socket listeners
+    // --- Socket listeners ---
     useEffect(() => {
         if (!socket) return;
-
-        const handleConnect = () => {
-            if (roomRef.current) socket.emit('join', roomRef.current);
-        };
 
         const handleOffer = async (payload: { sdp: RTCSessionDescriptionInit; from: string }) => {
             try {
@@ -132,31 +128,36 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
                 const pc = ensurePeer();
                 await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
             } catch {
-                // Ignore ICE timing errors
+                // ignore
             }
         };
 
-        socket.on('connect', handleConnect);
         socket.on('offer', handleOffer);
         socket.on('answer', handleAnswer);
         socket.on('ice-candidate', handleIce);
 
-        if (socket.connected && roomRef.current) {
-            socket.emit('join', roomRef.current);
-        }
-
         return () => {
-            socket.off('connect', handleConnect);
             socket.off('offer', handleOffer);
             socket.off('answer', handleAnswer);
             socket.off('ice-candidate', handleIce);
         };
     }, [attachLocalMedia, ensurePeer, socket]);
 
+    // --- joinRoom: initiator/receiver 역할 분리 ---
     const joinRoom = useCallback(
         (roomId: string) => {
             roomRef.current = roomId;
-            socket?.emit('join', roomId);
+            if (!socket) return;
+
+            socket.emit('joinRtc', roomId, async (count: number) => {
+                console.log(`🟢 joinRtc: ${roomId}, 현재 인원 ${count}`);
+                if (count === 1) {
+                    // 첫 참가자 → offer 생성
+                    startCall();
+                } else {
+                    console.log('🟡 다른 참가자를 기다립니다 (answer only)');
+                }
+            });
         },
         [socket],
     );
