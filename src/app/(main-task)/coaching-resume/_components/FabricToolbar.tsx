@@ -8,10 +8,11 @@ import { useState } from 'react';
 import { useCanvasStore } from '../_stores';
 
 // local hooks
-import { useVoiceRecorder } from '../_hooks';
+import { startRecording, stopRecording } from '../_hooks';
 
 // local components
 import { ReplayButton } from './ReplayButton';
+import { is } from 'date-fns/locale';
 
 export function FabricToolbar() {
     const isDrawingMode = useCanvasStore((store) => store.isDrawingMode);
@@ -24,9 +25,9 @@ export function FabricToolbar() {
     const isCamEnabled = useCanvasStore((store) => store.isCamEnabled);
     const toggleMic = useCanvasStore((store) => store.toggleMic);
     const toggleCam = useCanvasStore((store) => store.toggleCam);
-    const { isRecordingRef, handleRecord } = useVoiceRecorder({ canvasIdx: 0 });
     const isRecording = useCanvasStore((store) => store.isRecording);
     const toggleRecording = useCanvasStore((store) => store.toggleRecording);
+    const setRecording = useCanvasStore((store) => store.setRecording);
     const isRecordingListOpen = useCanvasStore((store) => store.isRecordingListOpen);
     const toggleRecordingList = useCanvasStore((store) => store.toggleRecordingList);
     const [hoverMic, setHoverMic] = useState(false);
@@ -151,8 +152,13 @@ export function FabricToolbar() {
                 <button
                     className='p-2 rounded hover:bg-gray-100'
                     onClick={() => {
+                        if (isRecording) {
+                            stopRecording();
+                        } else {
+                            startRecording();
+                        }
+
                         toggleRecording();
-                        handleRecord();
                     }}
                     title={isRecording ? '녹음 중지' : '녹음 시작'}
                 >
