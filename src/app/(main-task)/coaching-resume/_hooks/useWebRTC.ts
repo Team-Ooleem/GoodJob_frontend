@@ -57,7 +57,7 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
     const { isSpeaking: isLocalSpeaking, volumeLevel: localVolumeLevel } = useVoiceDetection(
         localStream,
         {
-            threshold: 0.04, // 음성 감지 임계값 (0.01 → 0.02로 증가)
+            threshold: 0.05, // 음성 감지 임계값 (0.01 → 0.02로 증가)
             smoothingFactor: 0.8, // 스무딩 팩터
             minSpeakingDuration: 100, // 최소 말하기 지속 시간 (ms)
             debounceDelay: 50, // 디바운스 지연 시간 (ms)
