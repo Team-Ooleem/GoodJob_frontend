@@ -16,6 +16,7 @@ import {
     useStickyNote,
     useLockTransform,
     usePdfDrop,
+    useCollaborativeCursor,
 } from '../_hooks';
 
 // local stores
@@ -79,8 +80,18 @@ export function FabricCanvas() {
     // 화면 공유 소켓 접속
     useCollaborativeCanvas('resume-room');
 
+    // 커서 위치 공유
+    useCollaborativeCursor('resume-room');
+
     // pdf drag & drop
     usePdfDrop(canvasRef);
 
-    return <canvas ref={canvasRef} />;
+    const isRecording = useCanvasStore((store) => store.isRecording);
+
+    return (
+        <canvas
+            ref={canvasRef}
+            className={isRecording ? 'border border-2 border-red-500' : undefined}
+        />
+    );
 }

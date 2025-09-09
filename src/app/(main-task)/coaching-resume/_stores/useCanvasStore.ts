@@ -1,6 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
+import { Socket } from 'socket.io-client';
 import * as fabric from 'fabric';
 
 type BrushKind = 'pencil' | 'highlighter';
@@ -26,11 +27,18 @@ type CanvasStoreState = {
     // media
     isMicEnabled: boolean;
     isCamEnabled: boolean;
+    // recording
+    isRecording: boolean;
+    isRecordingListOpen: boolean;
     stickyNoteConfig: StickyNoteConfig;
 
     // history
     isLocked: boolean;
     history: fabric.Object[];
+
+    // socket
+    socket: Socket | null;
+    setSocket: (socket: Socket | null) => void;
 
     // lifecycle
     setCanvasInstance: (canvas: fabric.Canvas | null) => void;
@@ -44,6 +52,11 @@ type CanvasStoreState = {
     toggleCam: () => void;
     setMicEnabled: (enabled: boolean) => void;
     setCamEnabled: (enabled: boolean) => void;
+    // recording
+    toggleRecording: () => void;
+    setRecording: (enabled: boolean) => void;
+    toggleRecordingList: () => void;
+    setRecordingListOpen: (open: boolean) => void;
 
     // objects
     deleteActiveObject: () => void;
@@ -69,6 +82,8 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     isStickyMode: false,
     isMicEnabled: true,
     isCamEnabled: true,
+    isRecording: false,
+    isRecordingListOpen: false,
     stickyNoteConfig: {
         width: 200,
         minHeight: 150,
@@ -76,6 +91,9 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     },
     isLocked: false,
     history: [],
+    socket: null,
+
+    setSocket: (socket) => set({ socket }),
 
     setStickyNoteConfig: (config) =>
         set((state) => ({
@@ -113,6 +131,11 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     toggleCam: () => set((state) => ({ isCamEnabled: !state.isCamEnabled })),
     setMicEnabled: (enabled: boolean) => set({ isMicEnabled: enabled }),
     setCamEnabled: (enabled: boolean) => set({ isCamEnabled: enabled }),
+    toggleRecording: () => set((state) => ({ isRecording: !state.isRecording })),
+    setRecording: (enabled: boolean) => set({ isRecording: enabled }),
+    toggleRecordingList: () =>
+        set((state) => ({ isRecordingListOpen: !state.isRecordingListOpen })),
+    setRecordingListOpen: (open: boolean) => set({ isRecordingListOpen: open }),
 
     setDrawingMode: (enabled) => {
         const canvas = get().canvasInstance;
