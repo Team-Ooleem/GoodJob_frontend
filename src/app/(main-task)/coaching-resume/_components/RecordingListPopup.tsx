@@ -4,7 +4,28 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { CloseOutlined, LeftOutlined } from '@ant-design/icons';
 import { List } from 'antd';
 import Image from 'next/image';
+import axios from 'axios';
 import { useCanvasStore } from '../_stores';
+import { customAudioPlayer } from '../_hooks';
+import { API_BASE_URL } from '@/constants/config';
+
+interface SpeakerSegment {
+    speakerTag: number;
+    textContent: string; // textcontent → textContent로 수정
+    startTime: number;
+    endTime: number;
+    audioUrl: string;
+}
+
+// 20-27번 라인 수정
+interface ChatSession {
+    sessionId: number;
+    segments: SpeakerSegment[];
+    timestamp: string; // timestamps → timestamp로 수정
+    mentor_idx: number;
+    mentee_idx: number; // memtee_idx → mentee_idx로 수정
+    segmentIndex: number;
+}
 
 type RecordingItem = {
     id: string;
@@ -31,6 +52,23 @@ export function RecordingListPopup() {
         offsetY: 0,
     });
 
+    /* 오디오 재생 관련 상태 */
+    const [playingSegment, setPlayingSegment] = useState<SpeakerSegment | null>(null);
+    const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
+    const [currentSegment, setCurrentSegment] = useState<SpeakerSegment | null>(null);
+    const [duration, setDuration] = useState<number>(0);
+    const [isPlaying, setIsPlaying] = useState<boolean>(false);
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+    const animationFrameRef = useRef<number | null>(null);
+
+    /* 데이터 관련 상태 */
+    const [sessions, setSessions] = useState<ChatSession[]>([]);
+    const [loading, setLoading] = useState<boolean>(false);
+    const [error, setError] = useState<string | null>(null);
+    const [selected, setSelected] = useState<RecordingItem | null>(null);
+
+    const canvasIdx = 'default-canvas-uuid';
+
     useEffect(() => {
         const onMove = (e: MouseEvent) => {
             if (!dragState.current.dragging) return;
@@ -55,48 +93,103 @@ export function RecordingListPopup() {
         };
     }, []);
 
-    // Infinite scroll dataset (mock)
-    const [items, setItems] = useState<RecordingItem[]>(() =>
-        Array.from({ length: 20 }).map((_, i) => ({
-            id: `rec-${i + 1}`,
-            title: `음성 메모 ${i + 1}`,
-            durationSec: 60 + (i % 10) * 7,
-            createdAt: new Date(Date.now() - i * 3600_000).toLocaleString(),
-        })),
-    );
+    useEffect(() => {
+        if (isOpen) {
+            fetchSessions();
+        }
+    }, [isOpen]);
+
+    // 백엔드에서 세션 데이터 가져오기
+    const fetchSessions = async (page: number = 1) => {
+        setLoading(true);
+        setError(null);
+        try {
+            const res = await axios.get(
+                `${API_BASE_URL}/stt/session-messages/${canvasIdx}?page=${page}`,
+            );
+            if (res.data.success) {
+                const sessionsWithSegments: ChatSession[] = res.data.messages.map((msg: any) => ({
+                    sessionId: msg.messageId,
+                    segments: msg.segments.map((seg: any) => ({
+                        speakerTag: seg.speakerTag,
+                        textContent: seg.textContent,
+                        startTime: seg.startTime,
+                        endTime: seg.endTime,
+                        audioUrl: msg.audioUrl,
+                    })),
+                    timestamp: msg.timestamp,
+                    mentor_idx: msg.mentor_idx,
+                    mentee_idx: msg.mentee_idx,
+                    segmentIndex: msg.segmentIndex,
+                }));
+
+                const sortedSessions = sessionsWithSegments
+                    .sort((a, b) => a.segmentIndex - b.segmentIndex)
+                    .map((session) => ({
+                        ...session,
+                        segments: session.segments.sort((a, b) => a.startTime - b.startTime),
+                    }));
+
+                setSessions(sortedSessions); // ← 이 줄 추가: 상태에 저장
+                return sortedSessions;
+            } else {
+                setError(res.data.message);
+                return [];
+            }
+        } catch (error) {
+            setError(error instanceof Error ? error.message : 'Unknown error');
+            return [];
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // 녹음 목록 아이템 생성 (세션 데이터 기반)
+    const items = useMemo<RecordingItem[]>(() => {
+        return sessions.map((session) => ({
+            id: `rec-${session.sessionId}`,
+            title: `음성 메모 ${session.segmentIndex}`,
+            durationSec: Math.max(...session.segments.map((s) => s.endTime)),
+            createdAt: new Date(session.timestamp).toLocaleString(),
+            sessionId: session.sessionId,
+            segmentIndex: session.segmentIndex,
+        }));
+    }, [sessions]);
+
+    /* 무한스크롤 */
     const [page, setPage] = useState(1);
-    const [loading, setLoading] = useState(false);
-    const loadMore = useCallback(() => {
+    const loadMore = useCallback(async () => {
         if (loading) return;
         setLoading(true);
-        const start = page * 20;
-        const next: RecordingItem[] = Array.from({ length: 20 }).map((_, idx) => ({
-            id: `rec-${start + idx + 1}`,
-            title: `음성 메모 ${start + idx + 1}`,
-            durationSec: 60 + ((start + idx) % 10) * 7,
-            createdAt: new Date(Date.now() - (start + idx) * 3600_000).toLocaleString(),
-        }));
-        setTimeout(() => {
-            setItems((prev) => [...prev, ...next]);
-            setPage((p) => p + 1);
+
+        try {
+            const newSessions = await fetchSessions(page + 1);
+            if (newSessions.length > 0) {
+                setSessions((prev) => [...prev, ...newSessions]);
+                setPage((p) => p + 1);
+            }
+        } catch (error) {
+            console.error('Failed to load more sessions:', error);
+        } finally {
             setLoading(false);
-        }, 400);
+        }
     }, [loading, page]);
 
     // 상세보기 상태: 선택된 녹음 및 STT 라인업
-    const [selected, setSelected] = useState<RecordingItem | null>(null);
     const transcripts = useMemo<TranscriptItem[]>(() => {
         if (!selected) return [];
-        return Array.from({ length: 24 }).map((_, i) => ({
-            id: `${selected.id}-line-${i + 1}`,
-            speaker: i % 2 === 0 ? '멘티' : '멘토',
-            timeSec: 5 + i * 7,
-            text:
-                i % 2 === 0
-                    ? '이 부분에서 자기소개를 조금 더 간결하게 해보겠습니다.'
-                    : '좋아요, 핵심 강점을 먼저 말하고 사례를 붙여보세요.',
+
+        // 선택된 아이템에 해당하는 실제 세션 데이터 찾기
+        const session = sessions.find((s) => `rec-${s.sessionId}` === selected.id);
+        if (!session) return [];
+
+        return session.segments.map((seg, idx) => ({
+            id: `${selected.id}-line-${idx + 1}`,
+            speaker: seg.speakerTag === 0 ? '멘토' : '멘티',
+            timeSec: seg.startTime,
+            text: seg.textContent,
         }));
-    }, [selected]);
+    }, [selected, sessions]);
 
     if (!isOpen) return null;
 
