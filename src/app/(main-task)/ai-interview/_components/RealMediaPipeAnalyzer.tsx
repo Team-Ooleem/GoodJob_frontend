@@ -21,6 +21,11 @@ export type VisualAggregatePayload = {
     smile_mean: number | null;
     smile_max: number | null;
 
+    // 추가 지표(평균)
+    eye_contact_mean: number | null; // 0~1
+    blink_mean: number | null; // 0~1 (깜빡임 확률 프록시)
+    gaze_stability: number | null; // 0~1 (높을수록 안정)
+
     presence_good: number;
     presence_average: number;
     presence_needs_improvement: number;
@@ -52,6 +57,8 @@ type VisualSampleLite = {
     detection: {
         confidenceScore?: number;
         smileIntensity?: number;
+        eyeContact?: number; // 0~1
+        blinkProb?: number; // 0~1
         overallPresence?: Presence;
         level?: LevelAgg;
         landmarks: {
@@ -328,6 +335,11 @@ export class RealMediaPipeAnalyzer {
                 detection: {
                     confidenceScore: interviewMetrics.confidence,
                     smileIntensity: interviewMetrics.smile,
+                    eyeContact: interviewMetrics.eyeContact,
+                    // 깜빡임 확률: attention 산식에 포함되나, 별도 보관을 위해 rough 추정
+                    // calculateInterviewMetrics 내부 blink를 직접 사용하지 않으므로, attention에서 추정 불가.
+                    // 여기서는 이전 단계 rawMetrics를 사용하도록 calculateInterviewMetrics를 확장(아래 참조).
+                    blinkProb: (this as any)._lastBlinkProb ?? undefined,
                     overallPresence: presence,
                     level,
                     landmarks: {
@@ -417,6 +429,8 @@ export class RealMediaPipeAnalyzer {
             (eyeLookDownLeft + eyeLookDownRight + eyeLookOutLeft + eyeLookOutRight) / 4;
         metrics.eyeContact = Math.max(0, 1 - gazeAway);
         metrics.attention = Math.max(0, Math.min(1, 0.6 * metrics.eyeContact + 0.4 * (1 - blink)));
+        // 외부에서 사용 가능하도록 마지막 blink를 보관
+        (this as any)._lastBlinkProb = blink;
 
         const cheekPuff = blendshapes.find((c: any) => c.categoryName === 'cheekPuff')?.score || 0;
         // 참여도: 시선/집중 + 적당한 미소 + 발화(입열림) 신호
@@ -681,9 +695,17 @@ export class RealMediaPipeAnalyzer {
         const mean = (arr: number[]) =>
             arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
         const maxv = (arr: number[]) => (arr.length ? Math.max(...arr) : null);
+        const std = (arr: number[]) => {
+            if (arr.length === 0) return null;
+            const m = mean(arr)!;
+            const v = arr.reduce((a, x) => a + (x - m) * (x - m), 0) / arr.length;
+            return Math.sqrt(v);
+        };
 
         const confs = toNumArr((s) => s.detection.confidenceScore);
         const smiles = toNumArr((s) => s.detection.smileIntensity);
+        const eyeContacts = toNumArr((s) => s.detection.eyeContact);
+        const blinks = toNumArr((s) => s.detection.blinkProb);
 
         const presence = { good: 0, average: 0, needs_improvement: 0 };
         const level = { ok: 0, info: 0, warning: 0, critical: 0 as 0 };
@@ -714,6 +736,15 @@ export class RealMediaPipeAnalyzer {
         const right = avgPt((s) => s.detection.landmarks.rightEye);
         const nose = avgPt((s) => s.detection.landmarks.nose);
 
+        // 시선 안정성: 코 포인트의 좌표 변동 표준편차 기반 (작을수록 안정)
+        const noseXs = toNumArr((s) => s.detection.landmarks.nose?.x);
+        const noseYs = toNumArr((s) => s.detection.landmarks.nose?.y);
+        const sx = std(noseXs) ?? 0;
+        const sy = std(noseYs) ?? 0;
+        const motion = Math.sqrt(sx * sx + sy * sy);
+        // 0~0.02 구간을 1~0으로 스케일 (영상 좌표 기준 경험값)
+        const gazeStability = Math.max(0, Math.min(1, 1 - motion / 0.02));
+
         const ts = samples
             .map((s) => Date.parse(s.timestamp))
             .filter((v) => Number.isFinite(v)) as number[];
@@ -725,6 +756,10 @@ export class RealMediaPipeAnalyzer {
             confidence_max: maxv(confs),
             smile_mean: mean(smiles),
             smile_max: maxv(smiles),
+
+            eye_contact_mean: mean(eyeContacts),
+            blink_mean: mean(blinks),
+            gaze_stability: Number.isFinite(gazeStability) ? gazeStability : null,
 
             presence_good: presence.good,
             presence_average: presence.average,

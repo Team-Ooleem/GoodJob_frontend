@@ -96,7 +96,7 @@ export default function AiInterviewSelectPage() {
         sessionStorage.setItem('jobPostUrl', jobPostUrl);
 
         message.success('환경 체크를 진행합니다.');
-        router.push('/ai-interview/calibration');
+        router.push('/ai-interview/setting');
     };
 
     if (loading || authLoading) {
@@ -280,10 +280,10 @@ export default function AiInterviewSelectPage() {
                             {resumes.length > 0
                                 ? !selectedResume || !jobPostUrl.trim()
                                     ? '면접 설정을 완료해주세요'
-                                    : '면접 설정으로 이동'
+                                    : '면접 환경 체크하기'
                                 : !jobPostUrl.trim()
                                   ? '면접 설정을 완료해주세요'
-                                  : '면접 설정으로 이동'}
+                                  : '면접 환경 체크하기'}
                         </Button>
                     </div>
                 </div>
