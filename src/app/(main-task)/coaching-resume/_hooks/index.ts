@@ -9,3 +9,4 @@ export * from './useStickyNote';
 export * from './useLockTransform';
 export * from './usePdfDrop';
 export * from './useCollaborativeCursor';
+export * from './useWebRTC';
