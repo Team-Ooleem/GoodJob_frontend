@@ -7,7 +7,7 @@ import { useInterviewAnalysis } from '@/hooks/use-interview-analysis';
 import { blobToBase64, resampleTo16kHzMonoWav } from '@/utils/audio';
 import axios from 'axios';
 import { api } from '@/apis/api'; // 경로는 실제 위치에 맞게 조정
-import { AUDIO_API_BASE, API_BASE_URL } from '@/constants/config';
+import { AI_API_BASE, API_BASE_URL } from '@/constants/config';
 import { speakSync, type SpeakSyncResponse } from '@/apis/avatar-api';
 
 // ===== 추가: WAV 레코더 유틸 =====
@@ -616,12 +616,12 @@ export default function AiInterviewSessionsPage() {
         blob: Blob,
         filename = 'answer.wav',
     ): Promise<AudioFeatures> => {
-        if (!AUDIO_API_BASE) throw new Error('AUDIO_API_BASE가 설정되지 않았습니다.');
+        if (!AI_API_BASE) throw new Error('AI_API_BASE 설정되지 않았습니다.');
         const form = new FormData();
         form.append('file', blob, filename);
 
         // axios는 브라우저에서 multipart boundary를 자동 설정합니다. Content-Type 수동 지정 X
-        const res = await axios.post(`${AUDIO_API_BASE}/audio/analyze`, form, {
+        const res = await axios.post(`${AI_API_BASE}/audio/analyze`, form, {
             timeout: 60000, // 선택: 타임아웃
             withCredentials: false, // CORS 쿠키 미사용이면 false (기본값)
             // headers: { 'Content-Type': 'multipart/form-data' } // 직접 지정하지 않는 것을 권장
@@ -786,10 +786,7 @@ ${qaList
             audioUrl: s.audioUrl,
         }));
         try {
-            localStorage.setItem(
-                'interviewAudioPerQuestion',
-                JSON.stringify(audioPerQuestionFull),
-            );
+            localStorage.setItem('interviewAudioPerQuestion', JSON.stringify(audioPerQuestionFull));
         } catch (e) {
             // QuotaExceededError 등 발생 시 audioUrl 제거하고 재시도
             try {

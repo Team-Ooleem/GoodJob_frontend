@@ -109,12 +109,12 @@ class WavRecorder {
     }
 }
 
-const AUDIO_API_BASE = process.env.NEXT_PUBLIC_AUDIO_API_BASE;
+const AI_API_BASE = process.env.AI_API_BASE;
 async function analyzeAudioBlob(blob: Blob) {
-    if (!AUDIO_API_BASE) return null;
+    if (!AI_API_BASE) return null;
     const form = new FormData();
     form.append('file', blob, 'calibration.wav');
-    const res = await axios.post(`${AUDIO_API_BASE}/audio/analyze`, form, { timeout: 60000 });
+    const res = await axios.post(`${AI_API_BASE}/audio/analyze`, form, { timeout: 60000 });
     return res.data?.features ?? null;
 }
 

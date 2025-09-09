@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { API_BASE_URL, AUDIO_API_BASE } from '@/constants/config';
+import { API_BASE_URL, AI_API_BASE } from '@/constants/config';
 
 interface AvatarProps {
     name: string;
@@ -30,8 +30,8 @@ export function Avatar({ name, title, isSpeaking = false, videoUrl, onEnded }: A
             resolution: String(DEFAULT_RESOLUTION),
             duration: String(DEFAULT_DURATION_SEC),
         });
-        // 우선순위: AUDIO_API_BASE(예: http://localhost:8081) → API_BASE_URL(게이트웨이 경유)
-        let base = AUDIO_API_BASE || API_BASE_URL;
+        // 우선순위: AI_API_BASE(예: http://localhost:8081) → API_BASE_URL(게이트웨이 경유)
+        let base = AI_API_BASE || API_BASE_URL;
         // 혼합 콘텐츠 방지: 페이지가 https인데 base가 http이면 게이트웨이로 폴백
         // if (typeof window !== 'undefined' && window.location.protocol === 'https:' && base.startsWith('http://')) {
         //     base = API_BASE_URL;

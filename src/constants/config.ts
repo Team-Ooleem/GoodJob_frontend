@@ -14,7 +14,7 @@ export const getCurrentEnvironment = (): Environment => {
 interface EnvironmentConfig {
     BACKEND_ORIGIN: string;
     API_BASE_URL: string;
-    AUDIO_API_BASE: string;
+    AI_API_BASE: string;
     SOCKET_CHAT_URL: string;
     REQUEST_TIMEOUT: number;
 }
@@ -24,7 +24,7 @@ const environmentConfigs: Record<Environment, EnvironmentConfig> = {
     development: {
         BACKEND_ORIGIN: process.env.NEXT_PUBLIC_BACKEND_ORIGIN || 'http://localhost:4000',
         API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000/api',
-        AUDIO_API_BASE: process.env.NEXT_PUBLIC_AI_API_BASE || 'http://localhost:8081',
+        AI_API_BASE: process.env.NEXT_PUBLIC_AI_API_BASE || 'http://localhost:8081',
         SOCKET_CHAT_URL:
             process.env.NEXT_PUBLIC_SOCKET_CHAT_URL || 'http://localhost:4000/api/chat',
         REQUEST_TIMEOUT: 60000,
@@ -32,7 +32,7 @@ const environmentConfigs: Record<Environment, EnvironmentConfig> = {
     production: {
         BACKEND_ORIGIN: process.env.NEXT_PUBLIC_BACKEND_ORIGIN || 'https://api.good-job.shop',
         API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api.good-job.shop/api',
-        AUDIO_API_BASE: process.env.NEXT_PUBLIC_AI_API_BASE || 'https://api.good-job.shop',
+        AI_API_BASE: process.env.NEXT_PUBLIC_AI_API_BASE || 'https://ai.good-job.shop',
         SOCKET_CHAT_URL:
             process.env.NEXT_PUBLIC_SOCKET_CHAT_URL || 'https://api.good-job.shop/api/chat',
         REQUEST_TIMEOUT: 30000,
@@ -43,5 +43,5 @@ const environmentConfigs: Record<Environment, EnvironmentConfig> = {
 const config = environmentConfigs[getCurrentEnvironment()];
 
 // 설정값들을 개별적으로 export
-export const { API_BASE_URL, BACKEND_ORIGIN, AUDIO_API_BASE, SOCKET_CHAT_URL, REQUEST_TIMEOUT } =
+export const { API_BASE_URL, BACKEND_ORIGIN, AI_API_BASE, SOCKET_CHAT_URL, REQUEST_TIMEOUT } =
     config;

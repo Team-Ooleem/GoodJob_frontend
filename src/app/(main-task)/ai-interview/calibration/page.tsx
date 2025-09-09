@@ -131,12 +131,12 @@ class WavRecorder {
 }
 
 // 서버 오디오 피처 API
-const AUDIO_API_BASE = process.env.NEXT_PUBLIC_AI_API_BASE; // 예: http://localhost:8081
+const AI_API_BASE = process.env.NEXT_PUBLIC_AI_API_BASE; // 예: http://localhost:8081
 async function analyzeAudioBlob(blob: Blob) {
-    if (!AUDIO_API_BASE) return null; // 서버가 없으면 생략
+    if (!AI_API_BASE) return null; // 서버가 없으면 생략
     const form = new FormData();
     form.append('file', blob, 'calibration.wav');
-    const res = await axios.post(`${AUDIO_API_BASE}/audio/analyze`, form, { timeout: 60000 });
+    const res = await axios.post(`${AI_API_BASE}/audio/analyze`, form, { timeout: 60000 });
     return res.data?.features ?? null;
 }
 
