@@ -61,6 +61,7 @@ export function CameraBox({
                     playsInline
                     muted={isLocal}
                     className='w-full h-full object-cover'
+                    style={{ transform: 'scaleX(-1)' }}
                 />
             )}
 

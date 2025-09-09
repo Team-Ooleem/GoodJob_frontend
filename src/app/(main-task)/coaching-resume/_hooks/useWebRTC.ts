@@ -132,30 +132,34 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
             }
         };
 
+        const handleReady = async () => {
+            console.log('✅ ready 이벤트 수신 → startCall 실행');
+            await startCall();
+        };
+
         socket.on('offer', handleOffer);
         socket.on('answer', handleAnswer);
         socket.on('ice-candidate', handleIce);
+        socket.on('ready', handleReady);
 
         return () => {
             socket.off('offer', handleOffer);
             socket.off('answer', handleAnswer);
             socket.off('ice-candidate', handleIce);
+            socket.off('ready', handleReady);
         };
     }, [attachLocalMedia, ensurePeer, socket]);
 
-    // --- joinRoom: initiator/receiver 역할 분리 ---
+    // --- joinRoom ---
     const joinRoom = useCallback(
         (roomId: string) => {
             roomRef.current = roomId;
             if (!socket) return;
 
-            socket.emit('joinRtc', roomId, async (count: number) => {
+            socket.emit('joinRtc', roomId, (count: number) => {
                 console.log(`🟢 joinRtc: ${roomId}, 현재 인원 ${count}`);
                 if (count === 1) {
-                    // 첫 참가자 → offer 생성
-                    startCall();
-                } else {
-                    console.log('🟡 다른 참가자를 기다립니다 (answer only)');
+                    console.log('🟡 방에 혼자 있음 → 다른 참가자 기다림');
                 }
             });
         },
