@@ -24,20 +24,17 @@ const environmentConfigs: Record<Environment, EnvironmentConfig> = {
     development: {
         BACKEND_ORIGIN: process.env.NEXT_PUBLIC_BACKEND_ORIGIN || 'http://localhost:4000',
         API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000/api',
-        AUDIO_API_BASE: process.env.NEXT_PUBLIC_AUDIO_API_BASE || 'http://localhost:8081',
+        AUDIO_API_BASE: process.env.NEXT_PUBLIC_AI_API_BASE || 'http://localhost:8081',
         SOCKET_CHAT_URL:
             process.env.NEXT_PUBLIC_SOCKET_CHAT_URL || 'http://localhost:4000/api/chat',
         REQUEST_TIMEOUT: 60000,
     },
     production: {
-        BACKEND_ORIGIN:
-            process.env.NEXT_PUBLIC_BACKEND_ORIGIN || 'https://api-good-job.duckdns.org',
-        API_BASE_URL:
-            process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api-good-job.duckdns.org/api',
-        AUDIO_API_BASE:
-            process.env.NEXT_PUBLIC_AUDIO_API_BASE || 'https://ai-api-good-job.duckdns.org',
+        BACKEND_ORIGIN: process.env.NEXT_PUBLIC_BACKEND_ORIGIN || 'https://api.good-job.shop',
+        API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api.good-job.shop/api',
+        AUDIO_API_BASE: process.env.NEXT_PUBLIC_AI_API_BASE || 'https://api.good-job.shop',
         SOCKET_CHAT_URL:
-            process.env.NEXT_PUBLIC_SOCKET_CHAT_URL || 'https://api-good-job.duckdns.org/api/chat',
+            process.env.NEXT_PUBLIC_SOCKET_CHAT_URL || 'https://api.good-job.shop/api/chat',
         REQUEST_TIMEOUT: 30000,
     },
 };

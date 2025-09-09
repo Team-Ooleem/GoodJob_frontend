@@ -148,11 +148,12 @@ export const Webcam = forwardRef<WebcamHandle, IWebcam>(function Webcam(
                     muted
                     playsInline
                     className='w-full h-full object-cover'
+                    style={{ transform: 'scaleX(-1)' }}
                 />
                 <canvas
                     ref={canvasRef}
                     className='absolute top-0 left-0 w-full h-full pointer-events-none'
-                    style={{ zIndex: 1 }}
+                    style={{ zIndex: 1, transform: 'scaleX(-1)' }}
                 />
                 {detectionData && !overlayGuide && (
                     <div className='absolute bottom-2 left-2 right-2 z-10'>

@@ -1,13 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Button, Card, Typography, Space, Row, Col, Input, Radio, Form, message, Spin } from 'antd';
-import {
-    FileTextOutlined,
-    LinkOutlined,
-    ArrowRightOutlined,
-    CheckCircleOutlined,
-} from '@ant-design/icons';
+import { Button, Card, Typography, Tabs, message, Spin } from 'antd';
+import { VideoCameraOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks';
 import { api } from '@/apis/api';
@@ -25,56 +20,17 @@ interface Resume {
     skills: string[];
 }
 
-// Dummy 이력서 데이터
-const dummyResumes: Resume[] = [
-    {
-        id: 1,
-        title: '이게보이면 너가짠 코드가 동작하지않는거란다 하하',
-        position: 'Frontend Developer',
-        company: 'TechCorp',
-        createdAt: '2024-01-15',
-        experience: '3년',
-        skills: ['React', 'TypeScript', 'Next.js', 'Tailwind CSS'],
-    },
-    {
-        id: 2,
-        title: '풀스택 개발자 이력서',
-        position: 'Full Stack Developer',
-        company: 'StartupXYZ',
-        createdAt: '2024-01-10',
-        experience: '5년',
-        skills: ['React', 'Node.js', 'Python', 'PostgreSQL'],
-    },
-    {
-        id: 3,
-        title: '백엔드 개발자 이력서',
-        position: 'Backend Developer',
-        company: 'DataFlow',
-        createdAt: '2024-01-08',
-        experience: '4년',
-        skills: ['Java', 'Spring Boot', 'MySQL', 'Redis'],
-    },
-    {
-        id: 4,
-        title: 'DevOps 엔지니어 이력서',
-        position: 'DevOps Engineer',
-        company: 'CloudTech',
-        createdAt: '2024-01-05',
-        experience: '6년',
-        skills: ['AWS', 'Docker', 'Kubernetes', 'Terraform'],
-    },
-];
-
 export default function AiInterviewSelectPage() {
     const [resumes, setResumes] = useState<Resume[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedResume, setSelectedResume] = useState<number | null>(null);
     const [jobPostUrl, setJobPostUrl] = useState('');
-    const [form] = Form.useForm();
+    const [activeTab, setActiveTab] = useState('resume');
+    const [buttonAnimation, setButtonAnimation] = useState(false);
     const router = useRouter();
 
     // JWT 쿠키 기반 사용자 정보 조회
-    const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+    const { user, isLoading: authLoading } = useAuth();
     const userId = user?.idx ?? null;
 
     useEffect(() => {
@@ -91,9 +47,6 @@ export default function AiInterviewSelectPage() {
         } catch (error) {
             console.error('Error fetching resumes:', error);
             message.error('이력서를 불러오는데 실패했습니다.');
-
-            // 에러 발생 시 더미 데이터로 폴백
-            setResumes(dummyResumes);
         } finally {
             setLoading(false);
         }
@@ -101,10 +54,18 @@ export default function AiInterviewSelectPage() {
 
     const handleResumeSelect = (resumeId: number) => {
         setSelectedResume(resumeId);
+        // 버튼 애니메이션 트리거
+        setButtonAnimation(true);
+        setTimeout(() => setButtonAnimation(false), 1000);
+
+        // 이력서 선택 후 자동으로 채용공고 선택 탭으로 이동
+        setTimeout(() => {
+            setActiveTab('job');
+        }, 500); // 0.5초 후 탭 변경
     };
 
     const handleStartInterview = () => {
-        if (!selectedResume) {
+        if (resumes.length > 0 && !selectedResume) {
             message.error('이력서를 선택해주세요.');
             return;
         }
@@ -122,192 +83,227 @@ export default function AiInterviewSelectPage() {
             return;
         }
 
-        // 선택된 이력서와 채용공고 URL을 저장하고 설정 페이지로 이동
-        const selectedResumeData = resumes.find((resume) => resume.id === selectedResume);
+        // 선택된 이력서 또는 프로필 기반 데이터 저장
+        if (resumes.length > 0 && selectedResume) {
+            const selectedResumeData = resumes.find((resume) => resume.id === selectedResume);
+            sessionStorage.setItem('selectedResume', JSON.stringify(selectedResumeData));
+            sessionStorage.setItem('interviewType', 'resume-based');
+        } else {
+            // 프로필 기반 면접
+            sessionStorage.setItem('interviewType', 'profile-based');
+        }
 
-        // 로컬 스토리지에 데이터 저장 (실제로는 상태 관리 라이브러리 사용 권장)
-        sessionStorage.setItem('selectedResume', JSON.stringify(selectedResumeData));
         sessionStorage.setItem('jobPostUrl', jobPostUrl);
 
-        message.success('모의면접 설정을 진행합니다.');
-        router.push('/ai-interview/setting');
-    };
-
-    const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('ko-KR');
+        message.success('환경 체크를 진행합니다.');
+        router.push('/ai-interview/calibration');
     };
 
     if (loading || authLoading) {
         return (
-            <div className='min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 flex items-center justify-center'>
+            <div className='min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center'>
                 <Spin size='large' />
             </div>
         );
     }
 
+    const tabItems = [
+        {
+            key: 'resume',
+            label: '이력서 선택',
+        },
+        {
+            key: 'job',
+            label: '채용공고 선택',
+        },
+    ];
+
     return (
-        <div className='min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8'>
-            <div className='container mx-auto px-4 max-w-6xl'>
-                {/* Header */}
-                <div className='text-center mb-8'>
-                    <Title level={1} className='!text-4xl !font-bold !text-gray-800 mb-4'>
-                        모의면접 준비
-                    </Title>
-                    <Paragraph className='!text-lg !text-gray-600 max-w-2xl mx-auto'>
-                        이력서를 선택하고 채용공고 URL을 입력하여 맞춤형 모의면접을 시작하세요.
-                    </Paragraph>
+        <div className='min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4'>
+            <Card className='w-full max-w-xl shadow-xl border-0 rounded-2xl overflow-hidden'>
+                {/* 탭 네비게이션 */}
+                <div className='px-8 pt-8 pb-4'>
+                    <Tabs
+                        activeKey={activeTab}
+                        onChange={setActiveTab}
+                        items={tabItems}
+                        className='interview-tabs'
+                        tabBarStyle={{
+                            marginBottom: 0,
+                            borderBottom: 'none',
+                        }}
+                    />
                 </div>
 
-                <Row gutter={[24, 24]}>
-                    {/* 이력서 선택 섹션 */}
-                    <Col xs={24} lg={16}>
-                        <Card className='!border-0 !shadow-lg' bodyStyle={{ padding: '32px' }}>
-                            <Space direction='vertical' size='large' className='w-full'>
-                                <div className='flex items-center gap-3 mb-4'>
-                                    <FileTextOutlined className='text-3xl text-blue-500' />
-                                    <Title level={3} className='!mb-0'>
-                                        이력서 선택
-                                    </Title>
-                                </div>
+                {/* 메인 콘텐츠 */}
+                <div className='px-8 pb-8'>
+                    {/* 섹션 제목 */}
+                    <div className='flex items-center justify-between mb-6'>
+                        <h2 className='text-3xl font-bold text-gray-900 mb-0'>
+                            AI 모의면접 진행하기
+                        </h2>
+                        <div className='w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center'>
+                            <VideoCameraOutlined className='text-blue-600 text-lg' />
+                        </div>
+                    </div>
 
-                                <Paragraph className='!text-gray-600'>
-                                    모의면접에 사용할 이력서를 선택해주세요. 선택한 이력서를
-                                    바탕으로 AI가 맞춤형 질문을 생성합니다.
-                                </Paragraph>
+                    {/* 면접 정보 */}
+                    <div className='mb-8'>
+                        <p className='text-gray-600 text-lg'>
+                            AI 모의면접을 위한 기본정보를 설정해 주세요.
+                        </p>
+                    </div>
 
-                                <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                    {/* 구분선 */}
+                    <div className='mb-8'>
+                        <div className='h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent'></div>
+                    </div>
+
+                    {/* 이력서 선택 탭 */}
+                    {activeTab === 'resume' && (
+                        <div className='mb-8'>
+                            {resumes.length > 0 ? (
+                                <div className='max-h-80 overflow-y-auto space-y-3 pr-2'>
                                     {resumes.map((resume) => (
-                                        <Card
+                                        <div
                                             key={resume.id}
-                                            className={`cursor-pointer transition-all duration-300 ${
+                                            className={`p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${
                                                 selectedResume === resume.id
-                                                    ? '!border-blue-500 !shadow-lg !bg-blue-50'
-                                                    : '!border-gray-200 hover:!border-blue-300 hover:!shadow-md'
+                                                    ? 'border-green-500 bg-green-50'
+                                                    : 'border-gray-200 hover:border-green-300'
                                             }`}
-                                            bodyStyle={{ padding: '20px' }}
                                             onClick={() => handleResumeSelect(resume.id)}
                                         >
-                                            <Space
-                                                direction='vertical'
-                                                size='small'
-                                                className='w-full'
-                                            >
-                                                <div className='flex items-center justify-between'>
-                                                    <Text className='!font-semibold !text-lg !text-gray-800'>
+                                            <div className='flex items-center justify-between'>
+                                                <div>
+                                                    <Text className='font-semibold text-gray-900'>
                                                         {resume.title}
                                                     </Text>
-                                                    {selectedResume === resume.id && (
-                                                        <CheckCircleOutlined className='text-blue-500 text-xl' />
-                                                    )}
-                                                </div>
-
-                                                <div className='space-y-1'>
-                                                    <Text className='!text-gray-600 block'>
-                                                        <strong>포지션:</strong> {resume.position}
-                                                    </Text>
-                                                    <Text className='!text-gray-600 block'>
-                                                        <strong>회사:</strong> {resume.company}
-                                                    </Text>
-                                                    <Text className='!text-gray-600 block'>
-                                                        <strong>경력:</strong> {resume.experience}
-                                                    </Text>
-                                                    <Text className='!text-gray-600 block'>
-                                                        <strong>생성일:</strong> {resume.createdAt}
-                                                    </Text>
-                                                </div>
-
-                                                <div>
-                                                    <Text className='!text-gray-600 block mb-2'>
-                                                        <strong>주요 기술:</strong>
-                                                    </Text>
-                                                    <div className='flex flex-wrap gap-1'>
-                                                        {resume.skills.map((skill, index) => (
-                                                            <span
-                                                                key={index}
-                                                                className='px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full'
-                                                            >
-                                                                {skill}
-                                                            </span>
-                                                        ))}
+                                                    <div className='text-sm text-gray-600 mt-1'>
+                                                        {resume.position} · {resume.company}
                                                     </div>
                                                 </div>
-                                            </Space>
-                                        </Card>
+                                                {selectedResume === resume.id && (
+                                                    <div className='w-5 h-5 bg-green-500 rounded-full flex items-center justify-center'>
+                                                        <div className='w-2 h-2 bg-white rounded-full'></div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
                                     ))}
                                 </div>
-                            </Space>
-                        </Card>
-                    </Col>
-
-                    {/* 채용공고 URL 입력 섹션 */}
-                    <Col xs={24} lg={8}>
-                        <Card
-                            className='!h-full !border-0 !shadow-lg'
-                            bodyStyle={{ padding: '32px' }}
-                        >
-                            <Space direction='vertical' size='large' className='w-full'>
-                                <div className='flex items-center gap-3'>
-                                    <LinkOutlined className='text-3xl text-green-500' />
-                                    <Title level={3} className='!mb-0'>
-                                        채용공고 URL
-                                    </Title>
+                            ) : (
+                                <div className='text-center py-6'>
+                                    <p className='text-gray-600 text-lg font-normal block mb-1'>
+                                        등록된 이력서가 없습니다
+                                    </p>
+                                    <p className='text-gray-500 text-lg font-normal'>
+                                        프로필 기반으로 면접을 진행합니다. 채용공고를 등록해주세요.
+                                    </p>
                                 </div>
-
-                                <Paragraph className='!text-gray-600'>
-                                    지원하고자 하는 채용공고의 URL을 입력해주세요. 이를 바탕으로 더
-                                    정확한 면접 질문을 생성합니다.
-                                </Paragraph>
-
-                                <Form form={form} layout='vertical' className='w-full'>
-                                    <Form.Item label='채용공고 URL' required className='!mb-4'>
-                                        <Input
-                                            placeholder='https://example.com/job-posting'
-                                            value={jobPostUrl}
-                                            onChange={(e) => setJobPostUrl(e.target.value)}
-                                            size='large'
-                                            className='!rounded-lg'
-                                        />
-                                    </Form.Item>
-                                </Form>
-
-                                <div className='bg-blue-50 rounded-lg p-4'>
-                                    <Text className='!text-blue-700 !text-sm'>
-                                        💡 <strong>팁:</strong> 채용공고 URL을 입력하면 해당
-                                        포지션에 맞는 구체적인 질문을 받을 수 있습니다.
-                                    </Text>
-                                </div>
-
-                                <Button
-                                    type='primary'
-                                    size='large'
-                                    className='!h-12 !w-full !text-lg !font-semibold'
-                                    icon={<ArrowRightOutlined />}
-                                    onClick={handleStartInterview}
-                                    disabled={!selectedResume || !jobPostUrl.trim()}
-                                >
-                                    모의면접 설정으로 이동
-                                </Button>
-                            </Space>
-                        </Card>
-                    </Col>
-                </Row>
-
-                {/* 선택 요약 */}
-                {selectedResume && (
-                    <Card className='!border-0 !shadow-lg mt-8 !bg-green-50'>
-                        <div className='text-center'>
-                            <Title level={4} className='!text-green-700 !mb-2'>
-                                선택 완료
-                            </Title>
-                            <Text className='!text-green-600'>
-                                {resumes.find((r) => r.id === selectedResume)?.title}이
-                                선택되었습니다.
-                                {jobPostUrl && ' 채용공고 URL도 입력되었습니다.'}
-                            </Text>
+                            )}
                         </div>
-                    </Card>
-                )}
-            </div>
+                    )}
+
+                    {/* 채용공고 선택 탭 */}
+                    {activeTab === 'job' && (
+                        <div className='mb-8'>
+                            <div className='space-y-4'>
+                                <div>
+                                    <p className='text-gray-700 font-medium text-lg block mb-2'>
+                                        채용공고 URL
+                                    </p>
+                                    <input
+                                        type='url'
+                                        placeholder='https://example.com/job-posting'
+                                        value={jobPostUrl}
+                                        onChange={(e) => {
+                                            setJobPostUrl(e.target.value);
+                                            // URL 입력 시 버튼 애니메이션 트리거
+                                            setButtonAnimation(true);
+                                            setTimeout(() => setButtonAnimation(false), 1000);
+                                        }}
+                                        className='w-full px-4 py-4 border-2 border-gray-200 rounded-lg focus:border-green-500 focus:outline-none transition-colors duration-200 text-lg'
+                                    />
+                                </div>
+
+                                {jobPostUrl &&
+                                    (() => {
+                                        try {
+                                            new URL(jobPostUrl);
+                                            return (
+                                                <div className='p-4 bg-green-50 border border-green-200 rounded-lg'>
+                                                    <div className='flex items-center'>
+                                                        <div className='w-5 h-5 bg-green-500 rounded-full flex items-center justify-center mr-3'>
+                                                            <div className='w-2 h-2 bg-white rounded-full'></div>
+                                                        </div>
+                                                        <p className='text-green-700 text-base'>
+                                                            채용공고 URL이 입력되었습니다.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            );
+                                        } catch {
+                                            return (
+                                                <div className='p-4 bg-red-50 border border-red-200 rounded-lg'>
+                                                    <div className='flex items-center'>
+                                                        <div className='w-5 h-5 bg-red-500 rounded-full flex items-center justify-center mr-3'>
+                                                            <div className='w-2 h-2 bg-white rounded-full'></div>
+                                                        </div>
+                                                        <p className='text-red-700 text-base'>
+                                                            올바른 URL 형식을 입력해주세요.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
+                                    })()}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 시작 버튼 */}
+                    <div className='text-center'>
+                        <Button
+                            type='primary'
+                            size='large'
+                            className={`!h-16 !px-16 !text-xl !font-semibold !bg-green-600 hover:!bg-green-700 !border-0 !rounded-xl !shadow-lg !text-white transition-all duration-300 ${
+                                buttonAnimation ? 'animate-pulse scale-105' : ''
+                            }`}
+                            onClick={handleStartInterview}
+                            disabled={
+                                resumes.length > 0
+                                    ? !selectedResume || !jobPostUrl.trim()
+                                    : !jobPostUrl.trim()
+                            }
+                        >
+                            {resumes.length > 0
+                                ? !selectedResume || !jobPostUrl.trim()
+                                    ? '면접 설정을 완료해주세요'
+                                    : '면접 설정으로 이동'
+                                : !jobPostUrl.trim()
+                                  ? '면접 설정을 완료해주세요'
+                                  : '면접 설정으로 이동'}
+                        </Button>
+                    </div>
+                </div>
+            </Card>
+
+            <style jsx global>{`
+                .interview-tabs .ant-tabs-tab {
+                    padding: 12px 24px !important;
+                    font-size: 16px !important;
+                    font-weight: 500 !important;
+                }
+
+                .interview-tabs .ant-tabs-tab-active {
+                    color: #16a34a !important;
+                }
+
+                .interview-tabs .ant-tabs-ink-bar {
+                    background: #16a34a !important;
+                }
+            `}</style>
         </div>
     );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
+import { Socket } from 'socket.io-client';
 import * as fabric from 'fabric';
 
 type BrushKind = 'pencil' | 'highlighter';
@@ -34,6 +35,10 @@ type CanvasStoreState = {
     // history
     isLocked: boolean;
     history: fabric.Object[];
+
+    // socket
+    socket: Socket | null;
+    setSocket: (socket: Socket | null) => void;
 
     // lifecycle
     setCanvasInstance: (canvas: fabric.Canvas | null) => void;
@@ -86,6 +91,9 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     },
     isLocked: false,
     history: [],
+    socket: null,
+
+    setSocket: (socket) => set({ socket }),
 
     setStickyNoteConfig: (config) =>
         set((state) => ({
