@@ -102,10 +102,10 @@ class WavRecorder {
         view.setUint32(28, sampleRate * 2, true);
         view.setUint16(32, 2, true);
         view.setUint16(34, 16, true);
-        writeString(36, "data");
+        writeString(36, 'data');
         view.setUint32(40, samples.length * 2, true);
         floatTo16(44, samples);
-        return new Blob([view], { type: "audio/wav" });
+        return new Blob([view], { type: 'audio/wav' });
     }
 }
 
@@ -113,7 +113,7 @@ const AUDIO_API_BASE = process.env.NEXT_PUBLIC_AUDIO_API_BASE;
 async function analyzeAudioBlob(blob: Blob) {
     if (!AUDIO_API_BASE) return null;
     const form = new FormData();
-    form.append("file", blob, "calibration.wav");
+    form.append('file', blob, 'calibration.wav');
     const res = await axios.post(`${AUDIO_API_BASE}/audio/analyze`, form, { timeout: 60000 });
     return res.data?.features ?? null;
 }
@@ -132,7 +132,7 @@ export default function AiInterviewSettingCalibrationCombined() {
     const [micOk, setMicOk] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
 
-    const CALI_TEXT = '나는 어려움을 이겨내며 성장한다.';
+    const CALI_TEXT = '나는 핀토스를 부순다.';
 
     useEffect(() => {
         if (phase !== 'running') return;
@@ -192,7 +192,7 @@ export default function AiInterviewSettingCalibrationCombined() {
             message.info('녹음을 시작했습니다. 자연스럽게 문장을 읽어주세요.');
         } catch (e: any) {
             setPhase('idle');
-            setError(e?.message || '캘리브레이션 시작 실패');
+            setError(e?.message || '모의면접 준비 실패');
         }
     };
 
@@ -226,9 +226,9 @@ export default function AiInterviewSettingCalibrationCombined() {
                 JSON.stringify({ createdAt: new Date().toISOString(), audio: feats, visual: vAgg }),
             );
             setPhase('done');
-            message.success('캘리브레이션 저장 완료! 이제 세션을 시작할 수 있어요.');
+            message.success('환경설정 완료! 이제 모의면접을 시작할 수 있어요.');
         } catch (e: any) {
-            setError(e?.message || '캘리브레이션 종료 실패');
+            setError(e?.message || '환경설정 실패');
             setPhase('idle');
         }
     };
@@ -242,56 +242,63 @@ export default function AiInterviewSettingCalibrationCombined() {
     };
 
     const goToSession: () => void = () => {
-        window.location.href = "/ai-interview/sessions";
+        window.location.href = '/ai-interview/sessions';
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8">
-            <div className="container mx-auto px-4">
-                <div className="max-w-2xl mx-auto">
-                    <Card className="!border-0 !shadow-lg !rounded-3xl">
-                        <div className="text-center mb-4">
-                            <Title level={2} className="!m-0 !text-gray-800">
+        <div className='min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8'>
+            <div className='container mx-auto px-4'>
+                <div className='max-w-2xl mx-auto'>
+                    <Card className='!border-0 !shadow-lg !rounded-3xl'>
+                        <div className='text-center mb-4'>
+                            <Title level={2} className='!m-0 !text-gray-800'>
                                 얼굴을 가이드 선 안에 들어오게 맞추고,
                                 <br /> 녹화 버튼을 눌러주세요.
                             </Title>
-                            <Paragraph className="!mt-2 !text-gray-500">
+                            <Paragraph className='!mt-2 !text-gray-500'>
                                 녹화가 시작되면 아래 문장을 소리 내서 읽어주세요.
                             </Paragraph>
                         </div>
 
                         {error && (
-                            <div className="mb-3">
-                                <Alert type="error" showIcon message="오류" description={error} />
+                            <div className='mb-3'>
+                                <Alert type='error' showIcon message='오류' description={error} />
                             </div>
                         )}
 
-                        <div className="flex flex-col items-center">
-                            <div className="rounded-3xl overflow-hidden shadow-md relative" style={{ width: 720, height: 405, background: '#e5e7eb' }}>
+                        <div className='flex flex-col items-center'>
+                            <div
+                                className='rounded-3xl overflow-hidden shadow-md relative'
+                                style={{ width: 720, height: 405, background: '#e5e7eb' }}
+                            >
                                 <Webcam ref={webcamRef} width={720} height={405} overlayGuide />
                             </div>
                             {/* 버튼을 영상 아래의 흰색 베이스 위에 배치 */}
-                            <div className="w-[720px] bg-white rounded-b-3xl shadow-sm flex items-center justify-center gap-4 py-6 -mt-1">
-                                {phase !== "running" ? (
+                            <div className='w-[720px] bg-white rounded-b-3xl shadow-sm flex items-center justify-center gap-4 py-6 -mt-1'>
+                                {phase !== 'running' ? (
                                     <button
                                         onClick={startCalibration}
-                                        className="w-16 h-16 rounded-full bg-white shadow-md flex items-center justify-center hover:scale-105 transition"
-                                        aria-label="기준 측정 시작"
+                                        className='w-16 h-16 rounded-full bg-white shadow-md flex items-center justify-center hover:scale-105 transition'
+                                        aria-label='기준 측정 시작'
                                     >
-                                        <span className="w-6 h-6 rounded-full bg-red-500 block"></span>
+                                        <span className='w-6 h-6 rounded-full bg-red-500 block'></span>
                                     </button>
                                 ) : (
                                     <button
                                         onClick={stopCalibration}
                                         disabled={isProcessing}
                                         className={`w-16 h-16 rounded-full shadow-md flex items-center justify-center hover:scale-105 transition ${isProcessing ? 'bg-red-300' : 'bg-red-500'}`}
-                                        aria-label="중지 및 결과 산출"
+                                        aria-label='중지 및 결과 산출'
                                     >
-                                        <span className="w-3 h-3 rounded-full bg-white block animate-pulse"></span>
+                                        <span className='w-3 h-3 rounded-full bg-white block animate-pulse'></span>
                                     </button>
                                 )}
                                 {phase === 'done' && (
-                                    <Button onClick={resetCalibration} size="small" disabled={isProcessing}>
+                                    <Button
+                                        onClick={resetCalibration}
+                                        size='small'
+                                        disabled={isProcessing}
+                                    >
                                         다시 녹음하기
                                     </Button>
                                 )}
@@ -300,19 +307,19 @@ export default function AiInterviewSettingCalibrationCombined() {
                             {/* 진행률/타이머 UI 제거 (요청) */}
 
                             {/* 캘리브레이션 문장 */}
-                            <blockquote className="text-2xl text-green-500/80 italic text-center px-6 py-4 border rounded-2xl bg-green-50/40">
+                            <blockquote className='text-2xl text-green-500/80 italic text-center px-6 py-4 border rounded-2xl bg-green-50/40'>
                                 “{CALI_TEXT}”
                             </blockquote>
 
                             {/* 액션들 */}
-                            <div className="mt-6 flex gap-3">
+                            <div className='mt-6 flex gap-3'>
                                 <Button
-                                    type="primary"
+                                    type='primary'
                                     icon={<SaveOutlined />}
                                     onClick={goToSession}
                                     disabled={!(webcamOk && micOk && phase === 'done')}
                                 >
-                                    세션 시작하기
+                                    AI 모의면접 시작하기
                                 </Button>
                             </div>
                         </div>

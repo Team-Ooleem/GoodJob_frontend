@@ -116,6 +116,9 @@ interface VisualQuestionAgg {
     confidence_max: number | null;
     smile_mean: number | null;
     smile_max: number | null;
+    eye_contact_mean?: number | null;
+    blink_mean?: number | null;
+    gaze_stability?: number | null;
     presence_dist: Record<PresenceKey, number>;
     level_dist: Record<LevelKey, number>;
     landmarks_mean?: {
@@ -132,6 +135,9 @@ interface VisualSessionAggOverall {
     confidence_max: number | null;
     smile_mean: number | null;
     smile_max: number | null;
+    eye_contact_mean?: number | null;
+    blink_mean?: number | null;
+    gaze_stability?: number | null;
     presence_dist: Record<PresenceKey, number>;
     level_dist: Record<LevelKey, number>;
     startedAt?: number;
@@ -316,10 +322,25 @@ export default function AiInterviewResultPage() {
         const t = (x - a) / (b - a);
         return Math.max(0, Math.min(1, t));
     };
-    const smileTo10 = (v?: number | null) => {
-        if (typeof v !== 'number') return 5;
-        const t = 1 - Math.min(1, Math.abs(v - 0.5) / 0.5);
-        return Math.round(t * 10);
+    const smileBalance01 = (v?: number | null) => {
+        if (typeof v !== 'number') return 0.5;
+        return 1 - Math.min(1, Math.abs(v - 0.5) / 0.5);
+    };
+    const videoScore10FromAgg = (v?: VisualSessionAggOverall | null) => {
+        if (!v) return 6; // 중간값 폴백
+        const count = v.count || 0;
+        const conf = typeof v.confidence_mean === 'number' ? v.confidence_mean : 0.65; // 0~1
+        const good = count ? (v.presence_dist?.good ?? 0) / count : 0;
+        const smileB = smileBalance01(v.smile_mean); // 0~1
+        const eye = typeof v.eye_contact_mean === 'number' ? v.eye_contact_mean : 0.6;
+        const gaze = typeof v.gaze_stability === 'number' ? v.gaze_stability : 0.6;
+        const warnR = count ? (v.level_dist?.warning ?? 0) / count : 0;
+        const critR = count ? (v.level_dist?.critical ?? 0) / count : 0;
+        // 가중치: conf 40% + presence 25% + smile balance 15% + eye contact 10% + gaze stability 10%
+        const base = 0.4 * conf + 0.25 * good + 0.15 * smileB + 0.1 * eye + 0.1 * gaze; // 0~1
+        const penalty = Math.min(0.4, 0.6 * warnR + 1.0 * critR); // 0~0.4
+        const score01 = Math.max(0, Math.min(1, base - penalty));
+        return Math.round(score01 * 10);
     };
 
     const computeFrontendReport = (
@@ -364,12 +385,7 @@ export default function AiInterviewResultPage() {
             .map((x) => x / 10);
         const audio10 = a10.length ? a10.reduce((a, b) => a + b, 0) / a10.length : 6.5;
 
-        const conf10 =
-            typeof visualAll?.confidence_mean === 'number'
-                ? Math.round(visualAll.confidence_mean * 10)
-                : 6;
-        const smile10 = smileTo10(visualAll?.smile_mean);
-        const visual10 = Math.round(conf10 * 0.6 + smile10 * 0.4);
+        const visual10 = videoScore10FromAgg(visualAll);
 
         const impression10 = Math.round(audio10 * 0.6 + visual10 * 0.4);
 
@@ -1470,7 +1486,7 @@ export default function AiInterviewResultPage() {
                         AI 모의면접 결과 리포트
                     </Title>
                     <Paragraph className='!text-lg !text-gray-600 max-w-2xl mx-auto'>
-                        ChatGPT AI가 분석한 면접 결과를 확인해보세요.
+                        굿잡이 제공하는 AI 모의면접 결과 리포트를 확인해보세요.
                     </Paragraph>
                     <div className='mt-4 print:hidden'>
                         <Space>
@@ -1801,7 +1817,20 @@ export default function AiInterviewResultPage() {
 
                 {/* ▼ ADDED: 종합 영상 지표 (접힘) */}
                 {visualOverall && showVisualDetails && (
-                    <Card id='visual' title='종합 영상 지표' className='!border-0 !shadow-lg mb-8'>
+                    <Card
+                        id='visual'
+                        title={
+                            <span>
+                                종합 영상 지표
+                                <Tooltip
+                                    title='점수= 40%자신감 + 25%존재감 + 15%미소균형 + 10%시선맞춤 + 10%시선안정 − 페널티(0.6×경고 + 1.0×치명, 최대 0.4)'
+                                >
+                                    <InfoCircleOutlined className='ml-2 text-gray-400' />
+                                </Tooltip>
+                            </span>
+                        }
+                        className='!border-0 !shadow-lg mb-8'
+                    >
                         <Row gutter={[16, 16]}>
                             <Col xs={24} md={8}>
                                 <Card size='small'>
@@ -1842,6 +1871,21 @@ export default function AiInterviewResultPage() {
                                                 : '-'}
                                         </div>
                                     </div>
+                                    <Statistic
+                                        title={
+                                            <span>
+                                                시선 맞춤(평균)
+                                                <Tooltip title='카메라/면접관을 향한 시선 비율(0~100)'>
+                                                    <InfoCircleOutlined className='ml-2 text-gray-400' />
+                                                </Tooltip>
+                                            </span>
+                                        }
+                                        value={
+                                            typeof visualOverall.eye_contact_mean === 'number'
+                                                ? (visualOverall.eye_contact_mean * 100).toFixed(0)
+                                                : '-'
+                                        }
+                                    />
                                     <Statistic
                                         title={
                                             <span>
@@ -1886,6 +1930,36 @@ export default function AiInterviewResultPage() {
                                             )}
                                         </div>
                                     </div>
+                                    <Statistic
+                                        title={
+                                            <span>
+                                                시선 안정성
+                                                <Tooltip title='얼굴 중심(코) 좌표 변동 표준편차 기반 0~100 (높을수록 안정)'>
+                                                    <InfoCircleOutlined className='ml-2 text-gray-400' />
+                                                </Tooltip>
+                                            </span>
+                                        }
+                                        value={
+                                            typeof visualOverall.gaze_stability === 'number'
+                                                ? (visualOverall.gaze_stability * 100).toFixed(0)
+                                                : '-'
+                                        }
+                                    />
+                                    <Statistic
+                                        title={
+                                            <span>
+                                                깜빡임(평균)
+                                                <Tooltip title='눈 깜빡임 확률(0~100). 과도한 깜빡임은 긴장/피로 신호일 수 있음'>
+                                                    <InfoCircleOutlined className='ml-2 text-gray-400' />
+                                                </Tooltip>
+                                            </span>
+                                        }
+                                        value={
+                                            typeof visualOverall.blink_mean === 'number'
+                                                ? (visualOverall.blink_mean * 100).toFixed(0)
+                                                : '-'
+                                        }
+                                    />
                                     <Statistic
                                         title={
                                             <span>
