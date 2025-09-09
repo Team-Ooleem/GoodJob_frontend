@@ -131,7 +131,7 @@ class WavRecorder {
 }
 
 // 서버 오디오 피처 API
-const AUDIO_API_BASE = process.env.NEXT_PUBLIC_AUDIO_API_BASE; // 예: http://localhost:8081
+const AUDIO_API_BASE = process.env.NEXT_PUBLIC_AI_API_BASE; // 예: http://localhost:8081
 async function analyzeAudioBlob(blob: Blob) {
     if (!AUDIO_API_BASE) return null; // 서버가 없으면 생략
     const form = new FormData();

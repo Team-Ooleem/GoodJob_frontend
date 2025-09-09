@@ -71,7 +71,7 @@ export class RealMediaPipeAnalyzer {
     private animationFrameId: number | null = null;
     private lastLogTime = 0;
     private logInterval = 10000; // 10초마다 분석 결과 로그 출력
-    private analysisInterval = 5000; // 5초마다 분석 실행
+    private analysisInterval = 2000; // 2초마다 분석 실행
     private lastAnalysisTime = 0;
 
     // MediaPipe Tasks Vision
@@ -170,9 +170,9 @@ export class RealMediaPipeAnalyzer {
                 attentionWarnThreshold: 0.45,
                 stressWarnThreshold: 0.6,
             };
-            console.log('[Calibration] Loaded visual calibration:', this.calib);
+            // console.debug('[Calibration] Loaded visual calibration:', this.calib);
         } catch (e) {
-            console.warn('[Calibration] Failed to load calibration. Using defaults.', e);
+            // console.warn('[Calibration] Failed to load calibration. Using defaults.', e);
             this.calib = {
                 presenceGoodCut: 0.6,
                 presenceNeedsCut: 0.4,
@@ -193,6 +193,9 @@ export class RealMediaPipeAnalyzer {
         this.currentQuestionText = opts?.text;
         this.sampleBuffer = [];
         this.questionStartedAt = Date.now();
+        if (questionId === 'calibration') {
+            console.log('[Calibration] 비디오 캘리브레이션 시작');
+        }
         // 최초 한두 프레임은 분석 이전일 수 있어 샘플 없을 수 있음(OK)
         // 별도 로그만
         // console.log('[Mediapipe] startQuestion:', questionId, opts);
@@ -211,6 +214,9 @@ export class RealMediaPipeAnalyzer {
         this.currentQuestionText = undefined;
         this.sampleBuffer = [];
         this.questionStartedAt = null;
+        if (payload._questionId === 'calibration') {
+            console.log('[Calibration] 비디오 캘리브레이션 종료 - samples:', payload.sample_count);
+        }
 
         return payload;
     }
@@ -248,8 +254,8 @@ export class RealMediaPipeAnalyzer {
     private analyzeFaceResults(results: any) {
         const currentTime = Date.now();
 
-        // 10초마다 요약 로그
-        if (currentTime - this.lastAnalysisLogTime >= this.logInterval) {
+        // 10초마다 요약 로그 (문항 수집 중일 때만)
+        if (this.currentQuestionId && currentTime - this.lastAnalysisLogTime >= this.logInterval) {
             console.log('👁️ Face Landmarker 분석 결과 (10초마다):', {
                 timestamp: new Date().toISOString(),
                 hasLandmarks: !!results.faceLandmarks,
@@ -290,8 +296,10 @@ export class RealMediaPipeAnalyzer {
             : rawMetrics;
         this.prevMetrics = interviewMetrics;
 
-        // ▼ 실시간 피드백 (기존 유지)
-        this.generateInterviewFeedback(interviewMetrics, leftEyeCenter, rightEyeCenter, noseTip);
+        // ▼ 실시간 피드백: 답변(문항) 진행 중일 때만 표시/발생
+        if (this.currentQuestionId) {
+            this.generateInterviewFeedback(interviewMetrics, leftEyeCenter, rightEyeCenter, noseTip);
+        }
 
         // ▼ 추가: 5초 간격 분석시 **버퍼에 샘플 기록** (문항 진행중일 때만)
         if (this.currentQuestionId) {
@@ -629,7 +637,8 @@ export class RealMediaPipeAnalyzer {
             this.isAnalyzing = true;
             this.lastDetectionTime = Date.now();
             this.lastAnalysisTime = Date.now();
-            console.log('🎯 MediaPipe Tasks Vision 분석 시작 (5초 간격)');
+            // 분석 루프 시작(캘리브레이션과는 별개)
+            // console.debug('MediaPipe 분석 루프 시작 (5초 간격)');
             this.analyzeFrame();
         } catch (error) {
             console.error('❌ MediaPipe Tasks Vision 분석 시작 실패:', error);

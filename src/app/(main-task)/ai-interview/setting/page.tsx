@@ -1,13 +1,13 @@
-"use client";
+'use client';
 
-import { useEffect, useRef, useState } from "react";
-import { Card, Typography, Button, Alert, message } from "antd";
-import { SaveOutlined } from "@ant-design/icons";
+import { useEffect, useRef, useState } from 'react';
+import { Card, Typography, Button, Alert, message } from 'antd';
+import { SaveOutlined } from '@ant-design/icons';
 // import Link from "next/link"; // not used in combined UI
-import axios from "axios";
+import axios from 'axios';
 
-import { Webcam, WebcamHandle } from "../_components/Webcam";
-import { VisualAggregatePayload } from "../_components/RealMediaPipeAnalyzer";
+import { Webcam, WebcamHandle } from '../_components/Webcam';
+import { VisualAggregatePayload } from '../_components/RealMediaPipeAnalyzer';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -59,7 +59,7 @@ class WavRecorder {
         const samples = this.merge(this.buffers);
         const wav = this.encodeWAV(samples, sr);
         try {
-            if (this.audioCtx && this.audioCtx.state !== "closed") await this.audioCtx.close();
+            if (this.audioCtx && this.audioCtx.state !== 'closed') await this.audioCtx.close();
         } catch {}
         this.audioCtx = null;
         this.stream = null;
@@ -91,10 +91,10 @@ class WavRecorder {
                 view.setInt16(off, s, true);
             }
         };
-        writeString(0, "RIFF");
+        writeString(0, 'RIFF');
         view.setUint32(4, 36 + samples.length * 2, true);
-        writeString(8, "WAVE");
-        writeString(12, "fmt ");
+        writeString(8, 'WAVE');
+        writeString(12, 'fmt ');
         view.setUint32(16, 16, true);
         view.setUint16(20, 1, true);
         view.setUint16(22, 1, true);
@@ -123,7 +123,7 @@ export default function AiInterviewSettingCalibrationCombined() {
     const recRef = useRef<WavRecorder | null>(null);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-    const [phase, setPhase] = useState<"idle" | "running" | "done">("idle");
+    const [phase, setPhase] = useState<'idle' | 'running' | 'done'>('idle');
     const [timeLeft, setTimeLeft] = useState(15);
     const [error, setError] = useState<string | null>(null);
     const [visualAgg, setVisualAgg] = useState<VisualAggregatePayload | null>(null);
@@ -132,10 +132,10 @@ export default function AiInterviewSettingCalibrationCombined() {
     const [micOk, setMicOk] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
 
-    const CALI_TEXT = "나는 어려움을 이겨내며 성장한다.";
+    const CALI_TEXT = '나는 어려움을 이겨내며 성장한다.';
 
     useEffect(() => {
-        if (phase !== "running") return;
+        if (phase !== 'running') return;
         timerRef.current && clearInterval(timerRef.current);
         timerRef.current = setInterval(() => {
             setTimeLeft((t) => {
@@ -150,8 +150,8 @@ export default function AiInterviewSettingCalibrationCombined() {
                             // 비디오 버퍼 클리어만 수행(결과 사용 안 함)
                             webcamRef.current?.endQuestion();
                         } catch {}
-                        message.warning("다시 말씀해 주세요");
-                        setPhase("idle");
+                        message.warning('다시 말씀해 주세요');
+                        setPhase('idle');
                         setTimeLeft(15);
                     })();
                     return 0;
@@ -185,19 +185,19 @@ export default function AiInterviewSettingCalibrationCombined() {
             setVisualAgg(null);
             setAudioFeatures(null);
             setTimeLeft(15);
-            setPhase("running");
-            webcamRef.current?.startQuestion("calibration", { text: "Calibration" });
+            setPhase('running');
+            webcamRef.current?.startQuestion('calibration', { text: 'Calibration' });
             recRef.current = new WavRecorder();
             await recRef.current.start();
             message.info('녹음을 시작했습니다. 자연스럽게 문장을 읽어주세요.');
         } catch (e: any) {
-            setPhase("idle");
-            setError(e?.message || "캘리브레이션 시작 실패");
+            setPhase('idle');
+            setError(e?.message || '캘리브레이션 시작 실패');
         }
     };
 
     const stopCalibration: () => Promise<void> = async () => {
-        if (phase !== "running") return;
+        if (phase !== 'running') return;
         if (timerRef.current) clearInterval(timerRef.current);
         try {
             setIsProcessing(true);
@@ -217,19 +217,19 @@ export default function AiInterviewSettingCalibrationCombined() {
                 try {
                     feats = await analyzeAudioBlob(wav);
                 } catch (err) {
-                    console.warn("오디오 분석 서버 미응답 또는 실패", err);
+                    console.warn('오디오 분석 서버 미응답 또는 실패', err);
                 }
             }
             setAudioFeatures(feats);
             localStorage.setItem(
-                "aiInterviewCalibration",
+                'aiInterviewCalibration',
                 JSON.stringify({ createdAt: new Date().toISOString(), audio: feats, visual: vAgg }),
             );
-            setPhase("done");
+            setPhase('done');
             message.success('캘리브레이션 저장 완료! 이제 세션을 시작할 수 있어요.');
         } catch (e: any) {
-            setError(e?.message || "캘리브레이션 종료 실패");
-            setPhase("idle");
+            setError(e?.message || '캘리브레이션 종료 실패');
+            setPhase('idle');
         }
     };
 
