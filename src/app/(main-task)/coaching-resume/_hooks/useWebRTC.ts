@@ -1,8 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { io, Socket } from 'socket.io-client';
-import { BACKEND_ORIGIN } from '@/constants/config';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCanvasStore } from '../_stores';
 
 export interface UseWebRTC {
     localStream: MediaStream | null;
@@ -30,12 +29,12 @@ type Options = {
 };
 
 export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
-    const socketRef = useRef<Socket | null>(null);
+    const socket = useCanvasStore((s) => s.socket);
     const pcRef = useRef<RTCPeerConnection | null>(null);
     const roomRef = useRef<string | null>(room ?? null);
 
-    const localStreamRef = useRef<MediaStream | null>(null);
-    const remoteStreamRef = useRef<MediaStream | null>(null);
+    const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+    const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
 
     const [isConnected, setIsConnected] = useState(false);
     const [isMuted, setIsMuted] = useState(false);
@@ -44,16 +43,6 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
 
     const onRemoteStream = options?.onRemoteStream;
     const onConnectionStateChange = options?.onConnectionStateChange;
-
-    const ensureSocket = useCallback((): Socket => {
-        if (socketRef.current) return socketRef.current;
-        const socket = io(BACKEND_ORIGIN, {
-            transports: ['websocket', 'polling'],
-            withCredentials: true,
-        });
-        socketRef.current = socket;
-        return socket;
-    }, []);
 
     const ensurePeer = useCallback((): RTCPeerConnection => {
         if (pcRef.current) return pcRef.current;
@@ -66,7 +55,8 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
 
         pc.onicecandidate = (e) => {
             if (e.candidate && roomRef.current) {
-                ensureSocket().emit('ice-candidate', {
+                const currentSocket = useCanvasStore.getState().socket;
+                currentSocket?.emit('ice-candidate', {
                     room: roomRef.current,
                     candidate: e.candidate.toJSON(),
                 });
@@ -75,7 +65,7 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
 
         pc.ontrack = (e) => {
             const [stream] = e.streams;
-            remoteStreamRef.current = stream;
+            setRemoteStream(stream); // ✅ state 업데이트
             onRemoteStream?.(stream);
         };
 
@@ -86,16 +76,16 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
 
         pcRef.current = pc;
         return pc;
-    }, [ensureSocket, onConnectionStateChange, onRemoteStream]);
+    }, [onConnectionStateChange, onRemoteStream]);
 
     const attachLocalMedia = useCallback(async () => {
-        if (localStreamRef.current) return localStreamRef.current;
+        if (localStream) return localStream;
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
                 audio: true,
                 video: { width: { ideal: 1280 }, height: { ideal: 720 } },
             });
-            localStreamRef.current = stream;
+            setLocalStream(stream); // ✅ state 업데이트
             const pc = ensurePeer();
             stream.getTracks().forEach((t) => pc.addTrack(t, stream));
             return stream;
@@ -103,11 +93,11 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
             setError(e?.message || 'Failed to get user media');
             throw e;
         }
-    }, [ensurePeer]);
+    }, [ensurePeer, localStream]);
 
     // Socket listeners
     useEffect(() => {
-        const socket = ensureSocket();
+        if (!socket) return;
 
         const handleConnect = () => {
             if (roomRef.current) socket.emit('join', roomRef.current);
@@ -141,8 +131,8 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
             try {
                 const pc = ensurePeer();
                 await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
-            } catch (e: any) {
-                // Ignore errors due to timing
+            } catch {
+                // Ignore ICE timing errors
             }
         };
 
@@ -151,25 +141,28 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
         socket.on('answer', handleAnswer);
         socket.on('ice-candidate', handleIce);
 
+        if (socket.connected && roomRef.current) {
+            socket.emit('join', roomRef.current);
+        }
+
         return () => {
             socket.off('connect', handleConnect);
             socket.off('offer', handleOffer);
             socket.off('answer', handleAnswer);
             socket.off('ice-candidate', handleIce);
         };
-    }, [attachLocalMedia, ensurePeer, ensureSocket]);
+    }, [attachLocalMedia, ensurePeer, socket]);
 
     const joinRoom = useCallback(
         (roomId: string) => {
             roomRef.current = roomId;
-            ensureSocket().emit('join', roomId);
+            socket?.emit('join', roomId);
         },
-        [ensureSocket],
+        [socket],
     );
 
     const leaveRoom = useCallback(() => {
         roomRef.current = null;
-        // no dedicated leave event in backend sample; rely on disconnect/cleanup
     }, []);
 
     const startCall = useCallback(async () => {
@@ -179,47 +172,39 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
             if (roomRef.current) {
-                ensureSocket().emit('offer', { room: roomRef.current, sdp: offer });
+                const currentSocket = useCanvasStore.getState().socket;
+                currentSocket?.emit('offer', { room: roomRef.current, sdp: offer });
             }
         } catch (e: any) {
             setError(e?.message || 'Failed to start call');
         }
-    }, [attachLocalMedia, ensurePeer, ensureSocket]);
+    }, [attachLocalMedia, ensurePeer]);
 
     const endCall = useCallback(() => {
         pcRef.current?.getSenders().forEach((s) => pcRef.current?.removeTrack(s));
         pcRef.current?.close();
         pcRef.current = null;
-        remoteStreamRef.current = null;
+        setRemoteStream(null);
         setIsConnected(false);
     }, []);
 
     const toggleMic = useCallback(() => {
-        const tracks = localStreamRef.current?.getAudioTracks() || [];
+        const tracks = localStream?.getAudioTracks() || [];
         const next = !tracks[0]?.enabled;
         tracks.forEach((t) => (t.enabled = next));
         setIsMuted(!next);
-    }, []);
+    }, [localStream]);
 
     const toggleCamera = useCallback(() => {
-        const tracks = localStreamRef.current?.getVideoTracks() || [];
+        const tracks = localStream?.getVideoTracks() || [];
         const next = !tracks[0]?.enabled;
         tracks.forEach((t) => (t.enabled = next));
         setIsCameraOff(!next);
-    }, []);
-
-    // Auto-connect socket and optionally join on mount if room provided
-    useEffect(() => {
-        const socket = ensureSocket();
-        return () => {
-            socket.disconnect();
-            socketRef.current = null;
-        };
-    }, [ensureSocket]);
+    }, [localStream]);
 
     return {
-        localStream: localStreamRef.current,
-        remoteStream: remoteStreamRef.current,
+        localStream,
+        remoteStream,
         isConnected,
         isMuted,
         isCameraOff,
