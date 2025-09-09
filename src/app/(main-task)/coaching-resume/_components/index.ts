@@ -7,4 +7,7 @@ export * from './CameraBox';
 export * from './ParticipantCamera';
 export * from './CanvasTitle';
 export * from './SessionToolbar';
+export { default as TranscriptList } from './TranscriptList';
+export { default as RecordingList } from './RecordingList';
+export { default as AudioPlayer } from './AudioPlayer';
 export * from './RecordingListPopup';
