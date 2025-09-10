@@ -179,9 +179,9 @@ export default function AiInterviewSelectPage() {
                                                     <Text className='font-semibold text-gray-900'>
                                                         {resume.title}
                                                     </Text>
-                                                    <div className='text-sm text-gray-600 mt-1'>
+                                                    {/* <div className='text-sm text-gray-600 mt-1'>
                                                         {resume.position} · {resume.company}
-                                                    </div>
+                                                    </div> */}
                                                 </div>
                                                 {selectedResume === resume.id && (
                                                     <div className='w-5 h-5 bg-green-500 rounded-full flex items-center justify-center'>
