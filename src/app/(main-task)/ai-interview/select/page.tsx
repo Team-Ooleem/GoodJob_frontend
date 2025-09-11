@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button, Card, Typography, Tabs, message, Spin } from 'antd';
-import { VideoCameraOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import { VideoCameraOutlined, InfoCircleOutlined, FileSearchOutlined } from '@ant-design/icons';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks';
 import { api } from '@/apis/api';
@@ -285,6 +285,14 @@ export default function AiInterviewSelectPage() {
                                   ? '면접 설정을 완료해주세요'
                                   : '면접 환경 체크하기'}
                         </Button>
+                        <div className='mt-4'>
+                            <Button
+                                icon={<FileSearchOutlined />}
+                                onClick={() => router.push('/ai-interview/reports')}
+                            >
+                                리포트 목록 보기
+                            </Button>
+                        </div>
                     </div>
                 </div>
             </Card>
