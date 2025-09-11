@@ -26,32 +26,36 @@
 
 ### UI Component Library
 
-- **Primary**: Use **Ant Design (antd)** components for all basic UI elements
+- **Primary**: Use **shadcn/ui** components for all basic UI elements
 - **Secondary**: Use **Tailwind CSS** for custom styling, layout, and spacing
+- **Icons**: Use **lucide-react** for consistent iconography
 
 ### Design System Guidelines
 
-#### Ant Design Components (우선 사용)
+#### shadcn/ui Components (우선 사용)
 
 - **Basic Components**: Button, Input, Form, Table, Modal, Card, Typography
 - **Data Display**: DatePicker, Select, Upload, Tree, Timeline
 - **Layout**: Layout, Grid, Space, Divider
-- **Feedback**: Message, Notification, Spin, Progress, Alert
+- **Feedback**: Toast, Notification, Spinner, Progress, Alert
 - **Navigation**: Menu, Breadcrumb, Pagination, Steps
+- **Interactive**: Dialog, Popover, Dropdown, Tooltip, Accordion
 
-#### Tailwind CSS (추가 스타일링)
+#### Tailwind CSS (스타일링 & 레이아웃)
 
 - **Layout & Spacing**: Use Tailwind for margins, padding, positioning
 - **Responsive Design**: Implement responsive breakpoints
-- **Custom Styling**: Override or extend Ant Design components when needed
-- **Color Consistency**: Use Ant Design's design tokens for colors and spacing
+- **Custom Styling**: Customize shadcn/ui components with Tailwind classes
+- **Color System**: Use consistent color tokens and design system
+- **Animation**: Use tailwindcss-animate for smooth transitions
 
 #### Best Practices
 
-- **Component Priority**: Always check if Ant Design has a suitable component before creating custom ones
-- **Consistency**: Maintain visual consistency with Ant Design's design language
-- **Accessibility**: Leverage Ant Design's built-in accessibility features
-- **Customization**: Use Tailwind classes to customize Ant Design components when necessary
+- **Component Priority**: Always check if shadcn/ui has a suitable component before creating custom ones
+- **Copy & Customize**: Copy shadcn/ui components to your project and customize as needed
+- **Consistency**: Maintain visual consistency with shadcn/ui's design language
+- **Accessibility**: Leverage Radix UI's built-in accessibility features
+- **Styling**: Use class-variance-authority, clsx, and tailwind-merge for advanced styling
 
 ---
 
@@ -68,7 +72,8 @@
 - Use `react-hook-form` for all form handling.
 - Define form validation rules using `Zod` schemas.
 - Integrate Zod with React Hook Form using `@hookform/resolvers`.
-- Use Ant Design's Form components for consistent form styling.
+- Use shadcn/ui's Form components for consistent form styling.
+- Leverage Radix UI's form primitives for accessibility.
 
 ---
 
@@ -93,5 +98,6 @@
 
 - **Shared resources** → `src/components/`, `src/apis/`, `src/utils/`, `src/constants/`
 - **Page-specific resources** → `src/app/[route]/_components/`, `_lib/`, `_apis/`
-- **UI Components** → **Ant Design first**, Tailwind CSS for custom styling
-- **Design System** → Maintain consistency with Ant Design's design language
+- **UI Components** → **shadcn/ui first**, Tailwind CSS for custom styling
+- **Design System** → Maintain consistency with shadcn/ui's design language
+- **Icons** → **lucide-react** for consistent iconography
