@@ -36,6 +36,7 @@ import {
     LinkOutlined,
 } from '@ant-design/icons';
 import Link from 'next/link';
+import { api } from '@/apis/api';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -284,6 +285,51 @@ export default function AiInterviewResultPage() {
             // setError('데이터를 불러오는 중 오류가 발생했습니다.');
             setLoading(false);
         }
+    }, []);
+
+    // 서버 저장본 동기화: 세션ID가 있으면 서버에서 리포트/집계 불러오기
+    useEffect(() => {
+        const sid = (() => {
+            try { return localStorage.getItem('aiInterviewSessionId') || null; } catch { return null; }
+        })();
+        if (!sid) return;
+        (async () => {
+            try {
+                setLoading(true);
+                const [rpt, vis, aOver, aPer] = await Promise.allSettled([
+                    api.get(`/report/${sid}`),
+                    api.get(`/metrics/${sid}`),
+                    api.get(`/audio-metrics/${sid}/overall`),
+                    api.get(`/audio-metrics/${sid}`),
+                ]);
+                if (rpt.status === 'fulfilled' && rpt.value?.data?.success) {
+                    setAnalysisResult(rpt.value.data.data);
+                }
+                if (vis.status === 'fulfilled' && vis.value?.data?.aggregate) {
+                    const agg = vis.value.data.aggregate;
+                    setVisualPerQuestion(agg.perQuestion);
+                    setVisualOverall(agg.overall);
+                }
+                if (aOver.status === 'fulfilled' && aOver.value?.data?.overall) {
+                    setAudioOverall(aOver.value.data.overall);
+                }
+                if (aPer.status === 'fulfilled' && aPer.value?.data?.rows) {
+                    const rows = aPer.value.data.rows as any[];
+                    setAudioPerQuestion(
+                        rows.map((r, idx) => ({
+                            questionNumber: idx + 1,
+                            question: qaList[idx]?.question ?? `질문 ${idx + 1}`,
+                            audioFeatures: r,
+                        })),
+                    );
+                }
+            } catch (e) {
+                // ignore
+            } finally {
+                setLoading(false);
+            }
+        })();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // ===== 클라이언트 측 리포트 산출 (QA/Audio/Visual 기반) =====

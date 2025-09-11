@@ -840,75 +840,20 @@ ${qaList
         console.log(`\n✅ 총 ${latestQAList.length}개의 질문에 답변했습니다.`);
         console.log('=====================================');
 
-        // 백엔드 API 호출하여 면접 분석 (임시 비활성화)
-        // message.loading('면접 결과를 분석 중입니다...', 0);
-        // try {
-        //     const requestData = formatMessagesForChatGPT(latestQAList);
-        //     console.log('🚀 백엔드 API 요청 데이터:');
-        //     console.log('=====================================');
-        //     console.log('📡 API 엔드포인트:', `${process.env.NEXT_PUBLIC_API_BASE_URL}/interview/analyze`);
-        //     console.log('📋 요청 메서드: POST');
-        //     console.log('📦 요청 헤더:', { 'Content-Type': 'application/json' });
-        //     console.log('📄 요청 바디:', JSON.stringify(requestData, null, 2));
-        //     console.log('=====================================');
-        //     console.log('🔧 백엔드 개발자용 cURL 명령어:');
-        //     console.log('=====================================');
-        //     console.log(`curl -X POST "${process.env.NEXT_PUBLIC_API_BASE_URL}/interview/analyze" \\`);
-        //     console.log(`  -H "Content-Type: application/json" \\`);
-        //     console.log(`  -d '${JSON.stringify(requestData)}'`);
-        //     console.log('=====================================');
-        //     const analysisResult = await interviewAnalysisMutation.mutateAsync(requestData);
-        //     message.destroy();
-        //     if (analysisResult.success) {
-        //         message.success('면접 분석이 완료되었습니다!');
-        //         console.log('🤖 면접 분석 결과:', analysisResult);
-        //         localStorage.setItem('interviewAnalysis', JSON.stringify(analysisResult.data));
-        //         localStorage.setItem('interviewQA', JSON.stringify(latestQAList));
-        //     } else {
-        //         console.error('❌ API 응답 실패:', analysisResult.error);
-        //         localStorage.setItem('interviewAnalysis', JSON.stringify({ error: true, message: analysisResult.error || '면접 분석에 실패했습니다.' }));
-        //         localStorage.setItem('interviewQA', JSON.stringify(latestQAList));
-        //     }
-        //     setTimeout(() => { window.location.href = '/ai-interview/result'; }, 2000);
-        // } catch (error) {
-        //     message.destroy();
-        //     console.error('❌ 면접 분석 API 호출 오류:', error);
-        //     localStorage.setItem('interviewAnalysis', JSON.stringify({ error: true, message: 'API 호출 중 오류가 발생했습니다. 네트워크 연결을 확인해주세요.' }));
-        //     localStorage.setItem('interviewQA', JSON.stringify(latestQAList));
-        //     setTimeout(() => { window.location.href = '/ai-interview/result'; }, 2000);
-        // }
-
-        // ▼ 임시: API 없이도 결과 페이지가 보이도록 기본 값 저장
+        // 백엔드 리포트 분석 호출로 전환
+        message.loading('면접 결과를 분석 중입니다...', 0);
         try {
-            localStorage.setItem('interviewQA', JSON.stringify(latestQAList));
-        } catch {}
-        try {
-            const fallback = {
-                overall_score: 75,
-                detailed_scores: { completeness: 7, specificity: 7, logic: 7, impression: 7 },
-                strengths: ['명확한 의사 전달', '안정적인 톤과 태도'],
-                improvements: ['구체적 사례 추가', '핵심 요약으로 마무리'],
-                detailed_feedback: Object.fromEntries(
-                    latestQAList.map((_, i) => [
-                        `question_${i + 1}`,
-                        { score: 7, feedback: '핵심 근거를 1-2개로 정리하면 더 설득력 있습니다.' },
-                    ]),
-                ),
-                overall_evaluation:
-                    '전반적으로 안정적인 태도와 전달력을 보였습니다. 다만 일부 답변에서 구체적 사례와 수치 기반 근거가 더해지면 완성도가 높아질 것입니다.',
-                recommendations: [
-                    'STAR(상황-과제-행동-결과) 구조로 답변 정리',
-                    '정량 지표(숫자, 성과) 1개 이상 포함',
-                    '결론-근거-요약 3단 구조로 말하기 연습',
-                ],
-            };
-            localStorage.setItem('interviewAnalysis', JSON.stringify(fallback));
-        } catch {}
-
-        // 결과 페이지로 바로 이동
-        setTimeout(() => {
-            window.location.href = '/ai-interview/result';
-        }, 1000);
+            const res = await api.post(`/report/${SESSION_ID}/analyze`, { qa: latestQAList }, { timeout: 60000 });
+            if (res.data?.success) {
+                localStorage.setItem('interviewAnalysis', JSON.stringify(res.data.data));
+            }
+        } catch (error) {
+            console.error('리포트 분석 호출 실패:', error);
+        } finally {
+            message.destroy();
+            try { localStorage.setItem('interviewQA', JSON.stringify(latestQAList)); } catch {}
+            setTimeout(() => { window.location.href = '/ai-interview/result'; }, 800);
+        }
     };
 
     // 답변 시작 - 원래 async 없었는데 밑에서 await 쓰면서 GPT가 추가
@@ -1011,6 +956,19 @@ ${qaList
                         );
                     } catch (e) {
                         console.warn('오디오 분석 실패:', e);
+                    }
+
+                    // 백엔드에 오디오 지표 업서트(서버 리포트 계산용)
+                    if (audioFeatures) {
+                        try {
+                            await api.post(
+                                `audio-metrics/${SESSION_ID}/${aggQid}`,
+                                audioFeatures,
+                                { timeout: 10000 },
+                            );
+                        } catch (e) {
+                            console.warn('오디오 지표 업서트 실패:', e);
+                        }
                     }
 
                     // ✅ Google STT 호출 (최종 답변 확정)
@@ -1135,6 +1093,7 @@ ${qaList
 
     // 마운트 시 "첫 질문" 준비 + 음성 인식 초기화
     useEffect(() => {
+        try { localStorage.setItem('aiInterviewSessionId', SESSION_ID); } catch {}
         (async () => {
             try {
                 const q = await fetchFirstQuestion();
