@@ -50,19 +50,6 @@ export default function Home() {
     return (
         <div>
             <Header />
-            <div className='w-full h-[237px] bg-blue-500'></div>
-            <div className='max-w-[1400px] w-full mx-auto px-4 md:px-6 pt-32 pb-52'>
-                <Space direction='vertical' size={100}>
-                    <JobCardList title='모두가 주목하고 있어요!' data={jobList} />
-                    <JobCardList title='리모트 근무 포지션' data={jobList} />
-                    <JobCardList
-                        title='출퇴근 걱정없는 역세권 포지션'
-                        data={jobList.concat([...jobList.slice(1)])}
-                        variant='small'
-                    />
-                    <JobCardList title='요즘 뜨는 포지션' data={jobList} />
-                </Space>
-            </div>
             <Footer />
         </div>
     );
