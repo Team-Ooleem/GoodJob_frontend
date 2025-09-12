@@ -1,27 +1,34 @@
 'use client';
 
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import {
     MessageCircle,
     Users,
     Mic,
-    Palette,
     Save,
     ArrowRight,
     CheckCircle,
-    Star,
     Heart,
     Lightbulb,
-    Play,
-    Volume2,
     PenTool,
 } from 'lucide-react';
+import MentorApplicationModal from './MentorApplicationModal';
 
 export default function MentoringMainContent() {
+    const [isModalOpen, setIsModalOpen] = useState(false);
+
+    const handleOpenModal = () => {
+        setIsModalOpen(true);
+    };
+
+    const handleCloseModal = () => {
+        setIsModalOpen(false);
+    };
+
     return (
-        <div className='min-h-screen bg-gradient-to-br font-["Inter",system-ui,-apple-system,sans-serif]'>
+        <div className='min-h-screen bg-gradient-to-br from-background to-muted font-["Inter",system-ui,-apple-system,sans-serif]'>
             {/* Hero Section */}
             <section className='relative px-4 py-20 lg:py-32 overflow-hidden'>
                 {/* Sky-Blue Gradient Background */}
@@ -67,14 +74,14 @@ export default function MentoringMainContent() {
                 <div className='relative max-w-7xl mx-auto'>
                     <div className='text-center space-y-10'>
                         {/* Badge */}
-                        <div className='inline-flex items-center space-x-3 bg-white/80 backdrop-blur-sm text-sky-600 px-6 py-3 rounded-full text-sm font-semibold shadow-lg border border-sky-100/50'>
+                        <div className='inline-flex items-center space-x-3 bg-card/80 backdrop-blur-sm text-sky-600 px-6 py-3 rounded-full text-sm font-semibold shadow-lg border border-border'>
                             <MessageCircle className='w-5 h-5' />
                             <span>멘토링</span>
                         </div>
 
                         {/* Main Headline */}
                         <div className='space-y-8'>
-                            <h1 className='text-5xl lg:text-7xl font-bold text-gray-900 leading-tight tracking-tight'>
+                            <h1 className='text-5xl lg:text-7xl font-bold text-foreground leading-tight tracking-tight'>
                                 당신의 작은 이야기가
                                 <br />
                                 <span className='bg-gradient-to-r from-sky-500 via-blue-500 to-sky-600 bg-clip-text text-transparent'>
@@ -82,11 +89,11 @@ export default function MentoringMainContent() {
                                 </span>
                             </h1>
 
-                            <div className='space-y-6 text-xl text-gray-700 max-w-4xl mx-auto leading-relaxed'>
-                                <p className='font-semibold text-2xl'>
+                            <div className='space-y-6 text-xl text-muted-foreground max-w-4xl mx-auto leading-relaxed'>
+                                <p className='font-semibold text-2xl text-foreground'>
                                     "이런 걸 어떻게 알려드리지?"
                                 </p>
-                                <p className='text-lg text-gray-600 leading-relaxed'>
+                                <p className='text-lg text-muted-foreground leading-relaxed'>
                                     그 고민이 시작이에요. 당신이 겪은 실패와 성공, 그 모든 순간들이
                                     <br />
                                     <span className='font-medium text-sky-600'>
@@ -94,7 +101,7 @@ export default function MentoringMainContent() {
                                     </span>
                                     이 될 거예요.
                                 </p>
-                                <p className='text-base text-gray-500 italic'>
+                                <p className='text-base text-muted-foreground/70 italic'>
                                     "내가 도움이 될까?" 그 마음만으로도 충분해요.
                                 </p>
                             </div>
@@ -104,6 +111,7 @@ export default function MentoringMainContent() {
                         <div className='pt-12'>
                             <Button
                                 size='lg'
+                                onClick={handleOpenModal}
                                 className='group relative bg-gradient-to-r from-sky-500 via-blue-500 to-sky-600 hover:from-sky-600 hover:via-blue-600 hover:to-sky-700 text-white px-16 py-8 text-2xl font-bold rounded-3xl shadow-2xl hover:shadow-4xl transition-all duration-500 transform hover:scale-110 hover:-translate-y-2 overflow-hidden'
                             >
                                 {/* Animated background gradient */}
@@ -120,7 +128,7 @@ export default function MentoringMainContent() {
                                 {/* Shine effect */}
                                 <div className='absolute inset-0 -top-2 -left-2 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000'></div>
                             </Button>
-                            <p className='mt-6 text-base text-gray-500 font-semibold'>
+                            <p className='mt-6 text-base text-muted-foreground font-semibold'>
                                 ✨ 무료로 시작 • 언제든 중단 가능 • 5분이면 준비 완료
                             </p>
                         </div>
@@ -132,16 +140,10 @@ export default function MentoringMainContent() {
             <section className='py-20 bg-gradient-to-br from-sky-50 via-blue-50 to-sky-100'>
                 <div className='max-w-7xl mx-auto px-4'>
                     <div className='text-center space-y-6 mb-16'>
-                        <h2 className='text-4xl lg:text-5xl font-extrabold text-gray-900 leading-tight tracking-tight'>
-                            <span className='bg-gradient-to-r from-gray-800 via-gray-700 to-gray-800 bg-clip-text text-transparent'>
-                                그냥 말해보세요
-                            </span>
-                            <br />
-                            <span className='text-3xl lg:text-4xl font-bold text-gray-600 mt-2 block'>
-                                그게 시작이에요
-                            </span>
+                        <h2 className='text-4xl lg:text-5xl font-extrabold text-foreground leading-tight tracking-tight'>
+                            그냥 말해보세요, 그게 시작이에요
                         </h2>
-                        <p className='text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed font-medium'>
+                        <p className='text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed font-medium'>
                             강의처럼 무겁지 않아요. 가볍게 대화하면서 지식을 나눌 수 있어요.
                         </p>
                     </div>
@@ -210,17 +212,17 @@ export default function MentoringMainContent() {
 
                     {/* Additional Benefits */}
                     <div className='grid md:grid-cols-2 gap-8'>
-                        <Card className='border-0 shadow-xl hover:shadow-2xl transition-shadow duration-200 bg-white/90 backdrop-blur-sm'>
+                        <Card className='border-0 shadow-xl hover:shadow-2xl transition-shadow duration-200 bg-card/90 backdrop-blur-sm'>
                             <CardContent className='p-8'>
                                 <div className='flex items-start space-x-4'>
-                                    <div className='w-14 h-14 bg-sky-100 rounded-2xl flex items-center justify-center flex-shrink-0'>
-                                        <Lightbulb className='w-7 h-7 text-sky-600' />
+                                    <div className='w-14 h-14 bg-sky-100 dark:bg-sky-900 rounded-2xl flex items-center justify-center flex-shrink-0'>
+                                        <Lightbulb className='w-7 h-7 text-sky-600 dark:text-sky-400' />
                                     </div>
                                     <div>
-                                        <h4 className='text-lg font-semibold text-gray-900 mb-3'>
+                                        <h4 className='text-lg font-semibold text-foreground mb-3'>
                                             내가 알고 있는 걸 정리하는 과정도 꽤 의미 있어요
                                         </h4>
-                                        <p className='text-gray-600 leading-relaxed'>
+                                        <p className='text-muted-foreground leading-relaxed'>
                                             서로 묻고 답하면서, 같이 성장해요. 지식을 설명하고
                                             전달하는 과정에서 본인의 이해도가 더욱 깊어집니다.
                                         </p>
@@ -229,17 +231,17 @@ export default function MentoringMainContent() {
                             </CardContent>
                         </Card>
 
-                        <Card className='border-0 shadow-xl hover:shadow-2xl transition-shadow duration-200 bg-white/90 backdrop-blur-sm'>
+                        <Card className='border-0 shadow-xl hover:shadow-2xl transition-shadow duration-200 bg-card/90 backdrop-blur-sm'>
                             <CardContent className='p-8'>
                                 <div className='flex items-start space-x-4'>
-                                    <div className='w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center flex-shrink-0'>
-                                        <Heart className='w-7 h-7 text-blue-600' />
+                                    <div className='w-14 h-14 bg-blue-100 dark:bg-blue-900 rounded-2xl flex items-center justify-center flex-shrink-0'>
+                                        <Heart className='w-7 h-7 text-blue-600 dark:text-blue-400' />
                                     </div>
                                     <div>
-                                        <h4 className='text-lg font-semibold text-gray-900 mb-3'>
+                                        <h4 className='text-lg font-semibold text-foreground mb-3'>
                                             당신의 경험, 누군가는 정말 궁금해해요
                                         </h4>
-                                        <p className='text-gray-600 leading-relaxed'>
+                                        <p className='text-muted-foreground leading-relaxed'>
                                             마음만 있다면, 누구나 멘토가 될 수 있어요. 특별한 사람이
                                             아니어도 괜찮아요. 그냥, 조금 더 먼저 겪은 사람이라면
                                             돼요.
@@ -269,6 +271,7 @@ export default function MentoringMainContent() {
                         <div className='pt-8'>
                             <Button
                                 size='lg'
+                                onClick={handleOpenModal}
                                 className='bg-white text-blue-600 hover:bg-gray-50 px-12 py-6 text-xl font-bold rounded-xl shadow-2xl hover:shadow-3xl transition-all duration-200 transform hover:scale-105'
                             >
                                 나의 경험, 나눠볼게요
@@ -282,6 +285,9 @@ export default function MentoringMainContent() {
                     </div>
                 </div>
             </section>
+
+            {/* 멘토 지원 모달 */}
+            <MentorApplicationModal isOpen={isModalOpen} onClose={handleCloseModal} />
         </div>
     );
 }
