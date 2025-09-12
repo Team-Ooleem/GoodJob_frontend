@@ -20,12 +20,15 @@ import {
     Target,
     PenTool,
 } from 'lucide-react';
+import { useTheme } from 'next-themes';
 
 export default function MentoringLandingContent() {
     const [showAllServices, setShowAllServices] = useState(false);
+    const { setTheme } = useTheme();
 
     const scrollToList = useCallback(() => {
-        document.getElementById('coaching-list')?.scrollIntoView({ behavior: 'smooth' });
+        // document.getElementById('coaching-list')?.scrollIntoView({ behavior: 'smooth' });
+        setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
     }, []);
 
     const loadMoreServices = useCallback(() => {
@@ -33,13 +36,16 @@ export default function MentoringLandingContent() {
     }, []);
 
     return (
-        <div className='min-h-screen bg-gray-950 text-white'>
+        <div className='min-h-screen bg-background'>
             {/* HERO */}
             <section className='relative overflow-hidden'>
-                <div className='absolute inset-0 bg-[radial-gradient(1000px_600px_at_80%_-10%,#3b82f6_0%,transparent_60%),radial-gradient(900px_500px_at_10%_-10%,#2563eb_0%,transparent_55%)] opacity-40' />
+                {/* <div className='absolute inset-0 bg-[radial-gradient(1000px_600px_at_80%_-10%,var(--chart-1)_0%,transparent_60%),radial-gradient(900px_500px_at_10%_-10%,var(--chart-2)_0%,transparent_55%)] opacity-40' /> */}
                 <div className='max-w-7xl mx-auto px-4 pt-28 pb-20 lg:pt-40 lg:pb-36 relative'>
                     <div className='text-center space-y-8'>
-                        <Badge className='mx-auto bg-white/10 text-white border-white/20 backdrop-blur text-sm sm:text-base'>
+                        <Badge
+                            variant='outline'
+                            className='mx-auto bg-input text-foreground border-white/20 backdrop-blur text-sm sm:text-base'
+                        >
                             현직자 1:1 · 실시간 피드백 · 포트폴리오/자소서
                         </Badge>
                         <h1 className='text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.1]'>
@@ -50,7 +56,7 @@ export default function MentoringLandingContent() {
                                 현직자와 함께하는 이력서 코칭
                             </span>
                         </h1>
-                        <p className='text-base sm:text-lg text-white/70 max-w-3xl mx-auto'>
+                        <p className='text-base sm:text-lg foreground max-w-3xl mx-auto'>
                             실시간으로 고도화하는 이력서/자소서 코칭.
                         </p>
                         <div className='flex justify-center pt-4'>
@@ -63,7 +69,7 @@ export default function MentoringLandingContent() {
                                 <ArrowRight className='ml-2 h-5 w-5 transition-transform group-hover:translate-x-1' />
                             </Button>
                         </div>
-                        <div className='flex items-center justify-center gap-6 pt-6 text-white/70'>
+                        <div className='flex items-center justify-center gap-6 pt-6 foreground'>
                             <p className='flex items-center gap-2'>
                                 <Star className='h-4 w-4 text-yellow-400' /> 평균 평점 4.9/5.0
                             </p>
@@ -79,41 +85,41 @@ export default function MentoringLandingContent() {
             </section>
 
             {/* IMPACT / GROWTH (항해99 무드) */}
-            <section className='relative overflow-hidden bg-[#0b0d13] text-white'>
+            <section className='relative overflow-hidden sidebar-primary'>
                 {/* 배경 그라데이션 */}
-                <div
+                {/* <div
                     className='pointer-events-none absolute inset-0 opacity-40
                   bg-[radial-gradient(900px_500px_at_80%_-10%,#2563eb_0%,transparent_60%),
                       radial-gradient(900px_450px_at_10%_-20%,#0ea5e9_0%,transparent_65%)]'
-                />
+                /> */}
                 <div className='relative max-w-7xl mx-auto px-4 py-20'>
                     <div className='max-w-3xl'>
                         <h3 className='text-2xl md:text-3xl font-extrabold'>
                             설계가 바꾼 서류 통과율
                         </h3>
-                        <p className='mt-3 text-white/70'>
-                            단순 구현 역량만으론 부족한 시대. 직무 적합도 중심의 문서 설계는 서류
-                            통과율과 인터뷰 콜백을 크게 끌어올립니다.
+                        <p className='mt-3 foreground'>
+                            단순 작성만으론 부족한 시대. 직무 적합도 중심의 문서 설계는 서류
+                            통과율을 크게 끌어올립니다.
                         </p>
                     </div>
 
                     {/* 범례 */}
                     <div className='mt-8 flex items-center gap-6 text-sm'>
                         <div className='flex items-center gap-2'>
-                            <span className='inline-block h-2 w-6 rounded bg-blue-500' /> 서류
-                            통과율(설계 적용)
+                            <span className='inline-block h-2 w-6 rounded bg-blue-500' /> 코칭 작성
                         </div>
                         <div className='flex items-center gap-2'>
-                            <span className='inline-block h-2 w-6 rounded bg-white/40' /> 일반 작성
+                            <span className='inline-block h-2 w-6 rounded bg-muted-foreground' />{' '}
+                            일반 작성
                         </div>
                     </div>
 
                     {/* 차트 (SVG) */}
-                    <div className='mt-6 rounded-2xl bg-white/[0.03] border border-white/10 p-6'>
+                    <div className='mt-6 rounded-2xl bg-card border border-border p-6'>
                         <div className='aspect-[16/7]'>
                             <svg viewBox='0 0 1200 500' className='w-full h-full'>
                                 {/* grid */}
-                                <g stroke='rgba(255,255,255,0.08)' strokeWidth='1'>
+                                <g stroke='var(--border)' strokeWidth='1'>
                                     {[...Array(6)].map((_, i) => (
                                         <line
                                             key={i}
@@ -158,7 +164,7 @@ export default function MentoringLandingContent() {
                                         y={420 - b.h}
                                         width='36'
                                         height={b.h}
-                                        fill='rgba(255,255,255,0.18)'
+                                        fill='oklch(0.556 0 0)'
                                         rx='8'
                                     />
                                 ))}
@@ -189,7 +195,7 @@ export default function MentoringLandingContent() {
                                         y='460'
                                         textAnchor='middle'
                                         fontSize='20'
-                                        fill='rgba(255,255,255,0.7)'
+                                        fill='var(--foreground)'
                                     >
                                         {t}
                                     </text>
@@ -208,8 +214,8 @@ export default function MentoringLandingContent() {
                                 </defs>
                             </svg>
                         </div>
-                        <p className='mt-3 text-xs text-white/50'>
-                            * 직무 적합도 중심의 문서 설계 적용 전/후 비교
+                        <p className='mt-3 text-xs muted-foreground'>
+                            * 코칭 수강 전/후 평균 서류 통과율 비교
                         </p>
                     </div>
                 </div>
@@ -218,15 +224,12 @@ export default function MentoringLandingContent() {
             {/* CAPABILITY (페이드 인/아웃 배경) */}
             <section className='relative isolate'>
                 {/* 아래로 서서히 진해지는 페이드 */}
-                <div
-                    className='absolute inset-x-0 bottom-0 h-40 pointer-events-none -z-10
-               bg-gradient-to-b from-transparent to-[#0a0a0a]'
-                />
+
                 <div className='max-w-7xl mx-auto px-4 py-20'>
-                    <h3 className='text-2xl md:text-3xl font-extrabold text-white text-center'>
+                    <h3 className='text-2xl md:text-3xl font-extrabold foreground text-center'>
                         이제, 실력의 기준은 <span className='text-blue-400'>설계력</span>
                     </h3>
-                    <p className='mt-3 text-center text-white/70 max-w-3xl mx-auto'>
+                    <p className='mt-3 text-center muted-foreground max-w-3xl mx-auto'>
                         문제 정의부터 구조 설계, 지표화까지. 문서 한 장에도 전략이 스며들어야
                         합니다.
                     </p>
@@ -246,8 +249,10 @@ export default function MentoringLandingContent() {
                                 <div className='h-10 w-10 rounded-xl bg-blue-600/90 flex items-center justify-center text-white font-bold'>
                                     {it.n.split('.')[0]}
                                 </div>
-                                <h4 className='mt-4 text-white font-semibold'>{it.n}</h4>
-                                <p className='mt-2 text-white/70 text-sm leading-relaxed'>{it.d}</p>
+                                <h4 className='mt-4 muted-foreground font-semibold'>{it.n}</h4>
+                                <p className='mt-2 muted-foreground70 text-sm leading-relaxed'>
+                                    {it.d}
+                                </p>
                             </div>
                         ))}
                     </div>
@@ -480,29 +485,6 @@ export default function MentoringLandingContent() {
                         ) : (
                             <p className='text-gray-500 text-sm'>모든 서비스를 확인했습니다</p>
                         )}
-                    </div>
-                </div>
-            </section>
-
-            {/* TRUST */}
-            <section className='bg-gray-900 text-white border-t border-gray-700'>
-                <div className='max-w-7xl mx-auto px-4 py-16'>
-                    <div className='grid md:grid-cols-3 gap-6'>
-                        <TrustCard
-                            icon={<ShieldCheck className='h-6 w-6' />}
-                            title='안전 보장'
-                            desc='결제 보호 및 약관 기반 분쟁 대응'
-                        />
-                        <TrustCard
-                            icon={<Crown className='h-6 w-6' />}
-                            title='검증된 코치'
-                            desc='실무 경력/리뷰 기반 선별'
-                        />
-                        <TrustCard
-                            icon={<Sparkles className='h-6 w-6' />}
-                            title='만족도 4.9'
-                            desc='실사용자 리뷰로 검증된 품질'
-                        />
                     </div>
                 </div>
             </section>
