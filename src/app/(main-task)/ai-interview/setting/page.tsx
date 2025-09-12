@@ -107,12 +107,12 @@ class WavRecorder {
     }
 }
 
-const AI_API_BASE = process.env.AI_API_BASE;
+const AUDIO_API_BASE = process.env.NEXT_PUBLIC_AUDIO_API_BASE;
 async function analyzeAudioBlob(blob: Blob) {
-    if (!AI_API_BASE) return null;
+    if (!AUDIO_API_BASE) return null;
     const form = new FormData();
     form.append('file', blob, 'calibration.wav');
-    const res = await axios.post(`${AI_API_BASE}/audio/analyze`, form, { timeout: 60000 });
+    const res = await axios.post(`${AUDIO_API_BASE}/audio/analyze`, form, { timeout: 60000 });
     return res.data?.features ?? null;
 }
 
@@ -130,7 +130,7 @@ export default function AiInterviewSettingCalibrationCombined() {
     const [micOk, setMicOk] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
 
-    const CALI_TEXT = '나는 어려움을 이겨내며 성장한다.';
+    const CALI_TEXT = '나는 핀토스를 부순다.';
 
     useEffect(() => {
         if (phase !== 'running') return;
@@ -188,7 +188,7 @@ export default function AiInterviewSettingCalibrationCombined() {
             await recRef.current.start();
         } catch (e: any) {
             setPhase('idle');
-            setError(e?.message || '캘리브레이션 시작 실패');
+            setError(e?.message || '모의면접 준비 실패');
         }
     };
 
@@ -223,7 +223,7 @@ export default function AiInterviewSettingCalibrationCombined() {
             );
             setPhase('done');
         } catch (e: any) {
-            setError(e?.message || '캘리브레이션 종료 실패');
+            setError(e?.message || '환경설정 실패');
             setPhase('idle');
         }
     };
@@ -280,19 +280,18 @@ export default function AiInterviewSettingCalibrationCombined() {
                         {/* Video Container */}
                         <div className='relative mb-6'>
                             <div
-                                className='rounded-2xl overflow-hidden shadow-lg relative bg-gray-100'
-                                style={{ width: 640, height: 360 }}
+                                className='rounded-3xl overflow-hidden shadow-md relative'
+                                style={{ width: 720, height: 405, background: '#e5e7eb' }}
                             >
-                                <Webcam ref={webcamRef} width={640} height={360} overlayGuide />
+                                <Webcam ref={webcamRef} width={720} height={405} overlayGuide />
                             </div>
-
-                            {/* Recording Controls */}
-                            <div className='absolute -bottom-6 left-1/2 transform -translate-x-1/2'>
+                            {/* 버튼을 영상 아래의 흰색 베이스 위에 배치 */}
+                            <div className='w-[720px] bg-white rounded-b-3xl shadow-sm flex items-center justify-center gap-4 py-6 -mt-1'>
                                 {phase !== 'running' ? (
                                     <button
                                         onClick={startCalibration}
-                                        className='w-16 h-16 rounded-full bg-white shadow-lg flex items-center justify-center hover:scale-110 transition-all duration-200 border-4 border-gray-100'
-                                        aria-label='환경 테스트 시작'
+                                        className='w-16 h-16 rounded-full bg-white shadow-md flex items-center justify-center hover:scale-105 transition'
+                                        aria-label='기준 측정 시작'
                                     >
                                         <span className='w-6 h-6 rounded-full bg-red-500 block'></span>
                                     </button>
@@ -300,42 +299,39 @@ export default function AiInterviewSettingCalibrationCombined() {
                                     <button
                                         onClick={stopCalibration}
                                         disabled={isProcessing}
-                                        className={`w-16 h-16 rounded-full shadow-lg flex items-center justify-center hover:scale-110 transition-all duration-200 border-4 border-gray-100 ${isProcessing ? 'bg-red-300' : 'bg-red-500'}`}
-                                        aria-label='테스트 완료'
+                                        className={`w-16 h-16 rounded-full shadow-md flex items-center justify-center hover:scale-105 transition ${isProcessing ? 'bg-red-300' : 'bg-red-500'}`}
+                                        aria-label='중지 및 결과 산출'
                                     >
-                                        <span className='w-4 h-4 rounded-sm bg-white block'></span>
+                                        <span className='w-3 h-3 rounded-full bg-white block animate-pulse'></span>
                                     </button>
                                 )}
+                                {phase === 'done' && (
+                                    <Button
+                                        onClick={resetCalibration}
+                                        size='small'
+                                        disabled={isProcessing}
+                                    >
+                                        다시 녹음하기
+                                    </Button>
+                                )}
                             </div>
-                        </div>
 
-                        {/* Test Instructions */}
-                        <div className='w-full max-w-2xl mb-8'>
-                            <div className='bg-gradient-to-r from-blue-50 to-green-50 rounded-2xl p-6 border border-blue-100'>
-                                <div className='text-center'>
-                                    <h3 className='text-xl font-semibold text-gray-800 mb-3'>
-                                        📢 테스트 문장을 읽어주세요
-                                    </h3>
-                                    <blockquote className='text-2xl font-medium text-green-600 italic mb-4'>
-                                        "{CALI_TEXT}"
-                                    </blockquote>
-                                    <p className='text-gray-600'>
-                                        녹화 버튼을 누르고 위 문장을 자연스럽게 읽어주세요
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
+                            {/* 진행률/타이머 UI 제거 (요청) */}
 
-                        {/* Action Buttons */}
-                        <div className='flex gap-4 items-center'>
-                            {phase === 'done' && (
+                            {/* 캘리브레이션 문장 */}
+                            <blockquote className='text-2xl text-green-500/80 italic text-center px-6 py-4 border rounded-2xl bg-green-50/40'>
+                                “{CALI_TEXT}”
+                            </blockquote>
+
+                            {/* 액션들 */}
+                            <div className='mt-6 flex gap-3'>
                                 <Button
                                     onClick={resetCalibration}
                                     size='lg'
                                     className='h-12 px-6 text-base rounded-xl'
                                     disabled={isProcessing}
                                 >
-                                    다시 테스트하기
+                                    AI 모의면접 시작하기
                                 </Button>
                             )}
 
@@ -377,9 +373,9 @@ export default function AiInterviewSettingCalibrationCombined() {
                                 ))}
                             </div>
                         </div>
-                    </div>
-                )}
-            </Card>
+                    </Card>
+                </div>
+            </div>
         </div>
     );
 }
