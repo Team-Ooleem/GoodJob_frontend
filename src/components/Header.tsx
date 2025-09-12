@@ -25,7 +25,7 @@ export function Header() {
 
     return (
         <div className='w-full h-auto'>
-            <div className='mx-auto max-w-[1400px] w-full px-4 md:px-6 h-[60px] flex justify-between items-center'>
+            <div className='mx-auto max-w-[1300px] w-full px-4 md:px-6 h-[60px] flex justify-between items-center'>
                 <HeaderNavigation />
                 {/* TODO: 아래 div box의 사용 방법이 잘못됐습니다. 개선할 예정입니다. */}
                 <div className='justify-center items-center gap-1.5'>
