@@ -10,23 +10,25 @@ import { api } from '@/apis/api';
 const { Title, Paragraph, Text } = Typography;
 
 // 타입 정의
-interface Resume {
-    id: number;
-    title: string;
-    position: string;
-    company: string;
+interface ResumeFileItem {
+    id: string;
+    originalName: string;
+    url: string;
+    size: number;
+    mimetype: string;
+    hasSummary: boolean;
+    parseStatus: string; // 'none' | 'pending' | 'processing' | 'done' | 'error'
     createdAt: string;
-    experience: string;
-    skills: string[];
 }
 
 export default function AiInterviewSelectPage() {
-    const [resumes, setResumes] = useState<Resume[]>([]);
+    const [resumes, setResumes] = useState<ResumeFileItem[]>([]);
     const [loading, setLoading] = useState(true);
-    const [selectedResume, setSelectedResume] = useState<number | null>(null);
+    const [selectedResume, setSelectedResume] = useState<string | null>(null);
     const [jobPostUrl, setJobPostUrl] = useState('');
     const [activeTab, setActiveTab] = useState('resume');
     const [buttonAnimation, setButtonAnimation] = useState(false);
+    const [uploading, setUploading] = useState(false);
     const router = useRouter();
 
     // JWT 쿠키 기반 사용자 정보 조회
@@ -39,10 +41,11 @@ export default function AiInterviewSelectPage() {
         }
     }, [userId]);
 
-    const fetchResumes = async (uid: number) => {
+    const fetchResumes = async (_uid: number) => {
         try {
             setLoading(true);
-            const { data } = await api.get<Resume[]>(`/resumes/user/${uid}`);
+            // 백엔드 변경에 맞춰 내 이력서 파일 목록 API 사용
+            const { data } = await api.get<ResumeFileItem[]>(`/resume-files`);
             setResumes(data);
         } catch (error) {
             console.error('Error fetching resumes:', error);
@@ -52,7 +55,7 @@ export default function AiInterviewSelectPage() {
         }
     };
 
-    const handleResumeSelect = (resumeId: number) => {
+    const handleResumeSelect = (resumeId: string) => {
         setSelectedResume(resumeId);
         // 버튼 애니메이션 트리거
         setButtonAnimation(true);
@@ -86,7 +89,16 @@ export default function AiInterviewSelectPage() {
         // 선택된 이력서 또는 프로필 기반 데이터 저장
         if (resumes.length > 0 && selectedResume) {
             const selectedResumeData = resumes.find((resume) => resume.id === selectedResume);
-            sessionStorage.setItem('selectedResume', JSON.stringify(selectedResumeData));
+            if (!selectedResumeData) {
+                message.error('선택한 이력서를 확인할 수 없습니다.');
+                return;
+            }
+            if (!selectedResumeData.hasSummary || selectedResumeData.parseStatus !== 'done') {
+                message.warning('이력서 요약 생성 중입니다. 완료 후 다시 시도해주세요.');
+                return;
+            }
+            // 신규: 서버에서 요약을 찾아 쓰도록 파일 ID 저장
+            sessionStorage.setItem('selectedResumeId', selectedResumeData.id);
             sessionStorage.setItem('interviewType', 'resume-based');
         } else {
             // 프로필 기반 면접
@@ -98,6 +110,36 @@ export default function AiInterviewSelectPage() {
         message.success('환경 체크를 진행합니다.');
         router.push('/ai-interview/setting');
     };
+
+    const handleUploadFile = async (file: File) => {
+        if (!file) return;
+        if (file.type !== 'application/pdf') {
+            message.error('PDF 파일만 업로드할 수 있습니다.');
+            return;
+        }
+        try {
+            setUploading(true);
+            const form = new FormData();
+            form.append('file', file);
+            const uploadRes = await api.post(`resume-files`, form, {
+                timeout: 120000,
+            });
+            const { id } = uploadRes.data as { id: string };
+            // 업로드 직후 비동기 파싱/요약 시작
+            await api.post(`resume-files/${id}/parse`);
+            message.success('업로드 완료! 요약을 생성 중입니다. 잠시 후 새로고침됩니다.');
+            // 조금 있다 목록 새로고침
+            setTimeout(() => fetchResumes(userId as number), 1200);
+        } catch (e: any) {
+            console.error('파일 업로드 실패', e);
+            message.error('파일 업로드에 실패했습니다.');
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    // 자동 폴링 제거됨: 사용자가 업로드 후 1회 새로고침만 수행하고,
+    // 그 외에는 수동으로 목록을 새로고침하거나 다시 진입하여 확인합니다.
 
     if (loading || authLoading) {
         return (
@@ -117,6 +159,11 @@ export default function AiInterviewSelectPage() {
             label: '채용공고 선택',
         },
     ];
+
+    // 버튼 활성화 상태 계산
+    const selectedItem = selectedResume ? resumes.find((r) => r.id === selectedResume) : null;
+    const isResumeReady = resumes.length === 0 ? true : !!(selectedItem && selectedItem.hasSummary && selectedItem.parseStatus === 'done');
+    const canStart = jobPostUrl.trim().length > 0 && isResumeReady && (resumes.length === 0 || !!selectedResume);
 
     return (
         <div className='min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4'>
@@ -177,17 +224,42 @@ export default function AiInterviewSelectPage() {
                                             <div className='flex items-center justify-between'>
                                                 <div>
                                                     <Text className='font-semibold text-gray-900'>
-                                                        {resume.title}
+                                                        {resume.originalName}
                                                     </Text>
                                                     <div className='text-sm text-gray-600 mt-1'>
-                                                        {resume.position} · {resume.company}
+                                                        업로드: {new Date(resume.createdAt).toLocaleString()}
                                                     </div>
                                                 </div>
-                                                {selectedResume === resume.id && (
-                                                    <div className='w-5 h-5 bg-green-500 rounded-full flex items-center justify-center'>
-                                                        <div className='w-2 h-2 bg-white rounded-full'></div>
-                                                    </div>
-                                                )}
+                                                <div className='flex items-center gap-2'>
+                                                    <span
+                                                        className={
+                                                            'px-2 py-1 rounded text-xs ' +
+                                                            (resume.parseStatus === 'done'
+                                                                ? 'bg-green-100 text-green-700'
+                                                                : resume.parseStatus === 'processing' ||
+                                                                    resume.parseStatus === 'pending'
+                                                                  ? 'bg-yellow-100 text-yellow-700'
+                                                                  : resume.parseStatus === 'error'
+                                                                    ? 'bg-red-100 text-red-700'
+                                                                    : 'bg-gray-100 text-gray-600')
+                                                        }
+                                                    >
+                                                        {resume.parseStatus === 'done'
+                                                            ? '요약 완료'
+                                                            : resume.parseStatus === 'processing'
+                                                              ? '요약 중'
+                                                              : resume.parseStatus === 'pending'
+                                                                ? '대기 중'
+                                                                : resume.parseStatus === 'error'
+                                                                  ? '오류'
+                                                                  : '미설정'}
+                                                    </span>
+                                                    {selectedResume === resume.id && (
+                                                        <div className='w-5 h-5 bg-green-500 rounded-full flex items-center justify-center'>
+                                                            <div className='w-2 h-2 bg-white rounded-full'></div>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     ))}
@@ -202,6 +274,25 @@ export default function AiInterviewSelectPage() {
                                     </p>
                                 </div>
                             )}
+                            {/* 업로드 영역 */}
+                            <div className='mt-4'>
+                                <label className='block text-gray-700 font-medium mb-2'>PDF 업로드</label>
+                                <input
+                                    type='file'
+                                    accept='application/pdf'
+                                    onChange={(e) => {
+                                        const f = e.target.files?.[0];
+                                        if (f) handleUploadFile(f);
+                                        // reset input so selecting the same file again still triggers change
+                                        e.currentTarget.value = '';
+                                    }}
+                                    disabled={uploading}
+                                    className='block w-full text-gray-700'
+                                />
+                                {uploading && (
+                                    <p className='text-sm text-gray-500 mt-2'>업로드 중…</p>
+                                )}
+                            </div>
                         </div>
                     )}
 
@@ -271,19 +362,16 @@ export default function AiInterviewSelectPage() {
                                 buttonAnimation ? 'animate-pulse scale-105' : ''
                             }`}
                             onClick={handleStartInterview}
-                            disabled={
-                                resumes.length > 0
-                                    ? !selectedResume || !jobPostUrl.trim()
-                                    : !jobPostUrl.trim()
-                            }
+                            disabled={!canStart}
                         >
-                            {resumes.length > 0
-                                ? !selectedResume || !jobPostUrl.trim()
-                                    ? '면접 설정을 완료해주세요'
-                                    : '면접 환경 체크하기'
-                                : !jobPostUrl.trim()
-                                  ? '면접 설정을 완료해주세요'
-                                  : '면접 환경 체크하기'}
+                            {(() => {
+                                if (resumes.length === 0) {
+                                    return jobPostUrl.trim() ? '면접 환경 체크하기' : '면접 설정을 완료해주세요';
+                                }
+                                if (!selectedResume || !jobPostUrl.trim()) return '면접 설정을 완료해주세요';
+                                if (!isResumeReady) return '요약 생성 중…';
+                                return '면접 환경 체크하기';
+                            })()}
                         </Button>
                         <div className='mt-4'>
                             <Button
