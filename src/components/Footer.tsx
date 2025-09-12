@@ -1,8 +1,11 @@
+import { Separator } from '@/components/ui/separator';
+
 export function Footer() {
     return (
-        <footer className='w-full h-[130px] border-t border-neutral-200'>
+        <footer className='w-full h-[130px]'>
+            <Separator />
             <div className='mx-auto w-full max-w-[1400px] px-4 py-6'>
-                <p className='text-sm text-neutral-500'>ⓒ 2025 Team Ooleem</p>
+                <p className='text-sm'>ⓒ 2025 Team Ooleem</p>
             </div>
         </footer>
     );

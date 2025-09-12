@@ -8,6 +8,7 @@ import { Flex } from 'antd';
 import { HeaderNavigation } from './HeaderNavigation';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
 
 export function Header() {
     const router = useRouter();
@@ -23,18 +24,11 @@ export function Header() {
     };
 
     return (
-        <div className='w-full h-auto border-b border-gray-200'>
+        <div className='w-full h-auto'>
             <div className='mx-auto max-w-[1400px] w-full px-4 md:px-6 h-[60px] flex justify-between items-center'>
-                <Flex justify='center' align='center' gap={30}>
-                    <Image
-                        src='/assets/good-job-logo.webp'
-                        alt='올인원 채용 플랫폼 굿잡'
-                        width={40}
-                        height={40}
-                    />
-                    <HeaderNavigation />
-                </Flex>
-                <Flex justify='center' align='center' gap={6}>
+                <HeaderNavigation />
+                {/* TODO: 아래 div box의 사용 방법이 잘못됐습니다. 개선할 예정입니다. */}
+                <div className='justify-center items-center gap-1.5'>
                     {isLoading ? (
                         <Button variant='ghost' disabled={isLoading}>
                             로딩...
@@ -58,8 +52,9 @@ export function Header() {
                             로그인
                         </Button>
                     )}
-                </Flex>
+                </div>
             </div>
+            <Separator />
         </div>
     );
 }
