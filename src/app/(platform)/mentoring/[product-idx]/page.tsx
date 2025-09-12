@@ -1,5 +1,5 @@
-// global components
 import { MentorProductProfile, BuyCard, StarRating } from '@/components/mentoring';
+import { ScrollToNavigator } from '../_components';
 
 export default function ProductDetailPage() {
     return (
@@ -28,7 +28,8 @@ export default function ProductDetailPage() {
                     </div>
                 </div>
             </div>
-            <aside className='w-[1140px] h-0 mx-auto sticky top-3 flex justify-end -mt-48'>
+            <ScrollToNavigator />
+            <aside className='w-[1140px] h-0 mx-auto sticky top-3 flex justify-end'>
                 <div className='flex flex-col gap-2'>
                     <MentorProductProfile />
                     <BuyCard />
