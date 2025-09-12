@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { MarkdownEditor } from '@/components/MarkdownEditor';
 import { X, Mail, User, Phone, Briefcase, FileText, Link, Send } from 'lucide-react';
+import { useJobCategories, useCreateMentorApplication } from '../_hooks/useMentorApplication';
+import { CreateMentorApplicationDto } from '../_apis/mentor-api';
 
 interface MentorApplicationModalProps {
     isOpen: boolean;
@@ -23,14 +25,6 @@ interface MentorApplicationForm {
     links: string;
 }
 
-const FIELD_OPTIONS = [
-    { value: 'development', label: '개발/프로그래밍' },
-    { value: 'game-dev', label: '게임개발' },
-    { value: 'security', label: '보안' },
-    { value: 'marketing', label: '직무/마케팅/커리어' },
-    { value: 'design', label: '디자인' },
-];
-
 export default function MentorApplicationModal({ isOpen, onClose }: MentorApplicationModalProps) {
     const [formData, setFormData] = useState<MentorApplicationForm>({
         email: '',
@@ -40,7 +34,15 @@ export default function MentorApplicationModal({ isOpen, onClose }: MentorApplic
         introduction: '',
         links: '',
     });
-    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    // React Query 훅들
+    const {
+        data: categories = [],
+        isLoading: categoriesLoading,
+        error: categoriesError,
+    } = useJobCategories();
+    const { mutate: createApplication, isPending: isSubmitting } = useCreateMentorApplication();
 
     // 필수 필드 검증
     const isFormValid =
@@ -49,6 +51,15 @@ export default function MentorApplicationModal({ isOpen, onClose }: MentorApplic
         formData.phone.trim() !== '' &&
         formData.field !== '' &&
         formData.introduction.trim() !== '';
+
+    // 카테고리 에러 처리
+    useEffect(() => {
+        if (categoriesError) {
+            setError('카테고리를 불러오는데 실패했습니다.');
+        } else {
+            setError(null);
+        }
+    }, [categoriesError]);
 
     // Body scroll lock when modal is open
     useEffect(() => {
@@ -71,32 +82,43 @@ export default function MentorApplicationModal({ isOpen, onClose }: MentorApplic
         }));
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        setIsSubmitting(true);
+        setError(null);
 
-        try {
-            // TODO: API 호출로 멘토 지원 데이터 전송
-            console.log('멘토 지원 데이터:', formData);
+        // API 요청 데이터 변환
+        const applicationData: CreateMentorApplicationDto = {
+            contact_email: formData.email,
+            business_name: formData.name,
+            contact_phone: formData.phone,
+            preferred_field_id: parseInt(formData.field),
+            introduction: formData.introduction,
+            portfolio_link: formData.links || undefined,
+        };
 
-            // 임시로 2초 대기
-            await new Promise((resolve) => setTimeout(resolve, 2000));
-
-            // 성공 시 모달 닫기
-            onClose();
-            setFormData({
-                email: '',
-                name: '',
-                phone: '',
-                field: '',
-                introduction: '',
-                links: '',
-            });
-        } catch (error) {
-            console.error('멘토 지원 실패:', error);
-        } finally {
-            setIsSubmitting(false);
-        }
+        createApplication(applicationData, {
+            onSuccess: (result) => {
+                if (result.success) {
+                    // 성공 시 모달 닫기
+                    onClose();
+                    setFormData({
+                        email: '',
+                        name: '',
+                        phone: '',
+                        field: '',
+                        introduction: '',
+                        links: '',
+                    });
+                    alert(result.message);
+                } else {
+                    setError(result.message);
+                }
+            },
+            onError: (error) => {
+                console.error('멘토 지원 실패:', error);
+                setError('멘토 지원 중 오류가 발생했습니다.');
+            },
+        });
     };
 
     if (!isOpen) return null;
@@ -107,11 +129,14 @@ export default function MentorApplicationModal({ isOpen, onClose }: MentorApplic
     return createPortal(
         <div className='fixed inset-0 z-[9999] flex items-center justify-center p-2 sm:p-4'>
             {/* 배경 오버레이 */}
-            <div className='absolute inset-0 bg-black/70 backdrop-blur-sm' onClick={onClose} />
+            <div
+                className='absolute inset-0 bg-black/70 dark:bg-black/80 backdrop-blur-sm'
+                onClick={onClose}
+            />
 
             {/* 모달 컨텐츠 */}
-            <Card className='relative w-full max-w-xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden shadow-2xl rounded-lg sm:rounded-xl'>
-                <CardHeader className='bg-gradient-to-r from-sky-500 to-blue-600 text-white p-2 sm:p-6'>
+            <Card className='relative w-full max-w-xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden shadow-2xl rounded-lg sm:rounded-xl bg-card dark:bg-slate-900 border-border dark:border-slate-700'>
+                <CardHeader className='bg-gradient-to-r from-sky-500 to-blue-600 dark:from-sky-600 dark:to-blue-700 text-white p-2 sm:p-6'>
                     <div className='flex items-center justify-between'>
                         <CardTitle className='text-xl sm:text-2xl font-bold flex items-center space-x-2 sm:space-x-3'>
                             <span>멘토 지원하기</span>
@@ -125,7 +150,7 @@ export default function MentorApplicationModal({ isOpen, onClose }: MentorApplic
                             <X className='w-5 h-5' />
                         </Button>
                     </div>
-                    <p className='text-sky-100 text-sm sm:text-base'>
+                    <p className='text-sky-100 dark:text-sky-200 text-sm sm:text-base'>
                         당신의 경험을 나누고 싶다면, 지금 지원해보세요!
                     </p>
                 </CardHeader>
@@ -207,22 +232,35 @@ export default function MentorApplicationModal({ isOpen, onClose }: MentorApplic
                                     희망분야 <span className='text-red-500'>*</span>
                                 </span>
                             </Label>
-                            <div className='flex flex-wrap gap-2'>
-                                {FIELD_OPTIONS.map((option) => (
-                                    <button
-                                        key={option.value}
-                                        type='button'
-                                        onClick={() => handleInputChange('field', option.value)}
-                                        className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
-                                            formData.field === option.value
-                                                ? 'bg-sky-500 text-white shadow-md border border-transparent'
-                                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
-                                        }`}
-                                    >
-                                        {option.label}
-                                    </button>
-                                ))}
-                            </div>
+                            {categoriesLoading ? (
+                                <div className='flex items-center justify-center py-4'>
+                                    <div className='w-6 h-6 border-2 border-sky-500 border-t-transparent rounded-full animate-spin' />
+                                    <span className='ml-2 text-sm text-muted-foreground'>
+                                        카테고리 로딩 중...
+                                    </span>
+                                </div>
+                            ) : error ? (
+                                <div className='text-red-500 text-sm py-2'>{error}</div>
+                            ) : (
+                                <div className='flex flex-wrap gap-2'>
+                                    {categories.map((category) => (
+                                        <button
+                                            key={category.id}
+                                            type='button'
+                                            onClick={() =>
+                                                handleInputChange('field', category.id.toString())
+                                            }
+                                            className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                                                formData.field === category.id.toString()
+                                                    ? 'bg-sky-500 dark:bg-sky-600 text-white shadow-md border border-transparent'
+                                                    : 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600 border border-gray-300 dark:border-slate-600'
+                                            }`}
+                                        >
+                                            {category.name}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
                         {/* 자기소개 (마크다운 에디터) */}
@@ -271,14 +309,14 @@ export default function MentorApplicationModal({ isOpen, onClose }: MentorApplic
                         </div>
 
                         {/* 제출 버튼 */}
-                        <div className='pt-6 border-t'>
+                        <div className='pt-6 border-t border-border dark:border-slate-700'>
                             <Button
                                 type='submit'
                                 disabled={isSubmitting || !isFormValid}
                                 className={`w-full px-8 py-6 flex items-center justify-center space-x-2 ${
                                     isFormValid && !isSubmitting
-                                        ? 'bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white'
-                                        : 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                                        ? 'bg-gradient-to-r from-sky-500 to-blue-600 dark:from-sky-600 dark:to-blue-700 hover:from-sky-600 hover:to-blue-700 dark:hover:from-sky-700 dark:hover:to-blue-800 text-white'
+                                        : 'bg-gray-400 dark:bg-slate-600 text-gray-200 dark:text-slate-400 cursor-not-allowed'
                                 }`}
                             >
                                 {isSubmitting ? (
