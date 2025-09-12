@@ -19,12 +19,8 @@ export const handleAuthRedirect = async (maxRetries = 3, baseDelay = 500): Promi
                 throw new Error('Authentication failed');
             }
 
-            // 온보딩 상태에 따른 경로 결정
-            if (authData.onboarding?.isOnboarded) {
-                return '/'; // 메인 페이지
-            } else {
-                return '/job-selection'; // 온보딩 페이지
-            }
+            // 로그인 성공 시 메인 페이지로 리다이렉트
+            return '/';
         } catch (error) {
             retryCount++;
 

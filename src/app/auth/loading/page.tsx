@@ -19,7 +19,7 @@ export default function AuthLoadingPage() {
 
                 setLoadingText('사용자 정보를 불러오고 있습니다...');
 
-                // 온보딩 상태 확인 후 적절한 경로로 리다이렉트
+                // 로그인 성공 시 메인 페이지로 리다이렉트
                 const redirectPath = await handleAuthRedirect();
 
                 setLoadingText('페이지로 이동 중입니다...');
