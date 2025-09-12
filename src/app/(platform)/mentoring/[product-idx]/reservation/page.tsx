@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { addDays } from 'date-fns';
 
-import { ReservationTitle, FormCard, HourSlot } from './_components';
+import { ReservationTitle, FormCard, HourSlot, BuyCard } from './_components';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Calendar } from '@/components/ui/calendar';
 import { Textarea } from '@/components/ui/textarea';
@@ -14,7 +14,7 @@ export default function ReservationPage() {
 
     return (
         <div className='w-full p-8'>
-            <div className='w-[1140px] mx-auto'>
+            <div className='w-[1140px] mx-auto flex gap-5'>
                 <div className='w-[830px]'>
                     <div className='mb-6'>
                         <h1 className='text-2xl font-bold mb-5'>멘토링 신청</h1>
@@ -56,6 +56,9 @@ export default function ReservationPage() {
                             확정되면, 멘토와 세부 일정 조율 후 진행됩니다.
                         </AlertDescription>
                     </Alert>
+                </div>
+                <div className='flex-1'>
+                    <BuyCard />
                 </div>
             </div>
         </div>
