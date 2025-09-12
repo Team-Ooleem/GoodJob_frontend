@@ -107,7 +107,6 @@ export default function AiInterviewSelectPage() {
         }
 
         sessionStorage.setItem('jobPostUrl', jobPostUrl);
-
         router.push('/ai-interview/setting');
     };
 
@@ -120,7 +119,7 @@ export default function AiInterviewSelectPage() {
         try {
             setUploading(true);
             const form = new FormData();
-            form.append('file', file);
+            form.append('file', file, encodeURIComponent(file.name));
             const uploadRes = await api.post(`resume-files`, form, {
                 timeout: 120000,
             });
@@ -271,6 +270,7 @@ export default function AiInterviewSelectPage() {
                                     PDF 업로드
                                 </Label>
                                 <Input
+
                                     type='file'
                                     accept='application/pdf'
                                     onChange={(e) => {
