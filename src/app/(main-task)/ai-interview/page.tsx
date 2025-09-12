@@ -1,11 +1,9 @@
 'use client';
 
-import { Button, Row, Col, Typography } from 'antd';
-import { ArrowRightOutlined } from '@ant-design/icons';
+import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 import { AiInterviewInfoCard, aiInterviewData } from './_components';
-
-const { Title, Paragraph, Text } = Typography;
 
 export default function AiInterviewPage() {
     return (
@@ -38,10 +36,7 @@ export default function AiInterviewPage() {
                             🚀 베타 버전 - 지금 무료로 체험해보세요
                         </div>
 
-                        <Title
-                            level={1}
-                            className='!text-4xl lg:!text-5xl !font-bold !text-gray-900 mb-4 !leading-tight'
-                        >
+                        <h1 className='text-4xl lg:text-5xl font-bold text-gray-900 mb-4 leading-tight'>
                             <img
                                 src='/assets/good-job-logo.webp'
                                 alt='Good Job Logo'
@@ -49,25 +44,24 @@ export default function AiInterviewPage() {
                             />
                             면접, 이제 AI와 함께
                             <span className='text-blue-600'> 실전처럼 연습하세요</span>
-                        </Title>
+                        </h1>
 
-                        <Paragraph className='!text-lg !text-gray-700 !leading-relaxed mb-8 max-w-4xl mx-auto'>
+                        <p className='text-lg text-gray-700 leading-relaxed mb-8 max-w-4xl mx-auto'>
                             실제 면접관과 같은 AI가 당신만의 맞춤 질문을 만들고,
                             <span className='font-semibold text-gray-900'> 적절한 피드백</span>을
                             주며 면접 실력을 키워드립니다.
-                        </Paragraph>
+                        </p>
                     </div>
 
                     {/* CTA 버튼 */}
                     <div className='flex justify-center items-center mb-8'>
                         <Link href='/ai-interview/select'>
                             <Button
-                                type='primary'
-                                size='large'
-                                className='!h-16 !px-12 !text-xl !font-bold !bg-gradient-to-r !from-blue-600 !to-green-600 hover:!from-blue-700 hover:!to-green-700 !border-0 !rounded-2xl !shadow-2xl !text-white'
-                                icon={<ArrowRightOutlined />}
+                                size='lg'
+                                className='h-16 px-12 text-xl font-bold bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 border-0 rounded-2xl shadow-2xl text-white'
                             >
                                 베타 버전 체험하기
+                                <ArrowRight className='ml-2 h-5 w-5' />
                             </Button>
                         </Link>
                     </div>
@@ -75,17 +69,17 @@ export default function AiInterviewPage() {
 
                 {/* 하단 AI 면접 정보 카드 섹션 */}
                 <div className='flex-shrink-0 pb-8'>
-                    <Row gutter={[24, 24]} justify='center'>
-                        <Col xs={24} lg={8}>
+                    <div className='grid grid-cols-1 lg:grid-cols-3 gap-6 justify-center'>
+                        <div className='w-full'>
                             <AiInterviewInfoCard {...aiInterviewData.main} />
-                        </Col>
-                        <Col xs={24} lg={8}>
+                        </div>
+                        <div className='w-full'>
                             <AiInterviewInfoCard {...aiInterviewData.features[0]} />
-                        </Col>
-                        <Col xs={24} lg={8}>
+                        </div>
+                        <div className='w-full'>
                             <AiInterviewInfoCard {...aiInterviewData.features[1]} />
-                        </Col>
-                    </Row>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
