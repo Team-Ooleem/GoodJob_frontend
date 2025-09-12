@@ -1,14 +1,13 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Card, Typography, Button, Alert, message } from 'antd';
-import { ArrowRightOutlined, VideoCameraOutlined, AudioOutlined } from '@ant-design/icons';
+import { ArrowRight, Video, Mic } from 'lucide-react';
 import axios from 'axios';
 
 import { Webcam, WebcamHandle } from '../_components/Webcam';
 import { VisualAggregatePayload } from '../_components/RealMediaPipeAnalyzer';
-
-const { Title, Paragraph, Text } = Typography;
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
 // 간단 WAV 레코더 (레벨 콜백은 사용하지 않음)
 class WavRecorder {
@@ -149,7 +148,6 @@ export default function AiInterviewSettingCalibrationCombined() {
                             // 비디오 버퍼 클리어만 수행(결과 사용 안 함)
                             webcamRef.current?.endQuestion();
                         } catch {}
-                        message.warning('다시 말씀해 주세요');
                         setPhase('idle');
                         setTimeLeft(15);
                     })();
@@ -188,7 +186,6 @@ export default function AiInterviewSettingCalibrationCombined() {
             webcamRef.current?.startQuestion('calibration', { text: 'Calibration' });
             recRef.current = new WavRecorder();
             await recRef.current.start();
-            message.info('녹음을 시작했습니다. 자연스럽게 문장을 읽어주세요.');
         } catch (e: any) {
             setPhase('idle');
             setError(e?.message || '캘리브레이션 시작 실패');
@@ -225,7 +222,6 @@ export default function AiInterviewSettingCalibrationCombined() {
                 JSON.stringify({ createdAt: new Date().toISOString(), audio: feats, visual: vAgg }),
             );
             setPhase('done');
-            message.success('캘리브레이션 저장 완료! 이제 세션을 시작할 수 있어요.');
         } catch (e: any) {
             setError(e?.message || '캘리브레이션 종료 실패');
             setPhase('idle');
@@ -252,35 +248,34 @@ export default function AiInterviewSettingCalibrationCombined() {
             </div>
 
             <Card className='w-full max-w-4xl shadow-xl border-0 rounded-2xl overflow-hidden relative z-10'>
-                {/* Header Section */}
-                <div className='px-8 pt-8 pb-6 text-center'>
+                <CardHeader className='px-8 pt-8 pb-6 text-center'>
                     <div className='flex items-center justify-center mb-4'>
                         <div className='w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center mr-4'>
-                            <VideoCameraOutlined className='text-white text-xl' />
+                            <Video className='text-white text-xl' />
                         </div>
-                        <h2 className='text-3xl font-bold text-gray-900 mb-0'>
+                        <CardTitle className='text-3xl font-bold text-gray-900 mb-0'>
                             AI 모의면접 환경 설정
-                        </h2>
+                        </CardTitle>
                     </div>
                     <p className='text-gray-600 text-lg'>
                         최적의 면접 환경을 위해 카메라와 마이크를 테스트해주세요.
                     </p>
-                </div>
+                </CardHeader>
 
                 {error && (
                     <div className='px-8 mb-6'>
-                        <Alert
-                            type='error'
-                            showIcon
-                            message='오류'
-                            description={error}
-                            className='!rounded-xl'
-                        />
+                        <div className='bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-xl flex items-center'>
+                            <div className='w-4 h-4 bg-red-500 rounded-full mr-3'></div>
+                            <div>
+                                <div className='font-semibold'>오류</div>
+                                <div className='text-sm'>{error}</div>
+                            </div>
+                        </div>
                     </div>
                 )}
 
                 {/* Main Content */}
-                <div className='px-8 pb-8'>
+                <CardContent className='px-8 pb-8'>
                     <div className='flex flex-col items-center'>
                         {/* Video Container */}
                         <div className='relative mb-6'>
@@ -336,8 +331,8 @@ export default function AiInterviewSettingCalibrationCombined() {
                             {phase === 'done' && (
                                 <Button
                                     onClick={resetCalibration}
-                                    size='large'
-                                    className='!h-12 !px-6 !text-base !rounded-xl'
+                                    size='lg'
+                                    className='h-12 px-6 text-base rounded-xl'
                                     disabled={isProcessing}
                                 >
                                     다시 테스트하기
@@ -345,26 +340,25 @@ export default function AiInterviewSettingCalibrationCombined() {
                             )}
 
                             <Button
-                                type='primary'
-                                size='large'
-                                className='!h-16 !px-12 !text-xl !font-bold !bg-green-600 hover:!bg-green-700 !border-0 !rounded-2xl !shadow-lg !text-white'
-                                icon={<ArrowRightOutlined />}
+                                size='lg'
+                                className='h-16 px-12 text-xl font-bold bg-green-600 hover:bg-green-700 border-0 rounded-2xl shadow-lg text-white'
                                 onClick={goToSession}
                                 disabled={!(webcamOk && micOk && phase === 'done')}
                             >
+                                <ArrowRight className='mr-2' />
                                 {phase === 'done'
                                     ? 'AI 모의면접 시작하기'
                                     : '환경 테스트를 완료해주세요'}
                             </Button>
                         </div>
                     </div>
-                </div>
+                </CardContent>
 
                 {/* Audio Visualization - Bottom */}
                 {phase === 'running' && (
                     <div className='px-8 pb-6 relative'>
                         <div className='flex items-center justify-center gap-2'>
-                            <AudioOutlined className='text-green-500 text-lg animate-pulse' />
+                            <Mic className='text-green-500 text-lg animate-pulse' />
                             <span className='text-sm text-gray-600 mr-4'>음성 감지 중</span>
                             {/* Audio Level Visualization */}
                             <div className='flex items-center gap-1 relative'>
