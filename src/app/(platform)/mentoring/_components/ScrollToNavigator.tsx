@@ -7,7 +7,7 @@ export function ScrollToNavigator() {
         <>
             <div className='h-14'>
                 <div className='w-[1140px] h-full mx-auto flex justify-start items-center gap-2'>
-                    <Button variant='ghost' size='lg'>
+                    <Button variant='secondary' size='lg'>
                         멘토링 소개
                     </Button>
                     <Button variant='ghost' size='lg'>
