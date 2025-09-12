@@ -59,6 +59,12 @@ export default function ReservationPage() {
                 </div>
                 <div className='flex-1'>
                     <BuyCard />
+                    <Alert className='mt-4'>
+                        <AlertDescription>
+                            멘토링 환불은 멘토링 시작 시간을 기준으로 진행되며, 120시간 전 환불시
+                            전액 환불이 가능합니다.
+                        </AlertDescription>
+                    </Alert>
                 </div>
             </div>
         </div>
