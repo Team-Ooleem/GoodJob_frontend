@@ -1,15 +1,13 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Card, Typography, Button, Alert, message } from 'antd';
-import { SaveOutlined } from '@ant-design/icons';
-// import Link from "next/link"; // not used in combined UI
+import { ArrowRight, Video, Mic } from 'lucide-react';
 import axios from 'axios';
 
 import { Webcam, WebcamHandle } from '../_components/Webcam';
 import { VisualAggregatePayload } from '../_components/RealMediaPipeAnalyzer';
-
-const { Title, Paragraph, Text } = Typography;
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
 // 간단 WAV 레코더 (레벨 콜백은 사용하지 않음)
 class WavRecorder {
@@ -150,7 +148,6 @@ export default function AiInterviewSettingCalibrationCombined() {
                             // 비디오 버퍼 클리어만 수행(결과 사용 안 함)
                             webcamRef.current?.endQuestion();
                         } catch {}
-                        message.warning('다시 말씀해 주세요');
                         setPhase('idle');
                         setTimeLeft(15);
                     })();
@@ -189,7 +186,6 @@ export default function AiInterviewSettingCalibrationCombined() {
             webcamRef.current?.startQuestion('calibration', { text: 'Calibration' });
             recRef.current = new WavRecorder();
             await recRef.current.start();
-            message.info('녹음을 시작했습니다. 자연스럽게 문장을 읽어주세요.');
         } catch (e: any) {
             setPhase('idle');
             setError(e?.message || '모의면접 준비 실패');
@@ -226,7 +222,6 @@ export default function AiInterviewSettingCalibrationCombined() {
                 JSON.stringify({ createdAt: new Date().toISOString(), audio: feats, visual: vAgg }),
             );
             setPhase('done');
-            message.success('환경설정 완료! 이제 모의면접을 시작할 수 있어요.');
         } catch (e: any) {
             setError(e?.message || '환경설정 실패');
             setPhase('idle');
@@ -246,27 +241,44 @@ export default function AiInterviewSettingCalibrationCombined() {
     };
 
     return (
-        <div className='min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8'>
-            <div className='container mx-auto px-4'>
-                <div className='max-w-2xl mx-auto'>
-                    <Card className='!border-0 !shadow-lg !rounded-3xl'>
-                        <div className='text-center mb-4'>
-                            <Title level={2} className='!m-0 !text-gray-800'>
-                                얼굴을 가이드 선 안에 들어오게 맞추고,
-                                <br /> 녹화 버튼을 눌러주세요.
-                            </Title>
-                            <Paragraph className='!mt-2 !text-gray-500'>
-                                녹화가 시작되면 아래 문장을 소리 내서 읽어주세요.
-                            </Paragraph>
+        <div className='min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4 relative overflow-hidden'>
+            {/* Voice Activity Glow Effect */}
+            <div className='absolute bottom-0 left-1/2 transform -translate-x-1/2 w-full'>
+                <div className='w-full h-64 bg-green-400/20 rounded-full blur-3xl animate-pulse translate-y-8'></div>
+            </div>
+
+            <Card className='w-full max-w-4xl shadow-xl border-0 rounded-2xl overflow-hidden relative z-10'>
+                <CardHeader className='px-8 pt-8 pb-6 text-center'>
+                    <div className='flex items-center justify-center mb-4'>
+                        <div className='w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center mr-4'>
+                            <Video className='text-white text-xl' />
                         </div>
+                        <CardTitle className='text-3xl font-bold text-gray-900 mb-0'>
+                            AI 모의면접 환경 설정
+                        </CardTitle>
+                    </div>
+                    <p className='text-gray-600 text-lg'>
+                        최적의 면접 환경을 위해 카메라와 마이크를 테스트해주세요.
+                    </p>
+                </CardHeader>
 
-                        {error && (
-                            <div className='mb-3'>
-                                <Alert type='error' showIcon message='오류' description={error} />
+                {error && (
+                    <div className='px-8 mb-6'>
+                        <div className='bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-xl flex items-center'>
+                            <div className='w-4 h-4 bg-red-500 rounded-full mr-3'></div>
+                            <div>
+                                <div className='font-semibold'>오류</div>
+                                <div className='text-sm'>{error}</div>
                             </div>
-                        )}
+                        </div>
+                    </div>
+                )}
 
-                        <div className='flex flex-col items-center'>
+                {/* Main Content */}
+                <CardContent className='px-8 pb-8'>
+                    <div className='flex flex-col items-center'>
+                        {/* Video Container */}
+                        <div className='relative mb-6'>
                             <div
                                 className='rounded-3xl overflow-hidden shadow-md relative'
                                 style={{ width: 720, height: 405, background: '#e5e7eb' }}
@@ -314,13 +326,51 @@ export default function AiInterviewSettingCalibrationCombined() {
                             {/* 액션들 */}
                             <div className='mt-6 flex gap-3'>
                                 <Button
-                                    type='primary'
-                                    icon={<SaveOutlined />}
-                                    onClick={goToSession}
-                                    disabled={!(webcamOk && micOk && phase === 'done')}
+                                    onClick={resetCalibration}
+                                    size='lg'
+                                    className='h-12 px-6 text-base rounded-xl'
+                                    disabled={isProcessing}
                                 >
                                     AI 모의면접 시작하기
                                 </Button>
+                            )}
+
+                            <Button
+                                size='lg'
+                                className='h-16 px-12 text-xl font-bold bg-green-600 hover:bg-green-700 border-0 rounded-2xl shadow-lg text-white'
+                                onClick={goToSession}
+                                disabled={!(webcamOk && micOk && phase === 'done')}
+                            >
+                                <ArrowRight className='mr-2' />
+                                {phase === 'done'
+                                    ? 'AI 모의면접 시작하기'
+                                    : '환경 테스트를 완료해주세요'}
+                            </Button>
+                        </div>
+                    </div>
+                </CardContent>
+
+                {/* Audio Visualization - Bottom */}
+                {phase === 'running' && (
+                    <div className='px-8 pb-6 relative'>
+                        <div className='flex items-center justify-center gap-2'>
+                            <Mic className='text-green-500 text-lg animate-pulse' />
+                            <span className='text-sm text-gray-600 mr-4'>음성 감지 중</span>
+                            {/* Audio Level Visualization */}
+                            <div className='flex items-center gap-1 relative'>
+                                {/* Glow effect behind the bars */}
+                                <div className='absolute inset-0 bg-green-400/20 rounded-full blur-md animate-pulse'></div>
+                                {[...Array(12)].map((_, i) => (
+                                    <div
+                                        key={i}
+                                        className={`w-1.5 bg-gradient-to-t from-green-400 to-green-600 rounded-full animate-pulse relative z-10 shadow-lg shadow-green-400/50`}
+                                        style={{
+                                            height: `${Math.random() * 24 + 10}px`,
+                                            animationDelay: `${i * 50}ms`,
+                                            animationDuration: `${600 + Math.random() * 300}ms`,
+                                        }}
+                                    />
+                                ))}
                             </div>
                         </div>
                     </Card>

@@ -4,4 +4,5 @@ export { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 export { Input } from './input';
 export { Label } from './label';
 export { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './select';
+export { Tabs, TabsContent, TabsList, TabsTrigger } from './tabs';
 export { Textarea } from './textarea';

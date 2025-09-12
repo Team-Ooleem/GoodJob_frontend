@@ -1,13 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Button, Card, Typography, Tabs, message, Spin } from 'antd';
-import { VideoCameraOutlined, InfoCircleOutlined, FileSearchOutlined } from '@ant-design/icons';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks';
 import { api } from '@/apis/api';
-
-const { Title, Paragraph, Text } = Typography;
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Video, Info, FileSearch, Loader2 } from 'lucide-react';
 
 // 타입 정의
 interface ResumeFileItem {
@@ -49,7 +51,6 @@ export default function AiInterviewSelectPage() {
             setResumes(data);
         } catch (error) {
             console.error('Error fetching resumes:', error);
-            message.error('이력서를 불러오는데 실패했습니다.');
         } finally {
             setLoading(false);
         }
@@ -69,12 +70,12 @@ export default function AiInterviewSelectPage() {
 
     const handleStartInterview = () => {
         if (resumes.length > 0 && !selectedResume) {
-            message.error('이력서를 선택해주세요.');
+            alert('이력서를 선택해주세요.');
             return;
         }
 
         if (!jobPostUrl.trim()) {
-            message.error('채용공고 URL을 입력해주세요.');
+            alert('채용공고 URL을 입력해주세요.');
             return;
         }
 
@@ -82,7 +83,7 @@ export default function AiInterviewSelectPage() {
         try {
             new URL(jobPostUrl);
         } catch {
-            message.error('올바른 URL 형식을 입력해주세요.');
+            alert('올바른 URL 형식을 입력해주세요.');
             return;
         }
 
@@ -90,11 +91,11 @@ export default function AiInterviewSelectPage() {
         if (resumes.length > 0 && selectedResume) {
             const selectedResumeData = resumes.find((resume) => resume.id === selectedResume);
             if (!selectedResumeData) {
-                message.error('선택한 이력서를 확인할 수 없습니다.');
+                alert('선택한 이력서를 확인할 수 없습니다.');
                 return;
             }
             if (!selectedResumeData.hasSummary || selectedResumeData.parseStatus !== 'done') {
-                message.warning('이력서 요약 생성 중입니다. 완료 후 다시 시도해주세요.');
+                alert('이력서 요약 생성 중입니다. 완료 후 다시 시도해주세요.');
                 return;
             }
             // 신규: 서버에서 요약을 찾아 쓰도록 파일 ID 저장
@@ -106,15 +107,13 @@ export default function AiInterviewSelectPage() {
         }
 
         sessionStorage.setItem('jobPostUrl', jobPostUrl);
-
-        message.success('환경 체크를 진행합니다.');
         router.push('/ai-interview/setting');
     };
 
     const handleUploadFile = async (file: File) => {
         if (!file) return;
         if (file.type !== 'application/pdf') {
-            message.error('PDF 파일만 업로드할 수 있습니다.');
+            alert('PDF 파일만 업로드할 수 있습니다.');
             return;
         }
         try {
@@ -127,12 +126,12 @@ export default function AiInterviewSelectPage() {
             const { id } = uploadRes.data as { id: string };
             // 업로드 직후 비동기 파싱/요약 시작
             await api.post(`resume-files/${id}/parse`);
-            message.success('업로드 완료! 요약을 생성 중입니다. 잠시 후 새로고침됩니다.');
+            alert('업로드 완료! 요약을 생성 중입니다. 잠시 후 새로고침됩니다.');
             // 조금 있다 목록 새로고침
             setTimeout(() => fetchResumes(userId as number), 1200);
         } catch (e: any) {
             console.error('파일 업로드 실패', e);
-            message.error('파일 업로드에 실패했습니다.');
+            alert('파일 업로드에 실패했습니다.');
         } finally {
             setUploading(false);
         }
@@ -144,21 +143,13 @@ export default function AiInterviewSelectPage() {
     if (loading || authLoading) {
         return (
             <div className='min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center'>
-                <Spin size='large' />
+                <div className='flex flex-col items-center gap-4'>
+                    <Loader2 className='h-8 w-8 animate-spin text-green-600' />
+                    <p className='text-gray-600'>로딩 중...</p>
+                </div>
             </div>
         );
     }
-
-    const tabItems = [
-        {
-            key: 'resume',
-            label: '이력서 선택',
-        },
-        {
-            key: 'job',
-            label: '채용공고 선택',
-        },
-    ];
 
     // 버튼 활성화 상태 계산
     const selectedItem = selectedResume ? resumes.find((r) => r.id === selectedResume) : null;
@@ -172,29 +163,14 @@ export default function AiInterviewSelectPage() {
     return (
         <div className='min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4'>
             <Card className='w-full max-w-xl shadow-xl border-0 rounded-2xl overflow-hidden'>
-                {/* 탭 네비게이션 */}
-                <div className='px-8 pt-8 pb-4'>
-                    <Tabs
-                        activeKey={activeTab}
-                        onChange={setActiveTab}
-                        items={tabItems}
-                        className='interview-tabs'
-                        tabBarStyle={{
-                            marginBottom: 0,
-                            borderBottom: 'none',
-                        }}
-                    />
-                </div>
-
-                {/* 메인 콘텐츠 */}
-                <div className='px-8 pb-8'>
+                <CardHeader className='px-8 pt-8 pb-4'>
                     {/* 섹션 제목 */}
                     <div className='flex items-center justify-between mb-6'>
-                        <h2 className='text-3xl font-bold text-gray-900 mb-0'>
+                        <CardTitle className='text-3xl font-bold text-gray-900 mb-0'>
                             AI 모의면접 진행하기
-                        </h2>
+                        </CardTitle>
                         <div className='w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center'>
-                            <VideoCameraOutlined className='text-blue-600 text-lg' />
+                            <Video className='text-blue-600 text-lg' />
                         </div>
                     </div>
 
@@ -210,9 +186,15 @@ export default function AiInterviewSelectPage() {
                         <div className='h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent'></div>
                     </div>
 
-                    {/* 이력서 선택 탭 */}
-                    {activeTab === 'resume' && (
-                        <div className='mb-8'>
+                    {/* 탭 네비게이션 */}
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className='w-full'>
+                        <TabsList className='grid w-full grid-cols-2'>
+                            <TabsTrigger value='resume'>이력서 선택</TabsTrigger>
+                            <TabsTrigger value='job'>채용공고 선택</TabsTrigger>
+                        </TabsList>
+
+                        {/* 이력서 선택 탭 */}
+                        <TabsContent value='resume' className='mt-6'>
                             {resumes.length > 0 ? (
                                 <div className='max-h-80 overflow-y-auto space-y-3 pr-2'>
                                     {resumes.map((resume) => (
@@ -227,9 +209,9 @@ export default function AiInterviewSelectPage() {
                                         >
                                             <div className='flex items-center justify-between'>
                                                 <div>
-                                                    <Text className='font-semibold text-gray-900'>
+                                                    <p className='font-semibold text-gray-900'>
                                                         {resume.originalName}
-                                                    </Text>
+                                                    </p>
                                                     <div className='text-sm text-gray-600 mt-1'>
                                                         업로드:{' '}
                                                         {new Date(
@@ -284,10 +266,11 @@ export default function AiInterviewSelectPage() {
                             )}
                             {/* 업로드 영역 */}
                             <div className='mt-4'>
-                                <label className='block text-gray-700 font-medium mb-2'>
+                                <Label className='block text-gray-700 font-medium mb-2'>
                                     PDF 업로드
-                                </label>
-                                <input
+                                </Label>
+                                <Input
+
                                     type='file'
                                     accept='application/pdf'
                                     onChange={(e) => {
@@ -303,18 +286,16 @@ export default function AiInterviewSelectPage() {
                                     <p className='text-sm text-gray-500 mt-2'>업로드 중…</p>
                                 )}
                             </div>
-                        </div>
-                    )}
+                        </TabsContent>
 
-                    {/* 채용공고 선택 탭 */}
-                    {activeTab === 'job' && (
-                        <div className='mb-8'>
+                        {/* 채용공고 선택 탭 */}
+                        <TabsContent value='job' className='mt-6'>
                             <div className='space-y-4'>
                                 <div>
-                                    <p className='text-gray-700 font-medium text-lg block mb-2'>
+                                    <Label className='text-gray-700 font-medium text-lg block mb-2'>
                                         채용공고 URL
-                                    </p>
-                                    <input
+                                    </Label>
+                                    <Input
                                         type='url'
                                         placeholder='https://example.com/job-posting'
                                         value={jobPostUrl}
@@ -360,15 +341,16 @@ export default function AiInterviewSelectPage() {
                                         }
                                     })()}
                             </div>
-                        </div>
-                    )}
+                        </TabsContent>
+                    </Tabs>
+                </CardHeader>
 
+                <CardContent className='px-8 pb-8'>
                     {/* 시작 버튼 */}
                     <div className='text-center'>
                         <Button
-                            type='primary'
-                            size='large'
-                            className={`!h-16 !px-16 !text-xl !font-semibold !bg-green-600 hover:!bg-green-700 !border-0 !rounded-xl !shadow-lg !text-white transition-all duration-300 ${
+                            size='lg'
+                            className={`h-16 px-16 text-xl font-semibold bg-green-600 hover:bg-green-700 border-0 rounded-xl shadow-lg text-white transition-all duration-300 ${
                                 buttonAnimation ? 'animate-pulse scale-105' : ''
                             }`}
                             onClick={handleStartInterview}
@@ -388,31 +370,17 @@ export default function AiInterviewSelectPage() {
                         </Button>
                         <div className='mt-4'>
                             <Button
-                                icon={<FileSearchOutlined />}
+                                variant='outline'
                                 onClick={() => router.push('/ai-interview/reports')}
+                                className='flex items-center gap-2'
                             >
+                                <FileSearch className='w-4 h-4' />
                                 리포트 목록 보기
                             </Button>
                         </div>
                     </div>
-                </div>
+                </CardContent>
             </Card>
-
-            <style jsx global>{`
-                .interview-tabs .ant-tabs-tab {
-                    padding: 12px 24px !important;
-                    font-size: 16px !important;
-                    font-weight: 500 !important;
-                }
-
-                .interview-tabs .ant-tabs-tab-active {
-                    color: #16a34a !important;
-                }
-
-                .interview-tabs .ant-tabs-ink-bar {
-                    background: #16a34a !important;
-                }
-            `}</style>
         </div>
     );
 }
