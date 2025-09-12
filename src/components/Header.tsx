@@ -1,14 +1,17 @@
 'use client';
 
 import Image from 'next/image';
-import Link from 'next/link';
-import { Flex, Button } from 'antd';
+import { useRouter } from 'next/navigation';
+import { Flex } from 'antd';
 
 // global components
 import { HeaderNavigation } from './HeaderNavigation';
 import { useAuth } from '@/hooks/use-auth';
+import { Button } from '@/components/ui/button';
 
 export function Header() {
+    const router = useRouter();
+
     const { isAuthenticated, user, logout, isLoading } = useAuth();
 
     const handleLogout = async () => {
@@ -33,7 +36,7 @@ export function Header() {
                 </Flex>
                 <Flex justify='center' align='center' gap={6}>
                     {isLoading ? (
-                        <Button type='primary' loading>
+                        <Button variant='ghost' disabled={isLoading}>
                             로딩...
                         </Button>
                     ) : isAuthenticated ? (
@@ -41,16 +44,20 @@ export function Header() {
                             <span className='text-sm text-gray-600'>
                                 안녕하세요, {user?.name}님!
                             </span>
-                            <Button type='primary' onClick={handleLogout}>
+                            <Button variant='ghost' onClick={handleLogout}>
                                 로그아웃
                             </Button>
                         </div>
                     ) : (
-                        <Link href='/login'>
-                            <Button type='primary'>로그인</Button>
-                        </Link>
+                        <Button
+                            onClick={() => {
+                                router.push('/login');
+                            }}
+                            variant='ghost'
+                        >
+                            로그인
+                        </Button>
                     )}
-                    <Button>기업 서비스</Button>
                 </Flex>
             </div>
         </div>
