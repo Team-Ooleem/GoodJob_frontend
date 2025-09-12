@@ -120,7 +120,7 @@ export default function AiInterviewSelectPage() {
         try {
             setUploading(true);
             const form = new FormData();
-            form.append('file', file);
+            form.append('file', file, encodeURIComponent(file.name));
             const uploadRes = await api.post(`resume-files`, form, {
                 timeout: 120000,
             });
@@ -162,8 +162,12 @@ export default function AiInterviewSelectPage() {
 
     // 버튼 활성화 상태 계산
     const selectedItem = selectedResume ? resumes.find((r) => r.id === selectedResume) : null;
-    const isResumeReady = resumes.length === 0 ? true : !!(selectedItem && selectedItem.hasSummary && selectedItem.parseStatus === 'done');
-    const canStart = jobPostUrl.trim().length > 0 && isResumeReady && (resumes.length === 0 || !!selectedResume);
+    const isResumeReady =
+        resumes.length === 0
+            ? true
+            : !!(selectedItem && selectedItem.hasSummary && selectedItem.parseStatus === 'done');
+    const canStart =
+        jobPostUrl.trim().length > 0 && isResumeReady && (resumes.length === 0 || !!selectedResume);
 
     return (
         <div className='min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4'>
@@ -227,7 +231,10 @@ export default function AiInterviewSelectPage() {
                                                         {resume.originalName}
                                                     </Text>
                                                     <div className='text-sm text-gray-600 mt-1'>
-                                                        업로드: {new Date(resume.createdAt).toLocaleString()}
+                                                        업로드:{' '}
+                                                        {new Date(
+                                                            resume.createdAt,
+                                                        ).toLocaleString()}
                                                     </div>
                                                 </div>
                                                 <div className='flex items-center gap-2'>
@@ -236,7 +243,8 @@ export default function AiInterviewSelectPage() {
                                                             'px-2 py-1 rounded text-xs ' +
                                                             (resume.parseStatus === 'done'
                                                                 ? 'bg-green-100 text-green-700'
-                                                                : resume.parseStatus === 'processing' ||
+                                                                : resume.parseStatus ===
+                                                                        'processing' ||
                                                                     resume.parseStatus === 'pending'
                                                                   ? 'bg-yellow-100 text-yellow-700'
                                                                   : resume.parseStatus === 'error'
@@ -276,7 +284,9 @@ export default function AiInterviewSelectPage() {
                             )}
                             {/* 업로드 영역 */}
                             <div className='mt-4'>
-                                <label className='block text-gray-700 font-medium mb-2'>PDF 업로드</label>
+                                <label className='block text-gray-700 font-medium mb-2'>
+                                    PDF 업로드
+                                </label>
                                 <input
                                     type='file'
                                     accept='application/pdf'
@@ -366,9 +376,12 @@ export default function AiInterviewSelectPage() {
                         >
                             {(() => {
                                 if (resumes.length === 0) {
-                                    return jobPostUrl.trim() ? '면접 환경 체크하기' : '면접 설정을 완료해주세요';
+                                    return jobPostUrl.trim()
+                                        ? '면접 환경 체크하기'
+                                        : '면접 설정을 완료해주세요';
                                 }
-                                if (!selectedResume || !jobPostUrl.trim()) return '면접 설정을 완료해주세요';
+                                if (!selectedResume || !jobPostUrl.trim())
+                                    return '면접 설정을 완료해주세요';
                                 if (!isResumeReady) return '요약 생성 중…';
                                 return '면접 환경 체크하기';
                             })()}
