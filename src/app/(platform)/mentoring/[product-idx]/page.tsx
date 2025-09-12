@@ -1,5 +1,5 @@
-import { MentorProductProfile, BuyCard, StarRating } from '@/components/mentoring';
-import { ScrollToNavigator, Content, ReviewsSummary } from '../_components';
+import { StarRating } from '@/components/mentoring';
+import { ScrollToNavigator, Content, ReviewsSummary, ReviewItem } from '../_components';
 
 export default function ProductDetailPage() {
     return (
@@ -32,13 +32,24 @@ export default function ProductDetailPage() {
             <Content>
                 Content
                 <ReviewsSummary />
-            </Content>
-            <aside className='w-[1140px] h-0 max-h-0 mx-auto sticky top-3 flex justify-end -mt-78'>
-                <div className='flex flex-col gap-2 absolute'>
-                    <MentorProductProfile />
-                    <BuyCard />
+                <div className='mt-10 flex flex-col'>
+                    <ReviewItem />
+                    <ReviewItem />
+                    <ReviewItem />
+                    <ReviewItem />
+                    <ReviewItem />
+                    <ReviewItem />
+                    <ReviewItem />
+                    <ReviewItem />
+                    <ReviewItem />
+                    <ReviewItem />
+                    <ReviewItem />
+                    <ReviewItem />
+                    <ReviewItem />
+                    <ReviewItem />
+                    <ReviewItem />
                 </div>
-            </aside>
+            </Content>
         </>
     );
 }
