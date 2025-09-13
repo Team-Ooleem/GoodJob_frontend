@@ -260,7 +260,10 @@ export default function AiInterviewSessionsPage() {
             skills?: string[];
         };
 
-        let resumeSummary: string | null = null;
+        // 선택된 이력서 기반: 우선 ID를 서버로 전달(서버에서 PDF 텍스트/파싱 활용)
+        const selectedResumeId = sessionStorage.getItem('selectedResumeId') || undefined; // resume-file id (string)
+
+        let resumeSummary: string | null = null; // 하위 호환: 요약 텍스트 기반
         try {
             const raw = sessionStorage.getItem('selectedResume');
             if (raw) {
@@ -290,7 +293,10 @@ export default function AiInterviewSessionsPage() {
         }
 
         const jobPostUrl = sessionStorage.getItem('jobPostUrl') || undefined;
-        const payload: any = { resumeSummary };
+        const payload: any = {};
+        // 서버가 resumeId를 우선 사용하도록 전달하고, 없으면 요약 텍스트 전달
+        if (selectedResumeId) payload.resumeFileId = selectedResumeId;
+        else payload.resumeSummary = resumeSummary;
         if (jobPostUrl) payload.jobPostUrl = jobPostUrl;
 
         const res = await api.post(`ai/question`, payload, { timeout: 60000 });
