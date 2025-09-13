@@ -132,13 +132,6 @@ class WavRecorder {
     }
 }
 
-// Web Speech API 타입 정의
-declare global {
-    interface Window {
-        webkitSpeechRecognition: any;
-    }
-}
-
 // 더미 면접 데이터
 const interviewData = {
     interviewer: {
@@ -209,7 +202,7 @@ export default function AiInterviewSessionsPage() {
     // 동적 질문 목록 (AI 생성)
     const [dynamicQuestions, setDynamicQuestions] = useState<QuestionDto[]>([]);
     // 전체 문항 수(기존 더미와 동일하게 3로 유지; 필요 시 조정)
-    const MAX_QUESTIONS = 2;
+    const MAX_QUESTIONS = 1;
 
     const timerRef = useRef<NodeJS.Timeout | null>(null);
     const speakingTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -318,9 +311,6 @@ export default function AiInterviewSessionsPage() {
     }
 
     const [isCompleting, setIsCompleting] = useState(false); // (선택) UI에서 버튼 비활성화 등에 사용
-
-    // 기존: Web Speech API 사용 여부 플래그 (원하면 true 유지)
-    const USE_LOCAL_INTERIM_CAPTIONS = true;
 
     //const STT_API_BASE = `${process.env.NEXT_PUBLIC_API_BASE_URL}/stt`;
 
@@ -556,66 +546,6 @@ export default function AiInterviewSessionsPage() {
         handleCompleteAnswer();
     };
 
-    // Web Speech API 초기화
-    const initializeSpeechRecognition = () => {
-        if (typeof window !== 'undefined' && 'webkitSpeechRecognition' in window) {
-            const SpeechRecognition = window.webkitSpeechRecognition;
-            const recognition = new SpeechRecognition();
-
-            recognition.continuous = true;
-            recognition.interimResults = true;
-            recognition.lang = 'ko-KR';
-
-            recognition.onstart = () => {
-                console.log('🎤 음성 인식 시작');
-            };
-
-            recognition.onresult = (event: any) => {
-                let finalTranscript = '';
-                let interimTranscript = '';
-
-                for (let i = event.resultIndex; i < event.results.length; i++) {
-                    const transcript = event.results[i][0].transcript;
-                    if (event.results[i].isFinal) {
-                        finalTranscript += transcript;
-                    } else {
-                        interimTranscript += transcript;
-                    }
-                }
-
-                setTranscribedText(finalTranscript + interimTranscript);
-            };
-
-            recognition.onerror = (event: any) => {
-                console.error('음성 인식 오류:', event.error);
-            };
-
-            recognition.onend = () => {
-                console.log('🎤 음성 인식 종료');
-            };
-
-            recognitionRef.current = recognition;
-            return recognition;
-        } else {
-            console.warn('이 브라우저는 음성 인식을 지원하지 않습니다.');
-            return null;
-        }
-    };
-
-    // 음성 인식 시작
-    const startSpeechRecognition = () => {
-        if (recognitionRef.current) {
-            recognitionRef.current.start();
-        }
-    };
-
-    // 음성 인식 중지
-    const stopSpeechRecognition = () => {
-        if (recognitionRef.current) {
-            recognitionRef.current.stop();
-        }
-    };
-
     // 기존: fetch 버전 analyzeAudioBlob
     // -> axios 버전으로 교체
     const analyzeAudioBlob = async (
@@ -635,80 +565,6 @@ export default function AiInterviewSessionsPage() {
         return res.data?.features as AudioFeatures;
     };
 
-    // ChatGPT API 호출 형식으로 데이터 변환
-    const formatMessagesForChatGPT = (qaList: Array<{ question: string; answer: string }>) => {
-        const interviewContext = `
-면접관: ${interviewData.interviewer.name} (${interviewData.interviewer.title})
-
-면접 질문과 답변:
-${qaList
-    .map(
-        (qa, index) => `
-질문 ${index + 1}: ${qa.question}
-답변 ${index + 1}: ${qa.answer}
-`,
-    )
-    .join('\n')}
-
-위의 면접 내용을 바탕으로 다음과 같은 JSON 형식으로 분석해주세요:
-
-{
-  "overall_score": 85,
-  "detailed_scores": {
-    "completeness": 8,
-    "specificity": 7,
-    "logic": 9,
-    "impression": 8
-  },
-  "strengths": [
-    "기술적 지식이 탄탄함",
-    "논리적인 사고 과정",
-    "구체적인 경험 제시"
-  ],
-  "improvements": [
-    "더 구체적인 수치와 결과 제시 필요",
-    "실무 경험의 깊이 보완 필요"
-  ],
-  "detailed_feedback": {
-    "question_1": {
-      "score": 8,
-      "feedback": "기술 스택에 대한 기본적인 이해도는 있으나, 구체적인 경험 사례가 부족합니다."
-    },
-    "question_2": {
-      "score": 7,
-      "feedback": "아키텍처 설계 경험은 있으나, 대용량 트래픽 처리에 대한 구체적인 수치가 필요합니다."
-    },
-    "question_3": {
-      "score": 9,
-      "feedback": "데이터베이스 최적화에 대한 깊이 있는 이해를 보여주었습니다."
-    }
-  },
-  "overall_evaluation": "전반적으로 백엔드 개발에 대한 기본기는 탄탄하나, 실무 경험을 바탕으로 한 구체적인 사례 제시가 필요한 상태입니다. 지속적인 학습과 프로젝트 경험을 통해 기술적 깊이를 쌓아가시길 권합니다.",
-  "recommendations": [
-    "실제 프로젝트에서의 성능 개선 사례를 정리해보세요",
-    "대용량 트래픽 처리 경험을 쌓기 위한 사이드 프로젝트를 추천합니다",
-    "기술 블로그 작성을 통해 학습한 내용을 정리해보세요"
-  ]
-}
-
-반드시 위의 JSON 형식으로만 응답해주세요. 다른 텍스트는 포함하지 마세요.
-        `.trim();
-
-        return {
-            messages: [
-                {
-                    role: 'system' as const,
-                    content:
-                        '당신은 경험이 풍부한 면접관입니다. 면접자의 답변을 객관적이고 건설적으로 분석하여 JSON 형식으로 응답해주세요.',
-                },
-                {
-                    role: 'user' as const,
-                    content: interviewContext,
-                },
-            ],
-        };
-    };
-
     // 면접 완료 처리 (API 호출 포함)
     const handleInterviewCompletion = async (finalSessions?: InterviewSession[]) => {
         // 최신 qaList를 가져오기 위해 sessions에서 재구성
@@ -718,69 +574,116 @@ ${qaList
             answer: session.answer,
         }));
 
-        // (선택) 오디오 종합 평균 같은 간단 요약 만들기
-        const audioAgg = (() => {
-            const feats = sessionsToUse
-                .map((s) => s.audioFeatures)
-                .filter(Boolean) as AudioFeatures[];
-            const mean = (arr: number[]) =>
-                arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
-            const meanOf = (pick: (f: AudioFeatures) => number | undefined) =>
-                mean(
-                    feats
-                        .map(pick)
-                        .filter((v): v is number => typeof v === 'number' && isFinite(v)),
+        // ===== 서버 API 호출로 음성 지표 가져오기 =====
+        let serverAudioData = null;
+        try {
+            const audioRes = await api.get(`/audio-metrics/${SESSION_ID}/overall`);
+            if (audioRes.data?.ok && audioRes.data?.overall) {
+                serverAudioData = audioRes.data.overall;
+                console.log('서버에서 음성 지표 로드 성공:', serverAudioData);
+            }
+        } catch (e) {
+            console.warn('서버 음성 지표 로드 실패:', e);
+        }
+
+        // 서버 음성 지표를 localStorage에 저장 (결과 페이지에서 사용)
+        if (serverAudioData) {
+            try {
+                localStorage.setItem(
+                    'interviewAudioOverallServer',
+                    JSON.stringify(serverAudioData),
                 );
-            const safeCv = (f: AudioFeatures) =>
-                typeof f.f0_cv === 'number' && isFinite(f.f0_cv) && f.f0_cv >= 0
-                    ? f.f0_cv
-                    : f.f0_mean > 0
-                      ? (f.f0_std ?? 0) / f.f0_mean
-                      : 0;
-            const approxSemitoneStd = (cv: number) => {
-                // 근사: 세미톤 표준편차 ≈ 12 * log2(1 + CV)
-                return 12 * Math.log2(1 + Math.max(0, cv));
-            };
-            return {
-                f0_mean: mean(feats.map((f) => f.f0_mean)),
-                f0_std: mean(feats.map((f) => f.f0_std)),
-                // 종합에도 CV/세미톤 표준편차를 포함해 톤 점수 안정화
-                f0_cv: mean(feats.map((f) => safeCv(f))),
-                f0_std_semitone: mean(feats.map((f) => approxSemitoneStd(safeCv(f)))),
-                rms_cv: mean(feats.map((f) => f.rms_cv)),
-                rms_cv_voiced: mean(
-                    feats.map((f) =>
-                        typeof f.rms_cv_voiced === 'number' ? f.rms_cv_voiced : f.rms_cv || 0,
-                    ),
-                ),
-                rms_db_std_voiced: mean(
-                    feats.map((f) =>
-                        typeof f.rms_db_std_voiced === 'number' ? f.rms_db_std_voiced : 0,
-                    ),
-                ),
-                jitter_like: mean(feats.map((f) => f.jitter_like)),
-                shimmer_like: mean(feats.map((f) => f.shimmer_like)),
-                silence_ratio: mean(feats.map((f) => f.silence_ratio)),
-                silence_ratio_db50: meanOf((f) => f.silence_ratio_db50),
-                voiced_ratio: mean(
-                    feats.map((f) => (typeof f.voiced_ratio === 'number' ? f.voiced_ratio : 0)),
-                ),
-                voiced_ratio_speech: meanOf((f) => f.voiced_ratio_speech),
-                // Diagnostics 평균
-                voiced_prob_mean: meanOf((f) => f.voiced_prob_mean),
-                voiced_prob_median: meanOf((f) => f.voiced_prob_median),
-                voiced_prob_p90: meanOf((f) => f.voiced_prob_p90),
-                voiced_flag_ratio: meanOf((f) => f.voiced_flag_ratio),
-                voiced_prob_ge_025_ratio: meanOf((f) => f.voiced_prob_ge_025_ratio),
-                voiced_prob_ge_035_ratio: meanOf((f) => f.voiced_prob_ge_035_ratio),
-                f0_valid_ratio: meanOf((f) => f.f0_valid_ratio),
-                speech_frames: meanOf((f) =>
-                    typeof f.speech_frames === 'number' && isFinite(f.speech_frames)
-                        ? f.speech_frames
-                        : undefined,
-                ),
-            };
-        })();
+            } catch (e) {
+                console.warn('서버 음성 지표 localStorage 저장 실패:', e);
+            }
+        }
+
+        // 문항별 음성 지표도 서버에서 가져오기
+        let serverAudioPerQuestion = null;
+        try {
+            const audioPerQRes = await api.get(`/audio-metrics/${SESSION_ID}`);
+            if (audioPerQRes.data?.ok && audioPerQRes.data?.rows) {
+                serverAudioPerQuestion = audioPerQRes.data.rows;
+                console.log('서버에서 문항별 음성 지표 로드 성공:', serverAudioPerQuestion);
+            }
+        } catch (e) {
+            console.warn('서버 문항별 음성 지표 로드 실패:', e);
+        }
+
+        if (serverAudioPerQuestion) {
+            try {
+                localStorage.setItem(
+                    'interviewAudioPerQuestionServer',
+                    JSON.stringify(serverAudioPerQuestion),
+                );
+            } catch (e) {
+                console.warn('서버 문항별 음성 지표 localStorage 저장 실패:', e);
+            }
+        }
+
+        // // (선택) 오디오 종합 평균 같은 간단 요약 만들기
+        // const audioAgg = (() => {
+        //     const feats = sessionsToUse
+        //         .map((s) => s.audioFeatures)
+        //         .filter(Boolean) as AudioFeatures[];
+        //     const mean = (arr: number[]) =>
+        //         arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+        //     const meanOf = (pick: (f: AudioFeatures) => number | undefined) =>
+        //         mean(
+        //             feats
+        //                 .map(pick)
+        //                 .filter((v): v is number => typeof v === 'number' && isFinite(v)),
+        //         );
+        //     const safeCv = (f: AudioFeatures) =>
+        //         typeof f.f0_cv === 'number' && isFinite(f.f0_cv) && f.f0_cv >= 0
+        //             ? f.f0_cv
+        //             : f.f0_mean > 0
+        //               ? (f.f0_std ?? 0) / f.f0_mean
+        //               : 0;
+        //     const approxSemitoneStd = (cv: number) => {
+        //         // 근사: 세미톤 표준편차 ≈ 12 * log2(1 + CV)
+        //         return 12 * Math.log2(1 + Math.max(0, cv));
+        //     };
+        //     return {
+        //         f0_mean: mean(feats.map((f) => f.f0_mean)),
+        //         f0_std: mean(feats.map((f) => f.f0_std)),
+        //         // 종합에도 CV/세미톤 표준편차를 포함해 톤 점수 안정화
+        //         f0_cv: mean(feats.map((f) => safeCv(f))),
+        //         f0_std_semitone: mean(feats.map((f) => approxSemitoneStd(safeCv(f)))),
+        //         rms_cv: mean(feats.map((f) => f.rms_cv)),
+        //         rms_cv_voiced: mean(
+        //             feats.map((f) =>
+        //                 typeof f.rms_cv_voiced === 'number' ? f.rms_cv_voiced : f.rms_cv || 0,
+        //             ),
+        //         ),
+        //         rms_db_std_voiced: mean(
+        //             feats.map((f) =>
+        //                 typeof f.rms_db_std_voiced === 'number' ? f.rms_db_std_voiced : 0,
+        //             ),
+        //         ),
+        //         jitter_like: mean(feats.map((f) => f.jitter_like)),
+        //         shimmer_like: mean(feats.map((f) => f.shimmer_like)),
+        //         silence_ratio: mean(feats.map((f) => f.silence_ratio)),
+        //         silence_ratio_db50: meanOf((f) => f.silence_ratio_db50),
+        //         voiced_ratio: mean(
+        //             feats.map((f) => (typeof f.voiced_ratio === 'number' ? f.voiced_ratio : 0)),
+        //         ),
+        //         voiced_ratio_speech: meanOf((f) => f.voiced_ratio_speech),
+        //         // Diagnostics 평균
+        //         voiced_prob_mean: meanOf((f) => f.voiced_prob_mean),
+        //         voiced_prob_median: meanOf((f) => f.voiced_prob_median),
+        //         voiced_prob_p90: meanOf((f) => f.voiced_prob_p90),
+        //         voiced_flag_ratio: meanOf((f) => f.voiced_flag_ratio),
+        //         voiced_prob_ge_025_ratio: meanOf((f) => f.voiced_prob_ge_025_ratio),
+        //         voiced_prob_ge_035_ratio: meanOf((f) => f.voiced_prob_ge_035_ratio),
+        //         f0_valid_ratio: meanOf((f) => f.f0_valid_ratio),
+        //         speech_frames: meanOf((f) =>
+        //             typeof f.speech_frames === 'number' && isFinite(f.speech_frames)
+        //                 ? f.speech_frames
+        //                 : undefined,
+        //         ),
+        //     };
+        // })();
 
         // 결과를 로컬에 보관(결과 페이지에서 활용)
         // 주의: audioUrl(data URL/Blob URL)은 매우 커서 quota를 초과할 수 있음.
@@ -791,6 +694,7 @@ ${qaList
             audioFeatures: s.audioFeatures,
             audioUrl: s.audioUrl,
         }));
+
         try {
             localStorage.setItem('interviewAudioPerQuestion', JSON.stringify(audioPerQuestionFull));
         } catch (e) {
@@ -805,11 +709,11 @@ ${qaList
                 console.warn('Failed to store interviewAudioPerQuestion:', e2);
             }
         }
-        try {
-            localStorage.setItem('interviewAudioOverall', JSON.stringify(audioAgg));
-        } catch (e) {
-            console.warn('Failed to store interviewAudioOverall:', e);
-        }
+        // try {
+        //     localStorage.setItem('interviewAudioOverall', JSON.stringify(audioAgg));
+        // } catch (e) {
+        //     console.warn('Failed to store interviewAudioOverall:', e);
+        // }
 
         try {
             const finalizeRes = await api.post(
@@ -849,7 +753,11 @@ ${qaList
         // 백엔드 리포트 분석 호출로 전환
         message.loading('면접 결과를 분석 중입니다...', 0);
         try {
-            const res = await api.post(`/report/${SESSION_ID}/analyze`, { qa: latestQAList }, { timeout: 60000 });
+            const res = await api.post(
+                `/report/${SESSION_ID}/analyze`,
+                { qa: latestQAList },
+                { timeout: 60000 },
+            );
             if (res.data?.success) {
                 localStorage.setItem('interviewAnalysis', JSON.stringify(res.data.data));
             }
@@ -857,8 +765,12 @@ ${qaList
             console.error('리포트 분석 호출 실패:', error);
         } finally {
             message.destroy();
-            try { localStorage.setItem('interviewQA', JSON.stringify(latestQAList)); } catch {}
-            setTimeout(() => { window.location.href = '/ai-interview/result'; }, 800);
+            try {
+                localStorage.setItem('interviewQA', JSON.stringify(latestQAList));
+            } catch {}
+            setTimeout(() => {
+                window.location.href = '/ai-interview/result';
+            }, 800);
         }
     };
 
@@ -886,10 +798,6 @@ ${qaList
             text: qtext,
         });
 
-        if (USE_LOCAL_INTERIM_CAPTIONS) {
-            startSpeechRecognition(); // 유지 시
-        }
-
         // WAV 레코더 시작
         try {
             recorderRef.current = new WavRecorder();
@@ -914,11 +822,6 @@ ${qaList
         try {
             stopTimer();
             setIsRecording(false);
-
-            // 음성 인식 중지는 실패해도 무시
-            try {
-                if (USE_LOCAL_INTERIM_CAPTIONS) stopSpeechRecognition();
-            } catch {}
 
             // ▼ 문항 종료: 집계 결과 받기 & 서버로 전송
             const agg = webcamRef.current?.endQuestion();
@@ -967,11 +870,9 @@ ${qaList
                     // 백엔드에 오디오 지표 업서트(서버 리포트 계산용)
                     if (audioFeatures) {
                         try {
-                            await api.post(
-                                `audio-metrics/${SESSION_ID}/${aggQid}`,
-                                audioFeatures,
-                                { timeout: 10000 },
-                            );
+                            await api.post(`audio-metrics/${SESSION_ID}/${aggQid}`, audioFeatures, {
+                                timeout: 10000,
+                            });
                         } catch (e) {
                             console.warn('오디오 지표 업서트 실패:', e);
                         }
@@ -1099,7 +1000,9 @@ ${qaList
 
     // 마운트 시 "첫 질문" 준비 + 음성 인식 초기화
     useEffect(() => {
-        try { localStorage.setItem('aiInterviewSessionId', SESSION_ID); } catch {}
+        try {
+            localStorage.setItem('aiInterviewSessionId', SESSION_ID);
+        } catch {}
         (async () => {
             try {
                 const q = await fetchFirstQuestion();
@@ -1119,7 +1022,6 @@ ${qaList
                 }
             } finally {
                 simulateAISpeaking(3000);
-                initializeSpeechRecognition();
             }
         })();
         // eslint-disable-next-line react-hooks/exhaustive-deps
