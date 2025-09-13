@@ -27,8 +27,8 @@ export default function MentoringLandingContent() {
     const { setTheme } = useTheme();
 
     const scrollToList = useCallback(() => {
-        // document.getElementById('coaching-list')?.scrollIntoView({ behavior: 'smooth' });
-        setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
+        document.getElementById('coaching-list')?.scrollIntoView({ behavior: 'smooth' });
+        // setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
     }, []);
 
     const loadMoreServices = useCallback(() => {
@@ -84,7 +84,12 @@ export default function MentoringLandingContent() {
                 </div>
             </section>
 
-            {/* IMPACT / GROWTH (항해99 무드) */}
+            {/* 구분선 추가 */}
+            <div className='max-w-7xl mx-auto px-4 py-8'>
+                <div className='h-px bg-gradient-to-r from-transparent via-border to-transparent'></div>
+            </div>
+
+            {/* IMPACT / GROWTH*/}
             <section className='relative overflow-hidden sidebar-primary'>
                 {/* 배경 그라데이션 */}
                 {/* <div
