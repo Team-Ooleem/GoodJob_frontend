@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/sidebar';
 
 const items = [
-    { title: '멘토링 관리', url: '/admin', icon: BookOpen },
+    { title: '멘토링 상품 관리', url: '/admin/mentoring', icon: BookOpen },
     { title: '예약 관리', url: '/admin/reservation', icon: Calendar },
     { title: '리뷰 관리', url: '/admin/review', icon: Star },
 ];
@@ -30,10 +30,10 @@ export function AppSidebar() {
                             {items.map((item) => (
                                 <SidebarMenuItem key={item.title}>
                                     <SidebarMenuButton asChild>
-                                        <a href={item.url}>
+                                        <Link href={item.url}>
                                             <item.icon />
                                             <span>{item.title}</span>
-                                        </a>
+                                        </Link>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
                             ))}
