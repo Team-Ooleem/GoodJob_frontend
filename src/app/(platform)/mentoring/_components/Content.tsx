@@ -23,7 +23,7 @@ export function Content({ children, product }: IContent) {
                             reviewCount={product?.reviewCount}
                             ratingAverage={product?.ratingAverage}
                         />
-                        <BuyCard price={product?.price} />
+                        <BuyCard price={product?.price} productIdx={product?.productIdx} />
                     </div>
                 </aside>
             </div>
