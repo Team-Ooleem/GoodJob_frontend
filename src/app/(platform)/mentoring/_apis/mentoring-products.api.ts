@@ -55,7 +55,23 @@ function normalizeProduct(raw: any): MentoringProduct {
     };
 }
 
+export interface MentoringSlot {
+    day_of_week: number;
+    hour_slot: number;
+    time_range: string;
+}
+
+export interface MentoringProductSlots {
+    product_idx: number;
+    slots: MentoringSlot[];
+}
+
 export async function getMentoringProduct(productIdx: number | string): Promise<MentoringProduct> {
     const response = await api.get(`/mentoring-products/${productIdx}`);
     return normalizeProduct(response.data);
+}
+
+export async function getMentoringProductSlots(productIdx: number | string): Promise<MentoringProductSlots> {
+    const response = await api.get(`/mentoring-products/${productIdx}/regular-slots`);
+    return response.data;
 }
