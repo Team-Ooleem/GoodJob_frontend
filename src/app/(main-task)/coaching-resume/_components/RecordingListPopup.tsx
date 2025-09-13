@@ -142,7 +142,7 @@ export function RecordingListPopup() {
         return sessions.map((session) => ({
             id: `rec-${session.sessionIdx}`,
             title: `음성 메모 ${session.segmentIndex}`,
-            durationSec: getTotalDuration(session as ChatSession),
+            durationSec: getTotalDuration(session), // 🆕 타입 캐스팅 제거
             createdAt: new Date(session.timestamp).toLocaleString(),
         }));
     }, [sessions]);
@@ -159,7 +159,7 @@ export function RecordingListPopup() {
             timeSec: seg.startTime,
             text: seg.textContent,
             segment: seg,
-            session: session as unknown as ChatSession,
+            session: session, // �� 타입 캐스팅 제거
         }));
     }, [selectedRecording, sessions]);
 

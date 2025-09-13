@@ -7,6 +7,7 @@ import {
     STTWithContextResponse,
     SessionUserResponse,
     ChatSession,
+    BackendSessionMessage, // 🆕 추가
 } from '@/apis/Recording-api';
 import { API_BASE_URL } from '@/constants/config';
 
@@ -49,12 +50,15 @@ export const useSessionData = (canvasIdx: string) => {
                     // 3. 백엔드 응답을 프론트엔드 구조로 변환
                     // messages가 undefined이거나 배열이 아닌 경우를 대비한 안전한 처리
                     const messagesArray = Array.isArray(data.messages) ? data.messages : [];
-                    const transformedSessions: ChatSession[] = messagesArray.map((session: any) =>
-                        transformBackendToFrontend(
-                            session,
-                            userData.mentor.idx,
-                            userData.mentee.idx,
-                        ),
+                    const transformedSessions: ChatSession[] = messagesArray.map(
+                        (
+                            session: BackendSessionMessage, // 🆕 any → BackendSessionMessage
+                        ) =>
+                            transformBackendToFrontend(
+                                session,
+                                userData.mentor.idx,
+                                userData.mentee.idx,
+                            ),
                     );
 
                     return transformedSessions;

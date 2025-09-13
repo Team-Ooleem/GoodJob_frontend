@@ -29,7 +29,7 @@ export interface SessionUserResponse {
 }
 
 export interface STTWithContextResponse {
-    messages: any[]; // (백엔드 응답에 맞춤)
+    messages: BackendSessionMessage[]; // (백엔드 응답에 맞춤)
     success: boolean;
     message?: string;
     totalCount?: number;
@@ -39,25 +39,25 @@ export interface STTWithContextResponse {
 }
 
 export const transformBackendToFrontend = (
-    session: any,
+    session: BackendSessionMessage, // 🆕 any → BackendSessionMessage
     mentorIdx: number,
     menteeIdx: number,
 ): ChatSession => {
     return {
-        sessionIdx: parseInt(session.messageId),
+        sessionIdx: session.messageId,
         segments: session.segments
-            .map((seg: any) => ({
+            .map((seg) => ({
                 speakerTag: seg.speakerTag,
                 textContent: seg.textContent,
-                startTime: parseFloat(seg.startTime) || 0,
-                endTime: parseFloat(seg.endTime) || 0,
+                startTime: parseFloat(seg.startTime.toString()) || 0,
+                endTime: parseFloat(seg.endTime.toString()) || 0,
                 audioUrl: session.audioUrl,
             }))
-            .filter((seg: any) => seg.startTime >= 0 && seg.endTime > seg.startTime),
+            .filter((seg) => seg.startTime >= 0 && seg.endTime > seg.startTime),
         timestamp: session.timestamp,
         mentor_idx: mentorIdx,
         mentee_idx: menteeIdx,
-        segmentIndex: session.segmentIndex,
+        segmentIndex: 0, // 기본값
         audioDuration: session.audioDuration || 0,
         audioUrl: session.audioUrl,
     };
@@ -78,3 +78,18 @@ export type RecordingItem = {
     durationSec: number;
     createdAt: string;
 };
+
+export interface BackendSessionMessage {
+    messageId: number;
+    audioUrl: string;
+    timestamp: string;
+    mentor_idx: number;
+    mentee_idx: number;
+    segments: Array<{
+        speakerTag: number;
+        textContent: string;
+        startTime: number;
+        endTime: number;
+    }>;
+    audioDuration: number;
+}
