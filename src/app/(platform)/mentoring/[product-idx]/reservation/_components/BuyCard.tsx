@@ -5,7 +5,12 @@ import * as PortOne from '@portone/browser-sdk/v2';
 import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardFooter, CardHeader } from '@/components/ui/card';
 
-export function BuyCard() {
+type Props = {
+    price?: number;
+    productTitle?: string;
+};
+
+export function BuyCard({ price, productTitle }: Props) {
     const handlePayment = async () => {
         try {
             const response = await PortOne.requestPayment({
@@ -14,8 +19,8 @@ export function BuyCard() {
                 // 채널 키 설정
                 channelKey: 'channel-key-de52913e-4fac-4dc0-9953-abfd21555353',
                 paymentId: `payment-${crypto.randomUUID()}`,
-                orderName: '나이키 와플 트레이너 2 SD',
-                totalAmount: 1000,
+                orderName: productTitle || '멘토링 상품',
+                totalAmount: typeof price === 'number' ? price : 0,
                 currency: 'CURRENCY_KRW',
                 payMethod: 'CARD',
             });
@@ -31,7 +36,14 @@ export function BuyCard() {
             <CardHeader>
                 <CardDescription className='flex justify-between items-center'>
                     <p className='text-base font-bold text-foreground'>총 결제 금액</p>
-                    <p className='text-base font-bold text-foreground'>₩49,500</p>
+                    <p className='text-base font-bold text-foreground'>
+                        {typeof price === 'number'
+                            ? new Intl.NumberFormat('ko-KR', {
+                                  style: 'currency',
+                                  currency: 'KRW',
+                              }).format(price)
+                            : '-'}
+                    </p>
                 </CardDescription>
             </CardHeader>
             <CardFooter className='flex-col gap-2'>
@@ -39,6 +51,7 @@ export function BuyCard() {
                     type='submit'
                     className='w-full h-[50px] text-lg font-semibold'
                     onClick={handlePayment}
+                    disabled={typeof price !== 'number' || price <= 0}
                 >
                     결제하기
                 </Button>

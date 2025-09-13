@@ -8,9 +8,30 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Calendar } from '@/components/ui/calendar';
 import { Textarea } from '@/components/ui/textarea';
 import { CheckCircle2Icon } from 'lucide-react';
+import { useMentoringProduct } from '../../_hooks/useMentoringProduct';
 
-export default function ReservationPage() {
+type Props = { params: { 'product-idx': string } };
+
+export default function ReservationPage({ params }: Props) {
+    const productId = params['product-idx'];
+    const { data: product, isLoading, error } = useMentoringProduct(productId);
     const [date, setDate] = useState<Date | undefined>(undefined);
+
+    if (isLoading) {
+        return (
+            <div className='w-full p-8'>
+                <div className='w-[1140px] mx-auto'>로딩 중...</div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className='w-full p-8'>
+                <div className='w-[1140px] mx-auto text-red-500'>오류: {error.message}</div>
+            </div>
+        );
+    }
 
     return (
         <div className='w-full p-8'>
@@ -18,7 +39,10 @@ export default function ReservationPage() {
                 <div className='w-[830px]'>
                     <div className='mb-6'>
                         <h1 className='text-2xl font-bold mb-5'>멘토링 신청</h1>
-                        <ReservationTitle />
+                        <ReservationTitle
+                            mentorName={product?.mentor?.name}
+                            productTitle={product?.title}
+                        />
                     </div>
                     <FormCard title='1. 일정 선택' className='mb-4'>
                         <p className='text-xs text-muted-foreground mb-1'>
@@ -58,7 +82,7 @@ export default function ReservationPage() {
                     </Alert>
                 </div>
                 <div className='flex-1'>
-                    <BuyCard />
+                    <BuyCard price={product?.price} productTitle={product?.title} />
                     <Alert className='mt-4'>
                         <AlertDescription>
                             멘토링 환불은 멘토링 시작 시간을 기준으로 진행되며, 120시간 전 환불시
