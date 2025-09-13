@@ -1,14 +1,23 @@
 import { useQuery } from '@tanstack/react-query';
-import { SocialApi } from '../_apis/social.api';
+import { SocialApi, MyProfileInfo, AnotherUserProfileInfo } from '../_apis/social.api';
 
 /**
- * 소셜 프로필 데이터를 관리하는 훅
+ * 내 프로필 데이터를 관리하는 훅
  */
-export const useSocialProfile = (userId: string) => {
+export const useMyProfile = () => {
     return useQuery({
-        queryKey: ['socialProfile', userId],
-        queryFn: () => SocialApi.getProfile(userId),
+        queryKey: ['myProfile'],
+        queryFn: () => SocialApi.getMyProfile(),
+    });
+};
+
+/**
+ * 다른 사용자 프로필 데이터를 관리하는 훅
+ */
+export const useAnotherUserProfile = (userId: string) => {
+    return useQuery({
+        queryKey: ['anotherUserProfile', userId],
+        queryFn: () => SocialApi.getAnotherUserProfile(userId),
         enabled: !!userId,
-        staleTime: 5 * 60 * 1000, // 5분
     });
 };

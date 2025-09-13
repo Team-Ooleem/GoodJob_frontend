@@ -1,71 +1,50 @@
 import { api } from '@/apis/api';
 
-// ===== 타입 정의 =====
-export interface SocialProfile {
-    name: string;
-    profileImage: string | null;
-    shortBio: string;
-    bio: string;
-    jobTitle: string;
-    residence: string;
-    currentPosition: string;
-    followerCount: number;
-    isFollowing?: boolean;
-}
+// ===== 새로운 API 명세에 맞는 타입 정의 =====
 
-// 새로운 API 명세에 맞는 타입들
-export interface UserProfileInfo {
-    // 기본 정보
+// 내 정보 조회 응답 타입
+export interface MyProfileInfo {
     name: string;
     profileImage?: string;
-    shortBio?: string;
     bio?: string;
-    phone?: string;
-    email?: string;
-
-    // 희망 정보
-    desiredJobTitle?: string;
-    desiredLocation?: string;
-    desiredSalary?: string;
-
-    // 소셜 정보
     followerCount: number;
     followingCount: number;
-    isFollowing?: boolean; // 현재 사용자가 이 유저를 팔로우하고 있는지 여부
+    totalPosts: number;
+    totalLikes: number;
+    joinDate: string;
+    isMentor: boolean;
+    mentorProfile?: {
+        businessName: string;
+        preferredField: string;
+        isApproved: boolean;
+        totalMentoringSessions: number;
+        totalMentoringReviews: number;
+        avgMentoringRating: number;
+        totalMentoringApplications: number;
+    };
+}
 
-    // 경력 정보
-    careers?: {
-        companyName: string;
-        position: string;
-        department?: string;
-        jobTitle?: string;
-        startDate: string;
-        endDate?: string;
-        isCurrent: boolean;
-        description?: string;
-        companyType?: string;
-    }[];
-
-    // 학력 정보
-    education?: {
-        schoolName: string;
-        major: string;
-        degreeName: string;
-        startDate: string;
-        endDate?: string;
-        isCurrent: boolean;
-    }[];
-
-    // 보유 기술
-    skills?: string[];
-
-    // 이력서 정보
-    resumeInfo?: {
-        resumeId: number;
-        title: string;
-        createdAt: string;
-        updatedAt: string;
-    }[];
+// 다른 사용자 정보 조회 응답 타입
+export interface AnotherUserProfileInfo {
+    name: string;
+    profileImage?: string;
+    bio?: string;
+    followerCount: number;
+    followingCount: number;
+    totalPosts: number;
+    totalLikes: number;
+    joinDate: string;
+    isFollowing?: boolean; // 현재 사용자가 이 사용자를 팔로우하고 있는지 여부
+    isMentor: boolean;
+    mentorProfile?: {
+        businessName: string;
+        preferredField: string;
+        isApproved: boolean;
+        totalMentoringSessions: number;
+        totalMentoringReviews: number;
+        avgMentoringRating: number;
+        totalMentoringApplications: number;
+    };
 }
 
 export interface Post {
@@ -75,19 +54,12 @@ export interface Post {
     mediaUrl?: string;
     createdAt: string;
     updatedAt: string;
-    author: {
-        name: string;
-        profileImage?: string;
-    };
+    authorName: string;
+    authorProfileImage?: string | null;
     likeCount: number;
     commentCount: number;
-    isLiked: boolean;
-    // 기존 호환성을 위한 필드들 (점진적 마이그레이션용)
-    authorName?: string;
-    authorProfileImage?: string | null;
-    authorShortBio?: string;
-    isLikedByCurrentUser?: boolean;
-    isFollowingAuthor?: boolean;
+    isLikedByCurrentUser: boolean;
+    isFollowingAuthor: boolean;
 }
 
 export interface PostsResponse {
@@ -138,7 +110,7 @@ export interface DeleteResponse {
 
 // ===== 프로필 상세 페이지용 타입 정의 =====
 export interface UserProfileDetailResponse {
-    userInfo: UserProfileInfo;
+    userInfo: AnotherUserProfileInfo;
     posts: Post[];
     hasMore: boolean;
     nextCursor?: number;
@@ -153,21 +125,18 @@ export interface UserPostsResponse {
 // ===== API 서비스 클래스 =====
 export class SocialApi {
     /**
-     * 사용자 소셜 프로필 정보를 가져오는 API
+     * 내 정보 조회 API
      */
-    static async getProfile(userId: string): Promise<SocialProfile> {
-        const response = await api.get<SocialProfile>(`/social/profile/${userId}`);
+    static async getMyProfile(): Promise<MyProfileInfo> {
+        const response = await api.get<MyProfileInfo>('/social/profile/me');
         return response.data;
     }
 
     /**
-     * 사용자 소셜 프로필 정보를 업데이트하는 API
+     * 다른 사용자 정보 조회 API
      */
-    static async updateProfile(
-        userId: string,
-        profileData: Partial<SocialProfile>,
-    ): Promise<SocialProfile> {
-        const response = await api.patch<SocialProfile>(`/social/profile/${userId}`, profileData);
+    static async getAnotherUserProfile(userId: string): Promise<AnotherUserProfileInfo> {
+        const response = await api.get<AnotherUserProfileInfo>(`/social/profile/${userId}`);
         return response.data;
     }
 
@@ -287,23 +256,6 @@ export class SocialApi {
         const response = await api.delete(`/social/posts/${postId}`, {
             data: { userId },
         });
-        return response.data;
-    }
-
-    /**
-     * 사용자 기본 프로필 정보 조회
-     */
-    static async getUserProfile(
-        targetUserId: string,
-        currentUserId: number,
-    ): Promise<UserProfileInfo> {
-        const params = new URLSearchParams({
-            currentUserId: currentUserId.toString(),
-        });
-
-        const response = await api.get<UserProfileInfo>(
-            `/social/profile/${targetUserId}?${params.toString()}`,
-        );
         return response.data;
     }
 
