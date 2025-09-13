@@ -4,6 +4,7 @@ import { api } from '@/apis/api';
 export interface MentoringProduct {
     productIdx: number;
     title: string;
+    content?: string;
     categoryName?: string;
     tags?: string[];
     price: number;
@@ -24,6 +25,7 @@ function normalizeProduct(raw: any): MentoringProduct {
     return {
         productIdx: raw?.product_idx ?? raw?.productIdx ?? raw?.id ?? 0,
         title: raw?.title ?? raw?.name ?? '',
+        content: raw?.content ?? raw?.description ?? raw?.markdown ?? raw?.body ?? '',
         categoryName: raw?.category?.name ?? raw?.category_name ?? raw?.categoryName,
         tags: raw?.tags ?? raw?.hash_tags ?? undefined,
         price: raw?.price ?? raw?.cost ?? 0,
@@ -44,4 +46,3 @@ export async function getMentoringProduct(productIdx: number | string): Promise<
     const response = await api.get(`/mentoring-products/${productIdx}`);
     return normalizeProduct(response.data);
 }
-

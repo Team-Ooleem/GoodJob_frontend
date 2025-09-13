@@ -1,7 +1,13 @@
 'use client';
 
 import { StarRating } from '@/components/mentoring';
-import { ScrollToNavigator, Content, ReviewsSummary, ReviewItem } from '../_components';
+import {
+    ScrollToNavigator,
+    Content,
+    ReviewsSummary,
+    ReviewItem,
+    MarkdownContent,
+} from '../_components';
 import { useMentoringProduct } from '../_hooks/useMentoringProduct';
 import { useMentoringProductReviews } from '../_hooks/useMentoringProductReviews';
 
@@ -61,6 +67,11 @@ export default function ProductDetailPage({ params }: Props) {
             </div>
             <ScrollToNavigator />
             <Content product={product}>
+                {product?.content && (
+                    <div className='mt-6'>
+                        <MarkdownContent source={product.content} />
+                    </div>
+                )}
                 <ReviewsSummary
                     averageRating={reviewsData?.averageRating ?? product?.ratingAverage ?? 0}
                     reviewCount={reviewsData?.reviewCount ?? product?.reviewCount ?? 0}
