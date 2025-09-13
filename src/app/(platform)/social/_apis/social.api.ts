@@ -11,10 +11,13 @@ export interface MentorProfile {
     totalMentoringReviews: number; // 총 리뷰 수
     avgMentoringRating: number; // 평균 평점
     totalMentoringApplications: number; // 총 멘토링 신청 수
+    introduction?: string; // 멘토 소개글
+    portfolioLink?: string; // 포트폴리오 링크
 }
 
 // 내 정보 조회 응답 타입 (기존 호환성 유지)
 export interface MyProfileInfo {
+    userIdx: number;
     name: string;
     profileImage?: string;
     bio?: string;
@@ -24,6 +27,22 @@ export interface MyProfileInfo {
     totalLikes: number;
     joinDate: string;
     isMentor: boolean;
+    mentorProfile?: MentorProfile;
+}
+
+// 사용자 프로필 조회 응답 타입
+export interface UserProfileResponse {
+    userIdx: number;
+    name: string;
+    profileImage?: string;
+    bio?: string;
+    followerCount: number;
+    followingCount: number;
+    totalPosts: number;
+    totalLikes: number;
+    joinDate: string;
+    isMentor: boolean;
+    isFollowing: boolean; // 현재 사용자가 팔로우하고 있는지
     mentorProfile?: MentorProfile;
 }
 
