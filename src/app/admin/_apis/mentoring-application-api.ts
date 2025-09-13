@@ -5,7 +5,7 @@ export type Application = {
     product_idx: number;
     product_title: string;
     booked_date: string;
-    application_status: 'pending' | 'approved' | 'rejected';
+    application_status: 'pending' | 'approved' | 'rejected' | 'completed' | 'cancelled';
     mentee: { user_idx: number; name: string; profile_img?: string };
     mentor: { mentor_idx: number; business_name: string; job_category: string };
 };
@@ -21,6 +21,43 @@ export type ApplicationsResponse = {
     applications: Application[];
     page_info: PageInfo;
 };
+
+// /** 예약 목록 조회 (실서버) */
+// export async function fetchApplications(
+//     userIdx: number,
+//     page = 1,
+//     limit = 10,
+// ): Promise<ApplicationsResponse> {
+//     const url = `${BASE_URL}/mentoring-applications/${userIdx}?page=${page}&limit=${limit}`;
+//     const res = await fetch(url, { credentials: 'include' });
+
+//     if (!res.ok) {
+//         const msg = await safeText(res);
+//         throw new Error(`예약 목록 조회 실패 (${res.status}) ${msg}`);
+//     }
+//     const data = await res.json();
+//     // 서버 응답이 바로 ApplicationsResponse 형태라고 가정
+//     return data as ApplicationsResponse;
+// }
+
+// /** 예약 상태 변경 (승인/거절) */
+// export async function updateApplication(
+//     applicationId: number,
+//     payload: { application_status: 'approved' | 'rejected'; rejection_reason?: string },
+// ) {
+//     const res = await fetch(`${BASE_URL}/mentoring-applications/${applicationId}`, {
+//         method: 'PATCH',
+//         headers: { 'Content-Type': 'application/json' },
+//         credentials: 'include',
+//         body: JSON.stringify(payload),
+//     });
+
+//     if (!res.ok) {
+//         const msg = await safeText(res);
+//         throw new Error(`예약 상태 변경 실패 (${res.status}) ${msg}`);
+//     }
+//     return res.json();
+// }
 
 // 더미 데이터
 const mockApplications: Application[] = [
@@ -162,7 +199,7 @@ const mockApplications: Application[] = [
     },
 ];
 
-// 예약 목록 조회 (더미 데이터 사용)
+/** 예약 목록 조회 (더미 데이터 사용) */
 export async function fetchApplications(
     userIdx: number,
     page = 1,
@@ -188,11 +225,27 @@ export async function fetchApplications(
     }
 }
 
-// 예약 상태 변경 (더미 구현)
+/** 예약 상태 변경 (더미 구현) */
 export async function updateApplication(
     applicationId: number,
     payload: { application_status: 'approved' | 'rejected'; rejection_reason?: string },
 ) {
     console.log(`예약 상태 변경: ${applicationId}`, payload);
     return { success: true };
+}
+
+/** 편의 함수: 승인/거절 래퍼 */
+export const approveApplication = (id: number) =>
+    updateApplication(id, { application_status: 'approved' });
+
+export const rejectApplication = (id: number, reason: string) =>
+    updateApplication(id, { application_status: 'rejected', rejection_reason: reason });
+
+/** 에러 메시지 보강용 */
+async function safeText(res: Response) {
+    try {
+        return await res.text();
+    } catch {
+        return '';
+    }
 }
