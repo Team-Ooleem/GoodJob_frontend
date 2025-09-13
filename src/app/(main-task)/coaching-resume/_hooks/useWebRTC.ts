@@ -166,21 +166,33 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
     }, [onConnectionStateChange, onRemoteStream]);
 
     // 🆕endRecordingStatus 함수
-    const sendRecordingStatus = useCallback((isRecording: boolean) => {
-        const dataChannel = dataChannelRef.current;
-        if (dataChannel && dataChannel.readyState === 'open') {
-            dataChannel.send(
-                JSON.stringify({
-                    type: 'recordingStatus',
-                    isRecording,
-                    timestamp: Date.now(),
-                }),
-            );
-            console.log(`📡 WebRTC로 녹음 상태 전송: ${isRecording ? '시작' : '중지'}`);
-        } else {
-            console.warn('DataChannel이 연결되지 않음 또는 준비되지 않음');
-        }
-    }, []);
+    const sendRecordingStatus = useCallback(
+        (isRecording: boolean) => {
+            const dataChannel = dataChannelRef.current;
+
+            // �� 연결 상태 확인
+            if (!isConnected) {
+                console.log(
+                    `🔧 [로컬 모드] WebRTC 연결 없음 - 녹음 상태: ${isRecording ? '시작' : '중지'}`,
+                );
+                return;
+            }
+
+            if (dataChannel && dataChannel.readyState === 'open') {
+                dataChannel.send(
+                    JSON.stringify({
+                        type: 'recordingStatus',
+                        isRecording,
+                        timestamp: Date.now(),
+                    }),
+                );
+                console.log(`�� WebRTC로 녹음 상태 전송: ${isRecording ? '시작' : '중지'}`);
+            } else {
+                console.warn('DataChannel이 연결되지 않음 또는 준비되지 않음');
+            }
+        },
+        [isConnected],
+    );
 
     const attachLocalMedia = useCallback(async () => {
         if (localStream) return localStream;

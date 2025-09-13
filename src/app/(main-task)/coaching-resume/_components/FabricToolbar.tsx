@@ -67,18 +67,25 @@ export function FabricToolbar() {
                 >
                     <Image
                         src={
-                            previewMicEnabled ? '/assets/videocam.svg' : '/assets/videocam-off.svg'
+                            previewCamEnabled ? '/assets/videocam.svg' : '/assets/videocam-off.svg'
                         }
                         width={20}
                         height={20}
                         alt='camera-toggle'
                     />
                 </button>
-            </div>
 
-            <div className='h-[55px] bg-white shadow-[0_2px_6px_rgba(0,0,0,0.25)] rounded-full px-4 py-1 flex items-center gap-1'>
-                {/* 브러시 */}
-                <Flex gap={1}>
+                <div className='w-px h-6 bg-gray-200' />
+
+                {/* 펜 / 형광펜 / 지우개 */}
+                <Flex gap={2} align='center'>
+                    {/* 선택 */}
+                    <button
+                        className='p-2 rounded hover:bg-gray-100'
+                        onClick={() => setDrawingMode(false)}
+                    >
+                        <Image src='/assets/selector.svg' width={20} height={20} alt='selector' />
+                    </button>
                     <button
                         className='p-2 rounded hover:bg-gray-100'
                         onClick={() => {
@@ -88,7 +95,7 @@ export function FabricToolbar() {
                     >
                         <Image
                             src='/assets/pencel.svg'
-                            width={15}
+                            width={24}
                             height={20}
                             alt='pencil'
                             className='object-contain'
@@ -103,7 +110,7 @@ export function FabricToolbar() {
                     >
                         <Image
                             src='/assets/highlighter.svg'
-                            width={15}
+                            width={24}
                             height={20}
                             alt='highlighter'
                             className='object-contain'
@@ -119,9 +126,9 @@ export function FabricToolbar() {
                     >
                         <Image
                             src='/assets/sticky.svg'
-                            width={15}
+                            width={30}
                             height={20}
-                            alt='sticky-note'
+                            alt='sticky'
                             className='object-contain'
                         />
                     </button>
@@ -176,5 +183,50 @@ export function FabricToolbar() {
                 </button>
             </div>
         </div>
+        // <Flex
+        //     className='absolute bottom-[10px] left-1/2 -translate-x-1/2 transform z-[10]'
+        //     justify='center'
+        //     align='center'
+        //     gap={20}
+        // >
+        //     <Button disabled={!hasCanvas} onClick={() => setDrawingMode(false)}>
+        //         선택
+        //     </Button>
+        //     <Button
+        //         disabled={!hasCanvas}
+        //         onClick={() => {
+        //             setDrawingMode(true);
+        //             setBrushOptions({ type: 'pencil', color: '#000000', width: 3 });
+        //         }}
+        //     >
+        //         <Image src='/assets/pencel.svg' width={32} height={71} alt='pencel' />
+        //     </Button>
+        //     <Button
+        //         disabled={!hasCanvas}
+        //         onClick={() => {
+        //             setDrawingMode(true);
+        //             setBrushOptions({ type: 'highlighter', width: 20 });
+        //         }}
+        //     >
+        //         <Image src='/assets/highlighter.svg' width={32} height={71} alt='pencel' />
+        //     </Button>
+        //     <Button
+        //         disabled={!hasCanvas}
+        //         onClick={() => {
+        //             setStickyMode(true);
+        //             setDrawingMode(false);
+        //             setEraserMode(false);
+        //         }}
+        //     >
+        //         스티커 메모
+        //     </Button>
+        //     <Button disabled={!hasCanvas} onClick={() => setEraserMode(true)}>
+        //         <Image src='/assets/eraser.svg' width={32} height={71} alt='pencel' />
+        //     </Button>
+        //     <Button type='default' onClick={handleRecord}>
+        //         {isRecordingRef.current ? '녹음 중' : '녹음'}
+        //     </Button>
+        //     <ReplayButton canvasIdx={0} />
+        // </Flex>
     );
 }

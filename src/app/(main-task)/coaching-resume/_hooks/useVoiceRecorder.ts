@@ -261,8 +261,6 @@ export const startRecording = async () => {
 
 /** 📊 녹음 상태 확인 함수 */
 export const stopRecording = () => {
-    console.log('🛑 stopRecording 호출');
-
     if (mediaRecorderRef.current?.state === 'recording') {
         mediaRecorderRef.current.stop();
         // onstop 이벤트에서 상태 업데이트됨

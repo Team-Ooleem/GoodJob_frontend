@@ -142,7 +142,7 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
         const currentState = get();
         const socket = currentState.socket;
         if (currentState.isRecording) {
-            set({ isRecording: false }); // 즉시 상태 업데이트
+            // 🆕 상태 변경을 stopRecording 함수 내부에서 처리하도록 수정
             stopRecording();
 
             // WebRTC DataChannel로 녹음 중지 알림
@@ -150,7 +150,7 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
                 currentState.sendRecordingStatus(false);
             }
         } else {
-            set({ isRecording: true }); // 즉시 상태 업데이트
+            // 🆕 상태 변경을 startRecording 함수 내부에서 처리하도록 수정
             startRecording();
             // WebRTC DataChannel로 녹음 시작 알림
             if (currentState.sendRecordingStatus) {
@@ -158,7 +158,6 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
             }
         }
     },
-
     setRecording: (enabled: boolean) => set({ isRecording: enabled }),
     toggleRecordingList: () =>
         set((state) => ({ isRecordingListOpen: !state.isRecordingListOpen })),
