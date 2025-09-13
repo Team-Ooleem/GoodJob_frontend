@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import '@uiw/react-md-editor/markdown-editor.css';
 
 @plugin 'tailwindcss-animate';
 
@@ -28,6 +29,135 @@ ul,
 ol,
 li {
     list-style: none;
+}
+
+.wmde-markdown ul,
+.wmde-markdown ul li {
+    list-style: disc;
+}
+
+.wmde-markdown ol,
+.wmde-markdown ol li {
+    list-style: decimal;
+}
+
+.wmde-markdown li {
+    margin-left: 1rem;
+}
+
+/* 마크다운 에디터 스타일 커스터마이징 */
+.w-md-editor {
+    background-color: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 0.5rem !important;
+}
+
+.w-md-editor.w-md-editor-focus {
+    border-color: #0ea5e9 !important;
+    box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.2) !important;
+}
+
+.w-md-editor-text-pre,
+.w-md-editor-text-input,
+.w-md-editor-text {
+    font-family:
+        'Pretendard Variable',
+        Pretendard,
+        -apple-system,
+        BlinkMacSystemFont,
+        system-ui,
+        sans-serif !important;
+    font-size: 14px !important;
+    line-height: 1.6 !important;
+}
+
+.w-md-editor-text-pre,
+.w-md-editor-text-input {
+    color: #374151 !important;
+}
+
+.w-md-editor-text-pre .w-md-editor-text-pre .token {
+    color: #0ea5e9 !important;
+}
+
+/* 마크다운 에디터 툴바 스타일 */
+.w-md-editor-toolbar {
+    background-color: #f8fafc !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    padding: 8px 12px !important;
+}
+
+.w-md-editor-toolbar button {
+    color: #64748b !important;
+    border-radius: 4px !important;
+    padding: 4px 6px !important;
+}
+
+.w-md-editor-toolbar button:hover {
+    background-color: #e2e8f0 !important;
+    color: #0ea5e9 !important;
+}
+
+.w-md-editor-toolbar button.active {
+    background-color: #0ea5e9 !important;
+    color: white !important;
+}
+
+/* 마크다운 에디터 미리보기 스타일 */
+.w-md-editor-preview {
+    background-color: #ffffff !important;
+    padding: 16px !important;
+}
+
+.w-md-editor-preview h1,
+.w-md-editor-preview h2,
+.w-md-editor-preview h3,
+.w-md-editor-preview h4,
+.w-md-editor-preview h5,
+.w-md-editor-preview h6 {
+    color: #1f2937 !important;
+    font-weight: 600 !important;
+    margin-top: 1.5em !important;
+    margin-bottom: 0.5em !important;
+}
+
+.w-md-editor-preview p {
+    color: #374151 !important;
+    margin-bottom: 1em !important;
+}
+
+.w-md-editor-preview code {
+    background-color: #f1f5f9 !important;
+    color: #0ea5e9 !important;
+    padding: 2px 4px !important;
+    border-radius: 3px !important;
+    font-size: 0.9em !important;
+}
+
+.w-md-editor-preview pre {
+    background-color: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 6px !important;
+    padding: 12px !important;
+    overflow-x: auto !important;
+}
+
+.w-md-editor-preview blockquote {
+    border-left: 4px solid #0ea5e9 !important;
+    background-color: #f0f9ff !important;
+    padding: 12px 16px !important;
+    margin: 1em 0 !important;
+    border-radius: 0 6px 6px 0 !important;
+}
+
+.w-md-editor-preview ul,
+.w-md-editor-preview ol {
+    padding-left: 1.5em !important;
+    margin-bottom: 1em !important;
+}
+
+.w-md-editor-preview li {
+    margin-bottom: 0.25em !important;
 }
 
 /* 채팅 메시지 컨테이너 스크롤 */
