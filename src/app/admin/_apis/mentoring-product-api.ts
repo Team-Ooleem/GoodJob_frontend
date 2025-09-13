@@ -1,4 +1,4 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_BASE!;
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!;
 
 export type MentoringProduct = {
     product_idx: number;

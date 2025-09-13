@@ -7,7 +7,7 @@
 ## Base URL
 
 ```
-http://localhost:4000/api/mentor-applications
+/mentor-applications
 ```
 
 ---
