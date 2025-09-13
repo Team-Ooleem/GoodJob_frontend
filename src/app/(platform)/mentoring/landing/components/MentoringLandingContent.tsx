@@ -39,7 +39,12 @@ export default function MentoringLandingContent() {
         <div className='min-h-screen bg-background'>
             {/* HERO */}
             <section className='relative overflow-hidden'>
-                {/* <div className='absolute inset-0 bg-[radial-gradient(1000px_600px_at_80%_-10%,var(--chart-1)_0%,transparent_60%),radial-gradient(900px_500px_at_10%_-10%,var(--chart-2)_0%,transparent_55%)] opacity-40' /> */}
+                {/* 배경 패턴 */}
+                <div className='absolute inset-0 opacity-30'>
+                    <div className='absolute top-20 left-10 w-32 h-32 bg-chart-1 rounded-full blur-3xl'></div>
+                    <div className='absolute top-40 right-20 w-24 h-24 bg-chart-2 rounded-full blur-2xl'></div>
+                    <div className='absolute bottom-20 left-1/4 w-40 h-40 bg-chart-3 rounded-full blur-3xl'></div>
+                </div>
                 <div className='max-w-7xl mx-auto px-4 pt-28 pb-20 lg:pt-40 lg:pb-36 relative'>
                     <div className='text-center space-y-8'>
                         <Badge
@@ -248,8 +253,8 @@ export default function MentoringLandingContent() {
                         ].map((it) => (
                             <div
                                 key={it.n}
-                                className='rounded-2xl p-6 border border-white/10 bg-white/5 backdrop-blur
-                     hover:bg-white/10 transition-colors'
+                                className='rounded-2xl p-6 border border-border bg-card/50 backdrop-blur
+         hover:bg-card/80 transition-colors'
                             >
                                 <div className='h-10 w-10 rounded-xl bg-blue-600/90 flex items-center justify-center text-white font-bold'>
                                     {it.n.split('.')[0]}
