@@ -1,25 +1,9 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { SpeakerSegment, ChatSession } from '@/apis/Recording-api';
 
-interface SpeakerSegment {
-    speakerTag: number;
-    textContent: string;
-    startTime: number;
-    endTime: number;
-    audioUrl: string;
-}
-
-interface ChatSession {
-    sessionId: number;
-    segments: SpeakerSegment[];
-    timestamp: string;
-    mentor_idx: number;
-    mentee_idx: number;
-    segmentIndex: number;
-}
-
-// 오디오 플레이어 컴포넌트
+// 미니멀 다크 테마 오디오 플레이어 컴포넌트
 function AudioPlayer({
     playingSegment,
     currentSegment,
@@ -29,6 +13,7 @@ function AudioPlayer({
     isPlaying,
     onPlayPause,
     onClose,
+    audioRef, // 추가
 }: {
     playingSegment: SpeakerSegment | null;
     currentSegment: SpeakerSegment | null;
@@ -38,42 +23,8 @@ function AudioPlayer({
     isPlaying: boolean;
     onPlayPause: () => void;
     onClose: () => void;
+    audioRef?: React.RefObject<HTMLAudioElement>; // 추가
 }) {
-    const [pos, setPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-    const [isDragging, setIsDragging] = useState(false);
-    const dragState = useRef<{ dragging: boolean; offsetX: number; offsetY: number }>({
-        dragging: false,
-        offsetX: 0,
-        offsetY: 0,
-    });
-
-    // 드래그 핸들러
-    useEffect(() => {
-        const onMove = (e: MouseEvent) => {
-            if (!dragState.current.dragging) return;
-            const nextX = e.clientX - dragState.current.offsetX;
-            const nextY = e.clientY - dragState.current.offsetY;
-            const maxX = window.innerWidth - 320;
-            const maxY = window.innerHeight - 200;
-            setPos({
-                x: Math.max(0, Math.min(nextX, maxX)),
-                y: Math.max(0, Math.min(nextY, maxY)),
-            });
-        };
-
-        const onUp = () => {
-            dragState.current.dragging = false;
-            setIsDragging(false);
-        };
-
-        window.addEventListener('mousemove', onMove);
-        window.addEventListener('mouseup', onUp);
-        return () => {
-            window.removeEventListener('mousemove', onMove);
-            window.removeEventListener('mouseup', onUp);
-        };
-    }, []);
-
     // 시간 포맷 함수
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
@@ -84,80 +35,116 @@ function AudioPlayer({
     // 게이지바 진행률 계산
     const progressPercentage = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0;
 
-    if (!playingSegment || !currentSegment || !currentSession) return null;
-
     return (
-        <div
-            className='fixed z-[60] transition-all duration-200'
-            style={{
-                left: pos.x || '50%',
-                top: pos.y || 'auto',
-                transform: pos.x ? 'none' : 'translateX(-50%)',
-                bottom: pos.y ? 'auto' : '1rem',
-                opacity: isDragging ? 0.8 : 1,
-            }}
-        >
-            <div className='bg-white border border-gray-200 rounded-xl p-4 shadow-xl w-80 backdrop-blur-sm'>
-                {/* 헤더 */}
+        <div className='relative'>
+            {/* 하늘색 블러 게이지바 - 2단계 굵기와 강화된 블러 효과 */}
+            <div className='w-full bg-gray-800 h-2 relative overflow-hidden'>
+                {/* 강화된 블러 배경 - 다층 효과 */}
+                <div className='absolute inset-0 bg-gradient-to-r from-sky-300 via-sky-400 to-sky-500 blur-md opacity-40' />
+                <div className='absolute inset-0 bg-gradient-to-r from-sky-400 to-sky-500 blur-sm opacity-60' />
+
+                {/* 메인 진행 바 - 그라데이션과 글로우 효과 */}
                 <div
-                    className='flex items-center justify-between mb-3 cursor-move select-none'
-                    onMouseDown={(e) => {
-                        const rect = (
-                            e.currentTarget.parentElement as HTMLElement
-                        ).getBoundingClientRect();
-                        dragState.current.dragging = true;
-                        setIsDragging(true);
-                        dragState.current.offsetX = e.clientX - rect.left;
-                        dragState.current.offsetY = e.clientY - rect.top;
-                    }}
+                    className='relative h-full transition-all duration-200 ease-out'
+                    style={{ width: `${progressPercentage}%` }}
                 >
-                    <div className='flex items-center gap-2'>
-                        <div
-                            className={`w-2 h-2 rounded-full ${isPlaying ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}
-                        />
-                        <div className='text-sm font-semibold text-gray-800'>
-                            {currentSegment.speakerTag === 0 ? '멘토' : '멘티'}
-                        </div>
-                    </div>
+                    {/* 내부 그라데이션 */}
+                    <div className='absolute inset-0 bg-gradient-to-r from-sky-300 via-sky-400 to-sky-500' />
+
+                    {/* 글로우 효과 */}
+                    <div className='absolute inset-0 bg-gradient-to-r from-sky-200 to-sky-400 blur-sm opacity-70' />
+
+                    {/* 상단 하이라이트 */}
+                    <div className='absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-r from-sky-100 to-sky-300 opacity-50' />
+                </div>
+
+                {/* 진행 바 끝부분 글로우 효과 */}
+                {progressPercentage > 0 && (
+                    <div
+                        className='absolute top-0 w-1 h-full bg-white opacity-80 blur-sm'
+                        style={{ left: `${progressPercentage}%` }}
+                    />
+                )}
+            </div>
+
+            {/* 오디오 플레이어 본체 - 패딩 최소화 */}
+            <div className='bg-black px-2 py-1'>
+                {/* 상단 시간 표시 */}
+                <div className='flex justify-between items-center mb-1'>
+                    <span className='text-gray-300 text-xs font-mono'>
+                        {formatTime(currentTime)}
+                    </span>
+                    <span className='text-gray-300 text-xs font-mono'>{formatTime(duration)}</span>
+                </div>
+
+                {/* 컨트롤 버튼들 */}
+                <div className='flex items-center justify-center gap-2'>
+                    {/* 재생 속도 */}
+                    <div className='text-white font-bold text-xs'>1x</div>
+
+                    {/* 되감기 버튼 */}
                     <button
-                        onClick={onClose}
-                        className='text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100'
+                        onClick={() => {
+                            // 5초 되감기 로직
+                            if (currentSegment && audioRef?.current) {
+                                audioRef.current.currentTime = Math.max(
+                                    0,
+                                    audioRef.current.currentTime - 5,
+                                );
+                            }
+                        }}
+                        disabled={!currentSegment}
+                        className='w-5 h-5 rounded-full border border-gray-600 flex items-center justify-center text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed'
                     >
-                        ✕
+                        <svg width='6' height='6' viewBox='0 0 24 24' fill='currentColor'>
+                            <path d='M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z' />
+                        </svg>
+                        <span className='text-xs ml-0.5'>5</span>
                     </button>
-                </div>
 
-                {/* 텍스트 내용 */}
-                <div className='text-sm text-gray-700 mb-3 leading-relaxed line-clamp-2'>
-                    {currentSegment.textContent}
-                </div>
-
-                {/* 컨트롤 */}
-                <div className='flex items-center gap-3 mb-3'>
+                    {/* 재생/일시정지 버튼 */}
                     <button
                         onClick={onPlayPause}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                            isPlaying
-                                ? 'bg-red-500 hover:bg-red-600 text-white'
-                                : 'bg-blue-500 hover:bg-blue-600 text-white'
-                        }`}
+                        disabled={!currentSegment}
+                        className='w-6 h-6 rounded-full bg-white flex items-center justify-center text-black hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed'
                     >
-                        {isPlaying ? '⏸️ 일시정지' : '▶️ 재생'}
+                        {isPlaying ? (
+                            <svg width='10' height='10' viewBox='0 0 24 24' fill='currentColor'>
+                                <path d='M6 4h4v16H6V4zm8 0h4v16h-4V4z' />
+                            </svg>
+                        ) : (
+                            <svg width='10' height='10' viewBox='0 0 24 24' fill='currentColor'>
+                                <path d='M8 5v14l11-7z' />
+                            </svg>
+                        )}
                     </button>
-                    <div className='flex-1 text-xs text-gray-500 font-mono'>
-                        {formatTime(currentTime)} / {formatTime(duration)}
-                    </div>
-                </div>
 
-                {/* 게이지바 */}
-                <div className='w-full bg-gray-200 rounded-full h-2 overflow-hidden'>
-                    <div
-                        className='bg-gradient-to-r from-blue-500 to-blue-600 h-full rounded-full transition-all duration-75 ease-out'
-                        style={{
-                            width: `${progressPercentage}%`,
-                            boxShadow: isPlaying ? '0 0 8px rgba(59, 130, 246, 0.5)' : 'none',
+                    {/* 빨리 감기 버튼 */}
+                    <button
+                        onClick={() => {
+                            // 5초 빨리 감기 로직
+                            if (currentSegment && audioRef?.current) {
+                                audioRef.current.currentTime = Math.min(
+                                    duration,
+                                    audioRef.current.currentTime + 5,
+                                );
+                            }
                         }}
-                    />
+                        disabled={!currentSegment}
+                        className='w-5 h-5 rounded-full border border-gray-600 flex items-center justify-center text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed'
+                    >
+                        <svg width='6' height='6' viewBox='0 0 24 24' fill='currentColor'>
+                            <path d='M13 6v12l8.5-6L13 6zM4 18l8.5-6L4 6v12z' />
+                        </svg>
+                        <span className='text-xs ml-0.5'>5</span>
+                    </button>
+
+                    {/* 메뉴 아이콘 */}
+                    <button className='w-5 h-5 rounded-full border border-gray-600 flex items-center justify-center text-white hover:bg-gray-800'>
+                        <svg width='8' height='8' viewBox='0 0 24 24' fill='currentColor'>
+                            <path d='M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z' />
+                        </svg>
+                    </button>
                 </div>
             </div>
         </div>
