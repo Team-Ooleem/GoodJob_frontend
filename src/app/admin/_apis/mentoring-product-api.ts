@@ -17,6 +17,43 @@ export type MentoringProduct = {
     };
 };
 
+// 멘토링 상품 생성 관련 타입
+export type TimeSlot = {
+    day_of_week: number; // 1: 월요일, 2: 화요일, ..., 7: 일요일
+    hour_slot: number; // 0-23 시간
+};
+
+export type CreateMentoringProductRequest = {
+    mentor_idx: number;
+    title: string;
+    job_category_id: number;
+    description: string;
+    price: number;
+    slots: TimeSlot[];
+};
+
+export type CreateMentoringProductResponse = {
+    success: boolean;
+    product_idx: number;
+    message: string;
+};
+
+// 직무 카테고리 타입
+export type JobCategory = {
+    id: number;
+    name: string;
+    parent_id?: number;
+};
+
+// 멘토 정보 타입
+export type Mentor = {
+    mentor_idx: number;
+    name: string;
+    job_category: string;
+    career: string;
+    business_name: string;
+};
+
 export type MentoringProductsResponse = {
     products: MentoringProduct[];
     page_info: {
@@ -181,5 +218,61 @@ export async function fetchMentoringProducts(
     } catch (error) {
         console.error('멘토링 상품 목록 조회 실패:', error);
         throw new Error('멘토링 상품 목록을 불러오는데 실패했습니다.');
+    }
+}
+
+/** 멘토링 상품 생성 */
+export async function createMentoringProduct(
+    data: CreateMentoringProductRequest,
+): Promise<CreateMentoringProductResponse> {
+    const res = await fetch(`${BASE_URL}/mentoring-products`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(data),
+    });
+
+    if (!res.ok) {
+        const msg = await safeText(res);
+        throw new Error(`멘토링 상품 생성 실패 (${res.status}) ${msg}`);
+    }
+
+    return res.json();
+}
+
+/** 직무 카테고리 목록 조회 */
+export async function fetchJobCategories(): Promise<JobCategory[]> {
+    const res = await fetch(`${BASE_URL}/job-categories`, {
+        credentials: 'include',
+    });
+
+    if (!res.ok) {
+        const msg = await safeText(res);
+        throw new Error(`직무 카테고리 조회 실패 (${res.status}) ${msg}`);
+    }
+
+    return res.json();
+}
+
+/** 멘토 목록 조회 */
+export async function fetchMentors(): Promise<Mentor[]> {
+    const res = await fetch(`${BASE_URL}/mentors`, {
+        credentials: 'include',
+    });
+
+    if (!res.ok) {
+        const msg = await safeText(res);
+        throw new Error(`멘토 목록 조회 실패 (${res.status}) ${msg}`);
+    }
+
+    return res.json();
+}
+
+/** 에러 메시지 보강용 */
+async function safeText(res: Response) {
+    try {
+        return await res.text();
+    } catch {
+        return '';
     }
 }
