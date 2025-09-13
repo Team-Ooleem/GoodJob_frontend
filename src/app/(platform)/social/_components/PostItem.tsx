@@ -381,83 +381,81 @@ export default function PostItem({
                         )}
 
                         {/* 댓글 입력 (본인이 작성한 글이 아닐 때만 표시) */}
-                        {!isOwnPost && (
-                            <form onSubmit={handleCommentSubmit(onCommentSubmit)}>
-                                <div className='flex items-center gap-3'>
-                                    <Avatar className='h-8 w-8'>
-                                        <AvatarImage
-                                            src={currentUserProfile?.profileImage}
-                                            alt={currentUserProfile?.name || '사용자'}
-                                        />
-                                        <AvatarFallback>
-                                            <User className='h-4 w-4' />
-                                        </AvatarFallback>
-                                    </Avatar>
-                                    <div className='flex-1'>
-                                        <div className='flex items-center bg-muted rounded-full px-4 py-2'>
-                                            <Input
-                                                {...registerComment('content', {
-                                                    required: '댓글을 입력해주세요.',
-                                                    minLength: {
-                                                        value: 1,
-                                                        message: '댓글을 입력해주세요.',
-                                                    },
-                                                    maxLength: {
-                                                        value: 500,
-                                                        message: '500자 이하로 입력해주세요.',
-                                                    },
-                                                })}
-                                                placeholder='댓글 남기기 (Enter 또는 등록 버튼)'
-                                                className={`bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-sm ${
-                                                    commentErrors.content ? 'text-destructive' : ''
-                                                }`}
-                                                disabled={createComment.isPending || !currentUserId}
-                                                onKeyDown={(
-                                                    e: React.KeyboardEvent<HTMLInputElement>,
-                                                ) => {
-                                                    if (e.key === 'Enter') {
-                                                        e.preventDefault();
-                                                        handleCommentSubmit(onCommentSubmit)();
-                                                    }
-                                                }}
-                                            />
-                                            <Button
-                                                type='submit'
-                                                size='sm'
-                                                disabled={
-                                                    !isCommentValid ||
-                                                    !commentContent.trim() ||
-                                                    !currentUserId ||
-                                                    createComment.isPending
+                        <form onSubmit={handleCommentSubmit(onCommentSubmit)}>
+                            <div className='flex items-center gap-3'>
+                                <Avatar className='h-8 w-8'>
+                                    <AvatarImage
+                                        src={currentUserProfile?.profileImage}
+                                        alt={currentUserProfile?.name || '사용자'}
+                                    />
+                                    <AvatarFallback>
+                                        <User className='h-4 w-4' />
+                                    </AvatarFallback>
+                                </Avatar>
+                                <div className='flex-1'>
+                                    <div className='flex items-center bg-muted rounded-full px-4 py-2'>
+                                        <Input
+                                            {...registerComment('content', {
+                                                required: '댓글을 입력해주세요.',
+                                                minLength: {
+                                                    value: 1,
+                                                    message: '댓글을 입력해주세요.',
+                                                },
+                                                maxLength: {
+                                                    value: 500,
+                                                    message: '500자 이하로 입력해주세요.',
+                                                },
+                                            })}
+                                            placeholder='댓글 남기기 (Enter 또는 등록 버튼)'
+                                            className={`bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-sm ${
+                                                commentErrors.content ? 'text-destructive' : ''
+                                            }`}
+                                            disabled={createComment.isPending || !currentUserId}
+                                            onKeyDown={(
+                                                e: React.KeyboardEvent<HTMLInputElement>,
+                                            ) => {
+                                                if (e.key === 'Enter') {
+                                                    e.preventDefault();
+                                                    handleCommentSubmit(onCommentSubmit)();
                                                 }
-                                                className='ml-2'
-                                            >
-                                                {createComment.isPending ? (
-                                                    <div className='animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-1'></div>
-                                                ) : null}
-                                                등록
-                                            </Button>
-                                        </div>
-                                        {commentErrors.content && (
-                                            <p className='text-destructive text-xs mt-1'>
-                                                {commentErrors.content.message as string}
-                                            </p>
-                                        )}
-                                        <div className='flex justify-between items-center mt-1'>
-                                            <span
-                                                className={`text-xs ${
-                                                    commentContent.length > 450
-                                                        ? 'text-destructive'
-                                                        : 'text-muted-foreground'
-                                                }`}
-                                            >
-                                                {commentContent.length}/500
-                                            </span>
-                                        </div>
+                                            }}
+                                        />
+                                        <Button
+                                            type='submit'
+                                            size='sm'
+                                            disabled={
+                                                !isCommentValid ||
+                                                !commentContent.trim() ||
+                                                !currentUserId ||
+                                                createComment.isPending
+                                            }
+                                            className='ml-2'
+                                        >
+                                            {createComment.isPending ? (
+                                                <div className='animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-1'></div>
+                                            ) : null}
+                                            등록
+                                        </Button>
+                                    </div>
+                                    {commentErrors.content && (
+                                        <p className='text-destructive text-xs mt-1'>
+                                            {commentErrors.content.message as string}
+                                        </p>
+                                    )}
+                                    <div className='flex justify-between items-center mt-1'>
+                                        <span
+                                            className={`text-xs ${
+                                                commentContent.length > 450
+                                                    ? 'text-destructive'
+                                                    : 'text-muted-foreground'
+                                            }`}
+                                        >
+                                            {commentContent.length}/500
+                                        </span>
                                     </div>
                                 </div>
-                            </form>
-                        )}
+                            </div>
+                        </form>
                     </>
                 )}
             </CardContent>
