@@ -130,18 +130,6 @@ export default function PostItem({
     // 본인이 작성한 글인지 확인
     const isOwnPost = post?.userId === currentUserId;
 
-    // 디버깅을 위한 로그 (개발 환경에서만)
-    if (process.env.NODE_ENV === 'development') {
-        console.log('PostItem Debug:', {
-            postIdx: post?.postIdx,
-            userId: post?.userId,
-            authorName: post?.authorName,
-            authorProfileImage: post?.authorProfileImage,
-            isLikedByCurrentUser: post?.isLikedByCurrentUser,
-            likeCount: post?.likeCount,
-        });
-    }
-
     return (
         <Card className='mb-4'>
             <CardContent className='p-6'>
@@ -177,24 +165,23 @@ export default function PostItem({
                     {isOwnPost ? (
                         <div className='flex gap-2'>
                             <Badge variant='secondary' className='text-xs'>
-                                내가 쓴 글
+                                me
                             </Badge>
                             <Button
                                 variant='outline'
                                 size='sm'
                                 onClick={handleDeletePost}
                                 disabled={deletePost.isPending}
-                                className='text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground'
+                                className='text-destructive border-destructive hover:bg-destructive hover:text-white'
                             >
                                 {deletePost.isPending ? (
                                     <div className='animate-spin rounded-full h-3 w-3 border-b-2 border-current mr-1'></div>
                                 ) : (
-                                    <Trash2 className='h-3 w-3 mr-1' />
+                                    <Trash2 className='h-3 w-3' />
                                 )}
-                                삭제
                             </Button>
                         </div>
-                    ) : false ? (
+                    ) : post?.isFollowingAuthor ? (
                         <Button
                             variant='outline'
                             size='sm'
@@ -253,9 +240,6 @@ export default function PostItem({
                         {post?.likeCount > 0 && (
                             <>
                                 <div className='flex -space-x-1'>
-                                    <div className='h-5 w-5 rounded-full bg-gradient-to-r from-sky-400 to-blue-500 flex items-center justify-center text-white text-xs shadow-sm'>
-                                        <ThumbsUp className='h-3 w-3' />
-                                    </div>
                                     <div className='h-5 w-5 rounded-full bg-gradient-to-r from-blue-400 to-sky-500 flex items-center justify-center text-white text-xs shadow-sm'>
                                         <Heart className='h-3 w-3' />
                                     </div>
@@ -364,7 +348,7 @@ export default function PostItem({
                                                         )
                                                     }
                                                     disabled={deleteComment.isPending}
-                                                    className='text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground rounded-full w-8 h-8 p-0'
+                                                    className='text-destructive border-destructive hover:bg-destructive hover:text-white rounded-full w-8 h-8 p-0'
                                                     title='댓글 삭제'
                                                 >
                                                     {deleteComment.isPending ? (
@@ -382,8 +366,8 @@ export default function PostItem({
 
                         {/* 댓글 입력 (본인이 작성한 글이 아닐 때만 표시) */}
                         <form onSubmit={handleCommentSubmit(onCommentSubmit)}>
-                            <div className='flex items-center gap-3'>
-                                <Avatar className='h-8 w-8'>
+                            <div className='flex gap-3'>
+                                <Avatar className='h-8 w-8 mt-1'>
                                     <AvatarImage
                                         src={currentUserProfile?.profileImage}
                                         alt={currentUserProfile?.name || '사용자'}
@@ -393,7 +377,7 @@ export default function PostItem({
                                     </AvatarFallback>
                                 </Avatar>
                                 <div className='flex-1'>
-                                    <div className='flex items-center bg-muted rounded-full px-4 py-2'>
+                                    <div className='flex items-center bg-muted'>
                                         <Input
                                             {...registerComment('content', {
                                                 required: '댓글을 입력해주세요.',

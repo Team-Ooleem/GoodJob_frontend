@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { User, Users, Star, Building2 } from 'lucide-react';
+import { User, Users, Star, Building2, Briefcase } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMyProfile } from '../_hooks';
 
@@ -85,37 +85,42 @@ export default function ProfileSection({ currentUserId }: ProfileSectionProps) {
                         <p className='text-muted-foreground text-sm mb-3'>{profile.bio}</p>
                     )}
 
-                    <Separator className='my-4' />
-
                     {/* 멘토 정보 */}
                     {profile?.isMentor && profile?.mentorProfile && (
-                        <div className='mb-4 p-3 bg-muted rounded-lg'>
-                            <div className='text-left space-y-1'>
-                                <div className='flex items-center gap-2 text-sm'>
-                                    <Building2 className='h-3 w-3 text-muted-foreground' />
-                                    <span>
-                                        {profile.mentorProfile?.businessName || '회사명 없음'}
-                                    </span>
-                                </div>
-                                <div className='flex items-center gap-2 text-sm'>
-                                    <span className='text-muted-foreground'>분야:</span>
-                                    <span>
-                                        {profile.mentorProfile?.preferredField || '분야 없음'}
-                                    </span>
-                                </div>
-                                <div className='flex items-center gap-2 text-sm'>
-                                    <Star className='h-3 w-3 text-yellow-500 dark:text-yellow-400' />
-                                    <span>
-                                        {profile.mentorProfile?.avgMentoringRating?.toFixed(1) ||
-                                            '0.0'}
-                                    </span>
-                                    <span className='text-muted-foreground'>
-                                        ({profile.mentorProfile?.totalMentoringReviews || 0}개 리뷰)
-                                    </span>
+                        <>
+                            <Separator className='my-4' />
+                            <div>
+                                <div className='text-left space-y-1'>
+                                    <div className='flex items-center gap-2 text-sm'>
+                                        <Building2 className='h-3 w-3 text-muted-foreground' />
+                                        <span>
+                                            {profile.mentorProfile?.businessName || '회사명 없음'}
+                                        </span>
+                                    </div>
+                                    <div className='flex items-center gap-2 text-sm'>
+                                        <Briefcase className='h-3 w-3 text-muted-foreground' />
+                                        <span>
+                                            {profile.mentorProfile?.preferredField || '분야 없음'}
+                                        </span>
+                                    </div>
+                                    <div className='flex items-center gap-2 text-sm'>
+                                        <Star className='h-3 w-3 text-yellow-500 dark:text-yellow-400' />
+                                        <span>
+                                            {profile.mentorProfile?.avgMentoringRating?.toFixed(
+                                                1,
+                                            ) || '0.0'}
+                                        </span>
+                                        <span className='text-muted-foreground'>
+                                            ({profile.mentorProfile?.totalMentoringReviews || 0}개
+                                            리뷰)
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        </>
                     )}
+
+                    <Separator className='my-4' />
 
                     {/* 소셜 통계 */}
                     <div className='space-y-3'>
