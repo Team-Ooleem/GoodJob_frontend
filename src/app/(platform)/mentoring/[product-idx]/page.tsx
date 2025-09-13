@@ -1,53 +1,80 @@
+'use client';
+
 import { StarRating } from '@/components/mentoring';
 import { ScrollToNavigator, Content, ReviewsSummary, ReviewItem } from '../_components';
+import { useMentoringProduct } from '../_hooks/useMentoringProduct';
+import { useMentoringProductReviews } from '../_hooks/useMentoringProductReviews';
 
-export default function ProductDetailPage() {
+type Props = { params: { 'product-idx': string } };
+
+export default function ProductDetailPage({ params }: Props) {
+    const productId = params['product-idx'];
+    const { data: product, isLoading, error } = useMentoringProduct(productId);
+    const {
+        data: reviewsData,
+        isLoading: isReviewsLoading,
+        error: reviewsError,
+    } = useMentoringProductReviews(productId, 10);
+
+    if (isLoading || isReviewsLoading) {
+        return (
+            <div className='w-full px-8 py-12 bg-muted'>
+                <div className='w-[1140px] mx-auto'>로딩 중...</div>
+            </div>
+        );
+    }
+
+    if (error || reviewsError) {
+        return (
+            <div className='w-full px-8 py-12 bg-muted'>
+                <div className='w-[1140px] mx-auto text-red-500'>
+                    오류: {(error || reviewsError)?.message}
+                </div>
+            </div>
+        );
+    }
+
     return (
         <>
             <div className='w-full px-8 py-12 bg-muted'>
                 <div className='w-[1140px] mx-auto flex justify-between'>
                     <div className='w-[700px] flex flex-col gap-3'>
                         <div className='flex flex-col gap-2'>
-                            <p className='text-sm'>개발 · 프로그래밍</p>
-                            <h1 className='text-4xl font-semibold'>
-                                #모의면접 #이력서 검토 #백엔드개발 #사이드프로젝트 #개발자 커리어
-                                #IT 업무 #매니징
-                            </h1>
+                            <p className='text-sm'>{product?.categoryName || '카테고리 미지정'}</p>
+                            <h1 className='text-4xl font-semibold'>{product?.title || '상품명'}</h1>
                         </div>
                         <div className='flex justify-start items-center gap-3'>
                             <div className='flex items-center gap-2'>
-                                <StarRating rating={5} />
+                                <StarRating rating={product?.ratingAverage ?? 0} />
                                 <p className='text-sm font-bold underline decoration-1'>
-                                    (5.0) 리뷰 70개
+                                    ({(product?.ratingAverage ?? 0).toFixed(1)}) 리뷰
+                                    {product?.reviewCount ?? 0}개
                                 </p>
                             </div>
                             <p className='text-sm font-normal'>
-                                멘티 <span className='font-bold'>162명</span>
+                                멘티{' '}
+                                <span className='font-bold'>{product?.menteeCount ?? 0}명</span>
                             </p>
                         </div>
                     </div>
                 </div>
             </div>
             <ScrollToNavigator />
-            <Content>
-                Content
-                <ReviewsSummary />
+            <Content product={product}>
+                <ReviewsSummary
+                    averageRating={reviewsData?.averageRating ?? product?.ratingAverage ?? 0}
+                    reviewCount={reviewsData?.reviewCount ?? product?.reviewCount ?? 0}
+                />
                 <div className='mt-10 flex flex-col'>
-                    <ReviewItem />
-                    <ReviewItem />
-                    <ReviewItem />
-                    <ReviewItem />
-                    <ReviewItem />
-                    <ReviewItem />
-                    <ReviewItem />
-                    <ReviewItem />
-                    <ReviewItem />
-                    <ReviewItem />
-                    <ReviewItem />
-                    <ReviewItem />
-                    <ReviewItem />
-                    <ReviewItem />
-                    <ReviewItem />
+                    {(reviewsData?.reviews ?? []).map((r) => (
+                        <ReviewItem
+                            key={r.reviewIdx}
+                            menteeName={r.menteeName}
+                            rating={r.rating}
+                            content={r.reviewContent}
+                            createdAt={r.createdAt}
+                        />
+                    ))}
                 </div>
             </Content>
         </>
