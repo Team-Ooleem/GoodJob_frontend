@@ -6,9 +6,6 @@ import { getQueryClient } from './get-query-client';
 import { ThemeProvider as NextThemesProvider } from 'next-themes';
 import { AntdRegistry } from '@ant-design/nextjs-registry';
 
-// components
-import { Header, Footer } from '@/components';
-
 interface ProvidersProps {
     children: React.ReactNode;
 }
@@ -24,11 +21,7 @@ export function Providers({ children }: ProvidersProps) {
                 enableSystem
                 disableTransitionOnChange
             >
-                <AntdRegistry>
-                    <Header />
-                    {children}
-                    <Footer />
-                </AntdRegistry>
+                <AntdRegistry>{children}</AntdRegistry>
             </NextThemesProvider>
             {process.env.NODE_ENV === 'development' && <ReactQueryDevtools initialIsOpen={false} />}
         </QueryClientProvider>
