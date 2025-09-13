@@ -1,60 +1,38 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useEffect, useMemo, useCallback } from 'react';
 import { CloseOutlined, LeftOutlined } from '@ant-design/icons';
-import axios from 'axios';
 import { useCanvasStore } from '../_stores/useCanvasStore';
+import { useRecordingStore } from '../_stores/useRecordingStore';
 import { useAudioPlayer } from '../_hooks/useAudioPlayer';
-import AudioPlayer from '../_components/AudioPlayer';
-import TranscriptList from '../_components/TranscriptList';
+import { useAudioMetadata } from '../_hooks/useAudioMetadata';
+import { useSessionData } from '../_hooks/useSessionData';
+import { useDragPosition } from '../_hooks/useDragPosition';
+import TranscriptList from './TranscriptList';
 import RecordingList from './RecordingList';
-import { API_BASE_URL } from '@/constants/config';
+import { ChatSession, SpeakerSegment, TranscriptItem } from '@/apis/Recording-api';
 
-interface SpeakerSegment {
-    speakerTag: number;
-    textContent: string;
-    startTime: number;
-    endTime: number;
-    audioUrl: string;
-}
-
-interface ChatSession {
-    sessionId: number;
-    segments: SpeakerSegment[];
-    timestamp: string;
-    mentor_idx: number;
-    mentee_idx: number;
-    segmentIndex: number;
-}
-
-type RecordingItem = {
+export type RecordingItem = {
     id: string;
     title: string;
     durationSec: number;
     createdAt: string;
 };
 
-type TranscriptItem = {
-    id: string;
-    speaker: '멘토' | '멘티';
-    timeSec: number;
-    text: string;
-    segment: SpeakerSegment;
-    session: ChatSession;
-};
-
 export function RecordingListPopup() {
+    // 스토어에서 상태 가져오기
     const isOpen = useCanvasStore((s) => s.isRecordingListOpen);
     const setOpen = useCanvasStore((s) => s.setRecordingListOpen);
+    const { selectedRecording, setSelectedRecording, isLoadingAudio, setIsLoadingAudio } =
+        useRecordingStore();
 
-    const [pos, setPos] = useState<{ x: number; y: number }>({ x: 40, y: 100 });
-    const dragState = useRef<{ dragging: boolean; offsetX: number; offsetY: number }>({
-        dragging: false,
-        offsetX: 0,
-        offsetY: 0,
-    });
+    // 커스텀 훅들
+    const { pos, handleMouseDown } = useDragPosition();
+    const { sessions, loading, error, fetchSessionMessages, loadMore, setSessions } =
+        useSessionData('default-canvas-uuid');
+    const { loadAudioMetadata } = useAudioMetadata();
 
-    // 오디오 플레이어 훅 사용
+    // 오디오 플레이어 훅
     const {
         playingSegment,
         currentSession,
@@ -65,179 +43,166 @@ export function RecordingListPopup() {
         isFullSessionMode,
         audioRef,
         playSegment,
-        playFullSession,
         stopAudio,
         handleTimeUpdate,
         handleAudioEnd,
         getAudioSources,
+        setCurrentSession,
+        setPlayingSegment,
+        setCurrentSegment,
+        setIsFullSessionMode,
+        setIsPlaying,
+        setCurrentTime,
+        setDuration,
     } = useAudioPlayer();
 
-    // 데이터 관련 상태
-    const [sessions, setSessions] = useState<ChatSession[]>([]);
-    const [loading, setLoading] = useState<boolean>(false);
-    const [error, setError] = useState<string | null>(null);
-    const [selected, setSelected] = useState<RecordingItem | null>(null);
-    const [page, setPage] = useState(1);
-
-    const canvasIdx = 'default-canvas-uuid';
-
-    // 백엔드에서 세션 데이터 가져오기 (axios 처리)
-    const fetchSessions = useCallback(
-        async (pageNum: number = 1) => {
-            setError(null);
+    // 오디오 로딩 함수 (useAudioLoading 훅 대신 직접 구현)
+    const loadAudioWithDuration = useCallback(
+        async (audioUrl: string, session: ChatSession) => {
+            setIsLoadingAudio(true);
             try {
-                const res = await axios.get(
-                    `${API_BASE_URL}/stt/session-messages/${canvasIdx}?page=${pageNum}`,
-                );
+                const audioDuration = await loadAudioMetadata(audioUrl);
+                setDuration(audioDuration);
 
-                if (res.data.success) {
-                    // 백엔드 응답 구조에 맞게 수정
-                    const sessions: ChatSession[] = res.data.messages.map((msg: any) => ({
-                        sessionId: msg.messageId,
-                        segments: msg.segments.map((seg: any) => ({
-                            speakerTag: seg.speakerTag,
-                            textContent: seg.textContent,
-                            startTime: parseFloat(seg.startTime),
-                            endTime: parseFloat(seg.endTime),
-                            audioUrl: msg.audioUrl,
-                        })),
-                        timestamp: msg.timestamp,
-                        mentor_idx: msg.mentor_idx,
-                        mentee_idx: msg.mentee_idx,
-                        segmentIndex: msg.segmentIndex,
-                    }));
-
-                    return sessions;
-                } else {
-                    setError(res.data.message);
-                    return [];
+                if (audioRef.current) {
+                    audioRef.current.src = audioUrl;
+                    audioRef.current.preload = 'auto';
+                    audioRef.current.load();
                 }
+
+                return audioDuration;
             } catch (error) {
-                setError(error instanceof Error ? error.message : 'Unknown error');
-                return [];
+                console.warn('Failed to load audio metadata:', error);
+                const fallbackDuration = Math.max(...session.segments.map((s) => s.endTime));
+                setDuration(fallbackDuration);
+                return fallbackDuration;
+            } finally {
+                setIsLoadingAudio(false);
             }
         },
-        [canvasIdx],
+        [loadAudioMetadata, setIsLoadingAudio, setDuration, audioRef],
     );
 
-    // 드래그 핸들러
-    useEffect(() => {
-        const onMove = (e: MouseEvent) => {
-            if (!dragState.current.dragging) return;
-            const nextX = e.clientX - dragState.current.offsetX;
-            const nextY = e.clientY - dragState.current.offsetY;
-            const maxX = window.innerWidth - 280;
-            const maxY = window.innerHeight - 180;
-            setPos({
-                x: Math.max(0, Math.min(nextX, maxX)),
-                y: Math.max(0, Math.min(nextY, maxY)),
-            });
-        };
-        const onUp = () => {
-            dragState.current.dragging = false;
-        };
-        window.addEventListener('mousemove', onMove);
-        window.addEventListener('mouseup', onUp);
-        return () => {
-            window.removeEventListener('mousemove', onMove);
-            window.removeEventListener('mouseup', onUp);
-        };
-    }, []);
-
+    // 데이터 로딩
     useEffect(() => {
         if (isOpen) {
             const loadData = async () => {
-                setLoading(true);
                 try {
-                    const sessions = await fetchSessions(1);
-                    setSessions(sessions); // ✅ 이 부분이 누락됨
+                    const sessions = await fetchSessionMessages(1);
+                    setSessions(sessions);
                 } catch (error) {
                     console.error('Failed to load sessions:', error);
-                } finally {
-                    setLoading(false);
                 }
             };
             loadData();
         }
-    }, [isOpen, fetchSessions]);
+    }, [isOpen, fetchSessionMessages, setSessions]);
 
-    // 무한스크롤
-    const loadMore = useCallback(async () => {
-        if (loading) return;
-        setLoading(true);
+    // 세션 로딩 최적화
+    useEffect(() => {
+        if (selectedRecording && sessions.length > 0) {
+            const session = sessions.find((s) => `rec-${s.sessionIdx}` === selectedRecording.id);
+            if (session) {
+                setCurrentSession(session as unknown as ChatSession);
+                setPlayingSegment(session.segments[0]);
+                setCurrentSegment(session.segments[0]);
+                setIsFullSessionMode(true);
+                setCurrentTime(0);
 
-        try {
-            const newSessions = await fetchSessions(page + 1);
-            if (newSessions.length > 0) {
-                setSessions((prev) => [...prev, ...newSessions]);
-                setPage((p) => p + 1);
+                const audioUrl = session.segments[0]?.audioUrl;
+                if (audioUrl) {
+                    loadAudioWithDuration(audioUrl, session as unknown as ChatSession);
+                }
             }
-        } catch (error) {
-            console.error('Failed to load more sessions:', error);
-        } finally {
-            setLoading(false);
         }
-    }, [loading, page, fetchSessions]);
+    }, [
+        selectedRecording,
+        sessions,
+        setCurrentSession,
+        setPlayingSegment,
+        setCurrentSegment,
+        setIsFullSessionMode,
+        setCurrentTime,
+        loadAudioWithDuration,
+    ]);
 
-    // 녹음메모 클릭 핸들러 (전체 오디오 재생)
-    const handleRecordingClick = useCallback(
-        (item: RecordingItem) => {
-            setSelected(item);
+    const getTotalDuration = (session: ChatSession): number => {
+        if (!session.segments || session.segments.length === 0) return 0;
 
-            // 해당 세션의 전체 오디오 재생
-            const session = sessions.find((s) => `rec-${s.sessionId}` === item.id);
-            if (session && session.segments.length > 0) {
-                playFullSession(session);
-            }
-        },
-        [sessions, playFullSession],
-    );
+        // audioDuration이 있으면 사용, 없으면 마지막 세그먼트의 endTime 사용
+        if (session.audioDuration && session.audioDuration > 0) {
+            return session.audioDuration;
+        }
 
-    // 녹음 목록 아이템 생성
+        const lastSegment = session.segments[session.segments.length - 1];
+        return lastSegment ? lastSegment.endTime : 0;
+    };
+
     const items = useMemo<RecordingItem[]>(() => {
         return sessions.map((session) => ({
-            id: `rec-${session.sessionId}`,
+            id: `rec-${session.sessionIdx}`,
             title: `음성 메모 ${session.segmentIndex}`,
-            durationSec: Math.max(...session.segments.map((s) => s.endTime)),
+            durationSec: getTotalDuration(session), // 🆕 타입 캐스팅 제거
             createdAt: new Date(session.timestamp).toLocaleString(),
         }));
     }, [sessions]);
 
-    // STT 타임라인 데이터 생성
     const transcripts = useMemo<TranscriptItem[]>(() => {
-        if (!selected) return [];
+        if (!selectedRecording) return [];
 
-        const session = sessions.find((s) => `rec-${s.sessionId}` === selected.id);
+        const session = sessions.find((s) => `rec-${s.sessionIdx}` === selectedRecording.id);
         if (!session) return [];
 
         return session.segments.map((seg, idx) => ({
-            id: `${selected.id}-line-${idx + 1}`,
+            id: `${selectedRecording.id}-line-${idx + 1}`,
             speaker: seg.speakerTag === 0 ? '멘토' : '멘티',
             timeSec: seg.startTime,
             text: seg.textContent,
             segment: seg,
-            session: session,
+            session: session, // �� 타입 캐스팅 제거
         }));
-    }, [selected, sessions]);
+    }, [selectedRecording, sessions]);
 
-    // 오디오 재생/일시정지 핸들러
-    const handlePlayPause = useCallback(() => {
-        if (audioRef.current) {
-            if (audioRef.current.paused) {
-                audioRef.current.play().catch(console.error);
+    //  핸들러들
+    const handleSegmentClick = useCallback(
+        (segment: SpeakerSegment, session: ChatSession) => {
+            if (isFullSessionMode && audioRef.current) {
+                audioRef.current.currentTime = segment.startTime;
+                setPlayingSegment(segment);
+                setCurrentSegment(segment);
             } else {
-                audioRef.current.pause();
+                playSegment(segment, session);
+            }
+        },
+        [isFullSessionMode, playSegment, setPlayingSegment, setCurrentSegment],
+    );
+
+    const handlePlayPause = useCallback(async () => {
+        if (audioRef.current) {
+            try {
+                if (audioRef.current.paused) {
+                    if (duration === 0) {
+                        await new Promise((resolve) => setTimeout(resolve, 100));
+                    }
+                    await audioRef.current.play();
+                    setIsPlaying(true);
+                } else {
+                    audioRef.current.pause();
+                    setIsPlaying(false);
+                }
+            } catch (error) {
+                if (error instanceof Error && error.name !== 'AbortError') {
+                    console.error('Audio play/pause error:', error);
+                }
             }
         }
-    }, [audioRef]);
+    }, [audioRef, duration, setIsPlaying]);
 
-    // 뒤로가기 핸들러
     const handleBack = useCallback(() => {
-        setSelected(null);
+        setSelectedRecording(null);
         stopAudio();
-    }, [stopAudio]);
+    }, [setSelectedRecording, stopAudio]);
 
-    // 닫기 핸들러
     const handleClose = useCallback(() => {
         setOpen(false);
         stopAudio();
@@ -247,20 +212,8 @@ export function RecordingListPopup() {
 
     return (
         <>
-            {/* 오디오 플레이어 */}
-            <AudioPlayer
-                playingSegment={playingSegment}
-                currentSegment={currentSegment}
-                currentSession={currentSession}
-                currentTime={currentTime}
-                duration={duration}
-                isPlaying={isPlaying}
-                onPlayPause={handlePlayPause}
-                onClose={stopAudio}
-            />
-
             {/* 숨겨진 오디오 엘리먼트 */}
-            {playingSegment && currentSegment && (
+            {currentSession && (
                 <audio
                     ref={audioRef}
                     onTimeUpdate={handleTimeUpdate}
@@ -270,9 +223,11 @@ export function RecordingListPopup() {
                     preload='none'
                     muted={false}
                 >
-                    {getAudioSources(currentSegment.audioUrl).map((source, index) => (
-                        <source key={index} src={source.src} type={source.type} />
-                    ))}
+                    {getAudioSources(currentSession.segments[0]?.audioUrl || '').map(
+                        (source, index) => (
+                            <source key={index} src={source.src} type={source.type} />
+                        ),
+                    )}
                 </audio>
             )}
 
@@ -284,21 +239,14 @@ export function RecordingListPopup() {
                 aria-modal='false'
                 aria-label='녹음 목록'
             >
-                <div className='w-[380px] min-h-[260px] bg-white rounded-xl shadow-[0_8px_24px_rgba(0,0,0,0.2)] border border-slate-200 overflow-hidden'>
+                <div className='w-[380px] h-[400px] bg-white rounded-xl shadow-[0_8px_24px_rgba(0,0,0,0.2)] border border-slate-200 overflow-hidden flex flex-col'>
                     {/* 헤더 */}
                     <div
-                        className='h-10 px-2 flex items-center justify-between bg-slate-50 border-b border-slate-200 cursor-move select-none'
-                        onMouseDown={(e) => {
-                            const rect = (
-                                e.currentTarget.parentElement as HTMLElement
-                            ).getBoundingClientRect();
-                            dragState.current.dragging = true;
-                            dragState.current.offsetX = e.clientX - rect.left;
-                            dragState.current.offsetY = e.clientY - rect.top;
-                        }}
+                        className='h-10 px-2 flex items-center justify-between bg-slate-50 border-b border-slate-200 cursor-move select-none flex-shrink-0'
+                        onMouseDown={handleMouseDown}
                     >
                         <div className='flex items-center gap-1'>
-                            {selected && (
+                            {selectedRecording && (
                                 <button
                                     aria-label='뒤로'
                                     className='p-1 rounded hover:bg-slate-200 cursor-pointer'
@@ -308,8 +256,13 @@ export function RecordingListPopup() {
                                 </button>
                             )}
                             <span className='text-sm font-medium text-slate-700'>
-                                {selected ? `${selected.title} • STT 타임라인` : '녹음 목록'}
+                                {selectedRecording
+                                    ? `${selectedRecording.title} • STT 타임라인`
+                                    : '녹음 목록'}
                             </span>
+                            {isLoadingAudio && (
+                                <div className='ml-2 w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin' />
+                            )}
                         </div>
                         <button
                             aria-label='닫기'
@@ -320,24 +273,33 @@ export function RecordingListPopup() {
                         </button>
                     </div>
 
-                    {/* 컨텐츠 */}
-                    {selected ? (
-                        <TranscriptList
-                            transcripts={transcripts}
-                            playingSegment={playingSegment}
-                            onPlaySegment={playSegment}
-                            isFullSessionMode={isFullSessionMode}
-                            audioRef={audioRef}
-                        />
-                    ) : (
-                        <RecordingList
-                            items={items}
-                            loading={loading}
-                            onRecordingClick={handleRecordingClick}
-                            onSelectItem={setSelected}
-                            onLoadMore={loadMore}
-                        />
-                    )}
+                    {/* 콘텐츠 영역 */}
+                    <div className='flex-1 overflow-hidden flex flex-col min-h-0'>
+                        {selectedRecording ? (
+                            <TranscriptList
+                                transcripts={transcripts}
+                                playingSegment={playingSegment}
+                                onPlaySegment={handleSegmentClick}
+                                isFullSessionMode={isFullSessionMode}
+                                audioRef={audioRef}
+                                currentSegment={currentSegment}
+                                currentSession={currentSession as ChatSession}
+                                currentTime={currentTime}
+                                duration={duration}
+                                isPlaying={isPlaying}
+                                onPlayPause={handlePlayPause}
+                                onClose={stopAudio}
+                            />
+                        ) : (
+                            <RecordingList
+                                items={items}
+                                loading={loading}
+                                onRecordingClick={() => {}}
+                                onSelectItem={setSelectedRecording}
+                                onLoadMore={loadMore}
+                            />
+                        )}
+                    </div>
                 </div>
             </div>
         </>

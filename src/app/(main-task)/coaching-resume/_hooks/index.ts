@@ -13,3 +13,8 @@ export * from './usePdfDrop';
 export * from './useAudioPlayer';
 export * from './useCollaborativeCursor';
 export * from './useWebRTC';
+
+export * from './useAudioLoading';
+export * from './useAudioMetadata';
+export * from './useSessionData';
+export * from './useDragPosition';
