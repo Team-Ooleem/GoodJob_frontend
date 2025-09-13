@@ -1,4 +1,4 @@
-export { useMyProfile, useAnotherUserProfile } from './useSocialProfile';
+export { useMyProfile } from './useSocialProfile';
 export { usePosts } from './usePosts';
 export { useComments } from './useComments';
 export { usePostMutations } from './usePostMutations';

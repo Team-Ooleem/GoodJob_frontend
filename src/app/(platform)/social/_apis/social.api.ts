@@ -24,29 +24,6 @@ export interface MyProfileInfo {
     };
 }
 
-// 다른 사용자 정보 조회 응답 타입
-export interface AnotherUserProfileInfo {
-    name: string;
-    profileImage?: string;
-    bio?: string;
-    followerCount: number;
-    followingCount: number;
-    totalPosts: number;
-    totalLikes: number;
-    joinDate: string;
-    isFollowing?: boolean; // 현재 사용자가 이 사용자를 팔로우하고 있는지 여부
-    isMentor: boolean;
-    mentorProfile?: {
-        businessName: string;
-        preferredField: string;
-        isApproved: boolean;
-        totalMentoringSessions: number;
-        totalMentoringReviews: number;
-        avgMentoringRating: number;
-        totalMentoringApplications: number;
-    };
-}
-
 export interface Post {
     postIdx: number;
     userId: number;
@@ -110,7 +87,7 @@ export interface DeleteResponse {
 
 // ===== 프로필 상세 페이지용 타입 정의 =====
 export interface UserProfileDetailResponse {
-    userInfo: AnotherUserProfileInfo;
+    userInfo: MyProfileInfo;
     posts: Post[];
     hasMore: boolean;
     nextCursor?: number;
@@ -129,14 +106,6 @@ export class SocialApi {
      */
     static async getMyProfile(): Promise<MyProfileInfo> {
         const response = await api.get<MyProfileInfo>('/social/profile/me');
-        return response.data;
-    }
-
-    /**
-     * 다른 사용자 정보 조회 API
-     */
-    static async getAnotherUserProfile(userId: string): Promise<AnotherUserProfileInfo> {
-        const response = await api.get<AnotherUserProfileInfo>(`/social/profile/${userId}`);
         return response.data;
     }
 
