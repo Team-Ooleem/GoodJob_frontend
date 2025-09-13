@@ -1,11 +1,12 @@
 'use client';
 
-import { Avatar, Card, Typography, Divider, Spin, Button } from 'antd';
-import { UserOutlined, EnvironmentOutlined, TeamOutlined } from '@ant-design/icons';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+import { User, Users, Star, Building2, Briefcase } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useSocialProfile } from '../_hooks';
-
-const { Text, Title } = Typography;
+import { useMyProfile } from '../_hooks';
 
 interface ProfileSectionProps {
     currentUserId: number;
@@ -16,24 +17,20 @@ export default function ProfileSection({ currentUserId }: ProfileSectionProps) {
 
     // 내 프로필 클릭 핸들러
     const handleMyProfileClick = () => {
-        router.push(`/user/social/profile/${currentUserId}`);
+        router.push(`/social/profile/${currentUserId}`);
     };
 
-    // 사용자 프로필 데이터 가져오기
-    const {
-        data: profile,
-        isLoading: profileLoading,
-        error: profileError,
-    } = useSocialProfile(currentUserId.toString());
+    // 내 프로필 데이터 가져오기
+    const { data: profile, isLoading: profileLoading, error: profileError } = useMyProfile();
 
     // 로딩 상태 처리
     if (profileLoading) {
         return (
             <div className='w-80 flex-shrink-0'>
                 <Card className='text-center'>
-                    <div className='flex justify-center items-center h-64'>
-                        <Spin size='large' />
-                    </div>
+                    <CardContent className='flex justify-center items-center h-64'>
+                        <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary'></div>
+                    </CardContent>
                 </Card>
             </div>
         );
@@ -44,12 +41,12 @@ export default function ProfileSection({ currentUserId }: ProfileSectionProps) {
         return (
             <div className='w-80 flex-shrink-0'>
                 <Card className='text-center'>
-                    <div className='flex flex-col justify-center items-center h-64'>
-                        <Text type='danger'>프로필을 불러오는데 실패했습니다.</Text>
-                        <Button onClick={() => window.location.reload()} className='mt-2'>
+                    <CardContent className='flex flex-col justify-center items-center h-64'>
+                        <p className='text-destructive mb-4'>프로필을 불러오는데 실패했습니다.</p>
+                        <Button onClick={() => window.location.reload()} variant='outline'>
                             다시 시도
                         </Button>
-                    </div>
+                    </CardContent>
                 </Card>
             </div>
         );
@@ -59,48 +56,105 @@ export default function ProfileSection({ currentUserId }: ProfileSectionProps) {
         return (
             <div className='w-80 flex-shrink-0'>
                 <Card className='text-center'>
-                    <div className='flex justify-center items-center h-64'>
-                        <Text>프로필 정보를 찾을 수 없습니다.</Text>
-                    </div>
+                    <CardContent className='flex justify-center items-center h-64'>
+                        <p className='text-muted-foreground'>프로필 정보를 찾을 수 없습니다.</p>
+                    </CardContent>
                 </Card>
             </div>
         );
     }
     return (
         <div className='w-80 flex-shrink-0'>
-            <Card className='!sticky top-0 text-center'>
-                <Avatar
-                    size={80}
-                    src={profile?.profileImage}
-                    icon={<UserOutlined />}
-                    className='mb-4'
-                />
-                <Title
-                    level={4}
-                    className='mb-2 cursor-pointer hover:text-blue-600 transition-colors'
-                    onClick={handleMyProfileClick}
-                >
-                    {profile?.name || '사용자'}
-                </Title>
-                <Text className='text-gray-600 block mb-1'>
-                    {profile?.jobTitle || '직책 정보 없음'}
-                </Text>
-                <Text className='text-gray-500 block mb-3'>
-                    <EnvironmentOutlined className='mr-1' />
-                    {profile?.residence || '위치 정보 없음'}
-                </Text>
+            <Card className='sticky top-16'>
+                <CardContent className='text-center p-6'>
+                    <Avatar className='h-20 w-20 mx-auto mb-4'>
+                        <AvatarImage src={profile?.profileImage} alt={profile?.name || '사용자'} />
+                        <AvatarFallback>
+                            <User className='h-8 w-8' />
+                        </AvatarFallback>
+                    </Avatar>
 
-                <Divider />
+                    <h3
+                        className='text-xl font-semibold mb-2 cursor-pointer hover:text-primary transition-colors'
+                        onClick={handleMyProfileClick}
+                    >
+                        {profile?.name || '사용자'}
+                    </h3>
 
-                <div className='text-left space-y-3'>
-                    <div className='flex items-center justify-between'>
-                        <Text className='text-gray-600'>
-                            <TeamOutlined className='mr-2' />
-                            팔로워
-                        </Text>
-                        <Text strong>{profile?.followerCount || 0}명</Text>
+                    {profile?.bio && (
+                        <p className='text-muted-foreground text-sm mb-3'>{profile.bio}</p>
+                    )}
+
+                    {/* 멘토 정보 */}
+                    {profile?.isMentor && profile?.mentorProfile && (
+                        <>
+                            <Separator className='my-4' />
+                            <div>
+                                <div className='text-left space-y-1'>
+                                    <div className='flex items-center gap-2 text-sm'>
+                                        <Building2 className='h-3 w-3 text-muted-foreground' />
+                                        <span>
+                                            {profile.mentorProfile?.businessName || '회사명 없음'}
+                                        </span>
+                                    </div>
+                                    <div className='flex items-center gap-2 text-sm'>
+                                        <Briefcase className='h-3 w-3 text-muted-foreground' />
+                                        <span>
+                                            {profile.mentorProfile?.preferredField || '분야 없음'}
+                                        </span>
+                                    </div>
+                                    <div className='flex items-center gap-2 text-sm'>
+                                        <Star className='h-3 w-3 text-yellow-500 dark:text-yellow-400' />
+                                        <span>
+                                            {profile.mentorProfile?.avgMentoringRating?.toFixed(
+                                                1,
+                                            ) || '0.0'}
+                                        </span>
+                                        <span className='text-muted-foreground'>
+                                            ({profile.mentorProfile?.totalMentoringReviews || 0}개
+                                            리뷰)
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    <Separator className='my-4' />
+
+                    {/* 소셜 통계 */}
+                    <div className='space-y-3'>
+                        <div className='flex items-center justify-between'>
+                            <div className='flex items-center gap-2 text-muted-foreground'>
+                                <Users className='h-4 w-4' />
+                                <span className='text-sm'>팔로워</span>
+                            </div>
+                            <span className='font-semibold'>{profile?.followerCount ?? 0}명</span>
+                        </div>
+
+                        <div className='flex items-center justify-between'>
+                            <div className='flex items-center gap-2 text-muted-foreground'>
+                                <Users className='h-4 w-4' />
+                                <span className='text-sm'>팔로잉</span>
+                            </div>
+                            <span className='font-semibold'>{profile?.followingCount ?? 0}명</span>
+                        </div>
+
+                        <div className='flex items-center justify-between'>
+                            <div className='flex items-center gap-2 text-muted-foreground'>
+                                <span className='text-sm'>게시글</span>
+                            </div>
+                            <span className='font-semibold'>{profile?.totalPosts ?? 0}개</span>
+                        </div>
+
+                        <div className='flex items-center justify-between'>
+                            <div className='flex items-center gap-2 text-muted-foreground'>
+                                <span className='text-sm'>받은 좋아요</span>
+                            </div>
+                            <span className='font-semibold'>{profile?.totalLikes ?? 0}개</span>
+                        </div>
                     </div>
-                </div>
+                </CardContent>
             </Card>
         </div>
     );

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { SpeakerSegment, ChatSession } from '@/apis/recoding-api';
 
+
 // 미니멀 다크 테마 오디오 플레이어 컴포넌트
 function AudioPlayer({
     playingSegment,

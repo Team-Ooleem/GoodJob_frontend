@@ -1,19 +1,30 @@
-import { UserProfileDetail } from './_components';
-import { Metadata } from 'next';
+'use client';
 
-interface ProfilePageProps {
+import { Suspense } from 'react';
+import { UserProfileLayout } from '../_components';
+
+interface UserProfilePageProps {
     params: {
         userId: string;
     };
 }
 
-export const metadata: Metadata = {
-    title: '프로필 | Good Job',
-    description: '사용자 프로필 상세 페이지',
-};
-
-export default function ProfilePage({ params }: ProfilePageProps) {
+export default function UserProfilePage({ params }: UserProfilePageProps) {
     const { userId } = params;
 
-    return <UserProfileDetail userId={userId} />;
+    return (
+        <div className='min-h-screen bg-background'>
+            <div className='container mx-auto'>
+                <Suspense
+                    fallback={
+                        <div className='flex justify-center items-center h-64'>
+                            <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary'></div>
+                        </div>
+                    }
+                >
+                    <UserProfileLayout userId={parseInt(userId)} />
+                </Suspense>
+            </div>
+        </div>
+    );
 }

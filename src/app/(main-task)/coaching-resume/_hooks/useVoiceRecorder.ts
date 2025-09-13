@@ -98,7 +98,7 @@ const calculateDuration = async (audioBlob: Blob, mimeType: string): Promise<num
     const blobSizeKB = audioBlob.size / 1024;
     let duration: number;
 
-    // 기본 추정값
+    // 기본
     if (mimeType === 'audio/mp4') {
         duration = Math.max(3, Math.min(30, blobSizeKB * 0.08));
     } else if (mimeType === 'audio/mp3') {
@@ -189,9 +189,9 @@ const processSTT = async (audioBlob: Blob, mimeType: string) => {
             duration: duration,
         };
 
-        console.log('🎵 녹음 완료 - STT 처리 시작');
+        console.log('녹음 완료 - STT 처리 시작');
         await axios.post(`${API_BASE_URL}/stt/transcribe-with-context`, requestData);
-        console.log('✅ STT 처리 완료');
+        console.log('STT 처리 완료');
     } catch (err) {
         console.error('STT 또는 DB 처리 실패', err);
     }
@@ -241,7 +241,7 @@ export const startRecording = async () => {
         };
 
         mediaRecorderRef.current.onstop = async () => {
-            console.log('�� 녹음 중지됨 - STT 처리 시작');
+            console.log(' 녹음 중지됨 - STT 처리 시작');
             const audioBlob = new Blob(audioChunksRef.current, { type: selectedType });
             await processSTT(audioBlob, mimeType);
 
@@ -261,7 +261,7 @@ export const startRecording = async () => {
 
 /** 📊 녹음 상태 확인 함수 */
 export const stopRecording = () => {
-    console.log('🛑 stopRecording 호출');
+    console.log('stopRecording 호출');
 
     if (mediaRecorderRef.current?.state === 'recording') {
         mediaRecorderRef.current.stop();

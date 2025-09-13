@@ -308,7 +308,7 @@ export default function AiInterviewSettingCalibrationCombined() {
                                 {phase === 'done' && (
                                     <Button
                                         onClick={resetCalibration}
-                                        size='small'
+                                        size='sm'
                                         disabled={isProcessing}
                                     >
                                         다시 녹음하기
@@ -320,7 +320,7 @@ export default function AiInterviewSettingCalibrationCombined() {
 
                             {/* 캘리브레이션 문장 */}
                             <blockquote className='text-2xl text-green-500/80 italic text-center px-6 py-4 border rounded-2xl bg-green-50/40'>
-                                “{CALI_TEXT}”
+                                "{CALI_TEXT}"
                             </blockquote>
 
                             {/* 액션들 */}
@@ -333,7 +333,7 @@ export default function AiInterviewSettingCalibrationCombined() {
                                 >
                                     AI 모의면접 시작하기
                                 </Button>
-                            )}
+                            </div>
 
                             <Button
                                 size='lg'
@@ -348,34 +348,34 @@ export default function AiInterviewSettingCalibrationCombined() {
                             </Button>
                         </div>
                     </div>
-                </CardContent>
 
-                {/* Audio Visualization - Bottom */}
-                {phase === 'running' && (
-                    <div className='px-8 pb-6 relative'>
-                        <div className='flex items-center justify-center gap-2'>
-                            <Mic className='text-green-500 text-lg animate-pulse' />
-                            <span className='text-sm text-gray-600 mr-4'>음성 감지 중</span>
-                            {/* Audio Level Visualization */}
-                            <div className='flex items-center gap-1 relative'>
-                                {/* Glow effect behind the bars */}
-                                <div className='absolute inset-0 bg-green-400/20 rounded-full blur-md animate-pulse'></div>
-                                {[...Array(12)].map((_, i) => (
-                                    <div
-                                        key={i}
-                                        className={`w-1.5 bg-gradient-to-t from-green-400 to-green-600 rounded-full animate-pulse relative z-10 shadow-lg shadow-green-400/50`}
-                                        style={{
-                                            height: `${Math.random() * 24 + 10}px`,
-                                            animationDelay: `${i * 50}ms`,
-                                            animationDuration: `${600 + Math.random() * 300}ms`,
-                                        }}
-                                    />
-                                ))}
+                    {/* Audio Visualization - Bottom */}
+                    {phase === 'running' && (
+                        <div className='px-8 pb-6 relative'>
+                            <div className='flex items-center justify-center gap-2'>
+                                <Mic className='text-green-500 text-lg animate-pulse' />
+                                <span className='text-sm text-gray-600 mr-4'>음성 감지 중</span>
+                                {/* Audio Level Visualization */}
+                                <div className='flex items-center gap-1 relative'>
+                                    {/* Glow effect behind the bars */}
+                                    <div className='absolute inset-0 bg-green-400/20 rounded-full blur-md animate-pulse'></div>
+                                    {[...Array(12)].map((_, i) => (
+                                        <div
+                                            key={i}
+                                            className={`w-1.5 bg-gradient-to-t from-green-400 to-green-600 rounded-full animate-pulse relative z-10 shadow-lg shadow-green-400/50`}
+                                            style={{
+                                                height: `${Math.random() * 24 + 10}px`,
+                                                animationDelay: `${i * 50}ms`,
+                                                animationDuration: `${600 + Math.random() * 300}ms`,
+                                            }}
+                                        />
+                                    ))}
+                                </div>
                             </div>
                         </div>
-                    </Card>
-                </div>
-            </div>
+                    )}
+                </CardContent>
+            </Card>
         </div>
     );
 }

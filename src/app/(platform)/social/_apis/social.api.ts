@@ -1,73 +1,52 @@
 import { api } from '@/apis/api';
 
-// ===== 타입 정의 =====
-export interface SocialProfile {
-    name: string;
-    profileImage: string | null;
-    shortBio: string;
-    bio: string;
-    jobTitle: string;
-    residence: string;
-    currentPosition: string;
-    followerCount: number;
-    isFollowing?: boolean;
+// ===== API 타입 정의 =====
+
+// 멘토 프로필 정보 (멘토인 경우에만 존재)
+export interface MentorProfile {
+    businessName: string; // 사업체명
+    preferredField: string; // 전문분야
+    isApproved: boolean; // 멘토 승인 상태
+    totalMentoringSessions: number; // 완료된 멘토링 세션 수
+    totalMentoringReviews: number; // 총 리뷰 수
+    avgMentoringRating: number; // 평균 평점
+    totalMentoringApplications: number; // 총 멘토링 신청 수
+    introduction?: string; // 멘토 소개글
+    portfolioLink?: string; // 포트폴리오 링크
 }
 
-// 새로운 API 명세에 맞는 타입들
-export interface UserProfileInfo {
-    // 기본 정보
+// 내 정보 조회 응답 타입 (기존 호환성 유지)
+export interface MyProfileInfo {
+    userIdx: number;
     name: string;
     profileImage?: string;
-    shortBio?: string;
     bio?: string;
-    phone?: string;
-    email?: string;
-
-    // 희망 정보
-    desiredJobTitle?: string;
-    desiredLocation?: string;
-    desiredSalary?: string;
-
-    // 소셜 정보
     followerCount: number;
     followingCount: number;
-    isFollowing?: boolean; // 현재 사용자가 이 유저를 팔로우하고 있는지 여부
-
-    // 경력 정보
-    careers?: {
-        companyName: string;
-        position: string;
-        department?: string;
-        jobTitle?: string;
-        startDate: string;
-        endDate?: string;
-        isCurrent: boolean;
-        description?: string;
-        companyType?: string;
-    }[];
-
-    // 학력 정보
-    education?: {
-        schoolName: string;
-        major: string;
-        degreeName: string;
-        startDate: string;
-        endDate?: string;
-        isCurrent: boolean;
-    }[];
-
-    // 보유 기술
-    skills?: string[];
-
-    // 이력서 정보
-    resumeInfo?: {
-        resumeId: number;
-        title: string;
-        createdAt: string;
-        updatedAt: string;
-    }[];
+    totalPosts: number;
+    totalLikes: number;
+    joinDate: string;
+    isMentor: boolean;
+    mentorProfile?: MentorProfile;
 }
 
+// 사용자 프로필 조회 응답 타입
+export interface UserProfileResponse {
+    userIdx: number;
+    name: string;
+    profileImage?: string;
+    bio?: string;
+    followerCount: number;
+    followingCount: number;
+    totalPosts: number;
+    totalLikes: number;
+    joinDate: string;
+    isMentor: boolean;
+    isFollowing: boolean; // 현재 사용자가 팔로우하고 있는지
+    mentorProfile?: MentorProfile;
+}
+
+// 기존 Post 타입 (호환성 유지)
 export interface Post {
     postIdx: number;
     userId: number;
@@ -75,19 +54,12 @@ export interface Post {
     mediaUrl?: string;
     createdAt: string;
     updatedAt: string;
-    author: {
-        name: string;
-        profileImage?: string;
-    };
+    authorName: string;
+    authorProfileImage?: string | null;
     likeCount: number;
     commentCount: number;
-    isLiked: boolean;
-    // 기존 호환성을 위한 필드들 (점진적 마이그레이션용)
-    authorName?: string;
-    authorProfileImage?: string | null;
-    authorShortBio?: string;
-    isLikedByCurrentUser?: boolean;
-    isFollowingAuthor?: boolean;
+    isLikedByCurrentUser: boolean;
+    isFollowingAuthor: boolean;
 }
 
 export interface PostsResponse {
@@ -136,38 +108,13 @@ export interface DeleteResponse {
     message: string;
 }
 
-// ===== 프로필 상세 페이지용 타입 정의 =====
-export interface UserProfileDetailResponse {
-    userInfo: UserProfileInfo;
-    posts: Post[];
-    hasMore: boolean;
-    nextCursor?: number;
-}
-
-export interface UserPostsResponse {
-    posts: Post[];
-    hasMore: boolean;
-    nextCursor?: number;
-}
-
 // ===== API 서비스 클래스 =====
 export class SocialApi {
     /**
-     * 사용자 소셜 프로필 정보를 가져오는 API
+     * 내 정보 조회 API
      */
-    static async getProfile(userId: string): Promise<SocialProfile> {
-        const response = await api.get<SocialProfile>(`/social/profile/${userId}`);
-        return response.data;
-    }
-
-    /**
-     * 사용자 소셜 프로필 정보를 업데이트하는 API
-     */
-    static async updateProfile(
-        userId: string,
-        profileData: Partial<SocialProfile>,
-    ): Promise<SocialProfile> {
-        const response = await api.patch<SocialProfile>(`/social/profile/${userId}`, profileData);
+    static async getMyProfile(): Promise<MyProfileInfo> {
+        const response = await api.get<MyProfileInfo>('/social/profile/me');
         return response.data;
     }
 
@@ -287,75 +234,6 @@ export class SocialApi {
         const response = await api.delete(`/social/posts/${postId}`, {
             data: { userId },
         });
-        return response.data;
-    }
-
-    /**
-     * 사용자 기본 프로필 정보 조회
-     */
-    static async getUserProfile(
-        targetUserId: string,
-        currentUserId: number,
-    ): Promise<UserProfileInfo> {
-        const params = new URLSearchParams({
-            currentUserId: currentUserId.toString(),
-        });
-
-        const response = await api.get<UserProfileInfo>(
-            `/social/profile/${targetUserId}?${params.toString()}`,
-        );
-        return response.data;
-    }
-
-    /**
-     * 사용자 상세 프로필 정보 조회 (프로필 + 포스트)
-     */
-    static async getUserProfileDetail(
-        targetUserId: string,
-        currentUserId: number,
-        postsLimit: number = 10,
-        postsCursor?: number,
-    ): Promise<UserProfileDetailResponse> {
-        const params = new URLSearchParams({
-            currentUserId: currentUserId.toString(),
-            limit: postsLimit.toString(),
-        });
-
-        if (postsCursor !== undefined) {
-            params.append('cursor', postsCursor.toString());
-        }
-
-        const response = await api.get<UserProfileDetailResponse>(
-            `/social/profile/${targetUserId}/detail?${params.toString()}`,
-        );
-        return response.data;
-    }
-
-    /**
-     * 특정 사용자의 포스트만 조회
-     */
-    static async getUserPosts(
-        targetUserId: string,
-        currentUserId: number,
-        limit: number = 10,
-        cursor?: number,
-    ): Promise<UserPostsResponse> {
-        if (limit < 1 || limit > 20) {
-            throw new Error('limit은 1-20 사이의 값이어야 합니다.');
-        }
-
-        const params = new URLSearchParams({
-            currentUserId: currentUserId.toString(),
-            limit: limit.toString(),
-        });
-
-        if (cursor !== undefined) {
-            params.append('cursor', cursor.toString());
-        }
-
-        const response = await api.get<UserPostsResponse>(
-            `/social/posts/user/${targetUserId}?${params.toString()}`,
-        );
         return response.data;
     }
 }

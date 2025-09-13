@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { ChatSession, SpeakerSegment, RecordingItem, TranscriptItem } from '@/apis/recoding-api';
 
+
 export function useAudioPlayer() {
     const [playingSegment, setPlayingSegment] = useState<SpeakerSegment | null>(null);
     const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
