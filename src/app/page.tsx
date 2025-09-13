@@ -1,3 +1,10 @@
+import PlatformPage from './(platform)/page';
+import UserLayout from './(platform)/layout';
+
 export default function Home() {
-    return null;
+    return (
+        <UserLayout>
+            <PlatformPage />
+        </UserLayout>
+    );
 }

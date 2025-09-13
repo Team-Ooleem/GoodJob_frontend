@@ -24,11 +24,7 @@ export function Providers({ children }: ProvidersProps) {
                 enableSystem
                 disableTransitionOnChange
             >
-                <AntdRegistry>
-                    <Header />
-                    {children}
-                    <Footer />
-                </AntdRegistry>
+                <AntdRegistry>{children}</AntdRegistry>
             </NextThemesProvider>
             {process.env.NODE_ENV === 'development' && <ReactQueryDevtools initialIsOpen={false} />}
         </QueryClientProvider>
