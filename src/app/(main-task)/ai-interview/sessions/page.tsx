@@ -6,11 +6,11 @@ import { message } from 'antd';
 import { useInterviewAnalysis } from '@/hooks/use-interview-analysis';
 import { blobToBase64, resampleTo16kHzMonoWav } from '@/utils/audio';
 import axios from 'axios';
-import { api } from '@/apis/api'; // 경로는 실제 위치에 맞게 조정
+import { api } from '@/apis/api';
 import { AI_API_BASE, API_BASE_URL } from '@/constants/config';
 import { speakSync, type SpeakSyncResponse } from '@/apis/avatar-api';
 
-// ===== 추가: WAV 레코더 유틸 =====
+// ===== WAV 레코더 유틸 =====
 class WavRecorder {
     private audioCtx: AudioContext | null = null;
     private stream: MediaStream | null = null;
@@ -18,17 +18,15 @@ class WavRecorder {
     private processor: ScriptProcessorNode | null = null;
     private buffers: Float32Array[] = [];
     private recording = false;
-    private stopped = false; // ⬅️ 추가: 중복 stop 방지 플래그
+    private stopped = false;
 
     async start() {
-        // 이미 켜져있다면 무시 (혹은 먼저 stop() 호출)
         if (this.recording) return;
         this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         this.audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
         this.source = this.audioCtx.createMediaStreamSource(this.stream);
         this.processor = this.audioCtx.createScriptProcessor(4096, 1, 1);
         this.source.connect(this.processor);
-        // ScriptProcessor는 destination에 연결해야 onaudioprocess가 트리거됨
         this.processor.connect(this.audioCtx.destination);
 
         this.buffers = [];
@@ -43,15 +41,12 @@ class WavRecorder {
     }
 
     async stop(): Promise<Blob> {
-        // ⬇️ 중복 호출 방지
         if (this.stopped) {
-            // 이미 만들어둔 마지막 WAV가 없다면 최소한의 빈 WAV라도 반환
             return this.encodeWAV(new Float32Array(0), this.audioCtx?.sampleRate || 44100);
         }
         this.stopped = true;
         this.recording = false;
 
-        // 안전하게 끊기
         try {
             if (this.processor) this.processor.onaudioprocess = null;
         } catch {}
@@ -69,13 +64,11 @@ class WavRecorder {
         const samples = this.merge(this.buffers);
         const wav = this.encodeWAV(samples, sr);
 
-        // AudioContext 닫기 (닫힌 상태면 skip)
         try {
             if (this.audioCtx && this.audioCtx.state !== 'closed') {
                 await this.audioCtx.close();
             }
         } catch {
-            // InvalidStateError 등은 무시
         } finally {
             this.audioCtx = null;
             this.stream = null;
@@ -118,8 +111,8 @@ class WavRecorder {
         writeString(8, 'WAVE');
         writeString(12, 'fmt ');
         view.setUint32(16, 16, true);
-        view.setUint16(20, 1, true); // PCM
-        view.setUint16(22, 1, true); // mono
+        view.setUint16(20, 1, true);
+        view.setUint16(22, 1, true);
         view.setUint32(24, sampleRate, true);
         view.setUint32(28, sampleRate * 2, true);
         view.setUint16(32, 2, true);
@@ -163,7 +156,6 @@ interface AudioFeatures {
     voiced_ratio?: number;
     voiced_frames?: number;
     total_frames?: number;
-    // Diagnostics
     voiced_prob_mean?: number;
     voiced_prob_median?: number;
     voiced_prob_p90?: number;
@@ -183,157 +175,58 @@ interface InterviewSession {
     timeSpent: number;
     detectionData: any[];
     timestamp: Date;
-    // ===== 추가: 오디오 관련 필드 =====
-    audioUrl?: string; // 클라이언트에서 재생용
-    audioFeatures?: AudioFeatures; // 서버 분석 결과
+    audioUrl?: string;
+    audioFeatures?: AudioFeatures;
 }
 
-export default function AiInterviewSessionsPage() {
-    const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-    const [isRecording, setIsRecording] = useState(false);
-    const [timeLeft, setTimeLeft] = useState(60);
+// ===== 질문 관리 훅 =====
+const useQuestionManager = () => {
+    const [questions, setQuestions] = useState<QuestionDto[]>([]);
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const [isLoading, setIsLoading] = useState(false);
+
+    const currentQuestion = questions[currentIndex] || null;
+    const hasCurrentQuestion = !!currentQuestion;
+    const questionText = currentQuestion?.text || '';
+    const questionId = currentQuestion?.id || `q${currentIndex + 1}`;
+    const aggregateId = `q${currentIndex + 1}`;
+
+    const addQuestion = (question: QuestionDto) => {
+        setQuestions((prev) => [...prev, question]);
+    };
+
+    const moveToNext = () => {
+        setCurrentIndex((prev) => prev + 1);
+    };
+
+    const isLastQuestion = (maxQuestions: number) => {
+        return currentIndex >= maxQuestions - 1;
+    };
+
+    return {
+        questions,
+        currentIndex,
+        currentQuestion,
+        hasCurrentQuestion,
+        questionText,
+        questionId,
+        aggregateId,
+        isLoading,
+        setIsLoading,
+        addQuestion,
+        moveToNext,
+        isLastQuestion,
+    };
+};
+
+// ===== TTS 관리 훅 =====
+const useTTSManager = () => {
     const [isSpeaking, setIsSpeaking] = useState(false);
     const [avatarVideoUrl, setAvatarVideoUrl] = useState<string | null>(null);
-    const [sessions, setSessions] = useState<InterviewSession[]>([]);
-    const [currentSession, setCurrentSession] = useState<InterviewSession | null>(null);
-    const [detectionHistory, setDetectionHistory] = useState<any[]>([]);
-    const [transcribedText, setTranscribedText] = useState('');
-    const [qaList, setQaList] = useState<Array<{ question: string; answer: string }>>([]);
-    // 동적 질문 목록 (AI 생성)
-    const [dynamicQuestions, setDynamicQuestions] = useState<QuestionDto[]>([]);
-    // 전체 문항 수(기존 더미와 동일하게 3로 유지; 필요 시 조정)
-    const MAX_QUESTIONS = 1;
-
-    const timerRef = useRef<NodeJS.Timeout | null>(null);
-    const speakingTimerRef = useRef<NodeJS.Timeout | null>(null);
-    const recognitionRef = useRef<any>(null);
-    const completingRef = useRef(false); // 완료 처리 재진입 가드
-    const webcamRef = useRef<WebcamHandle>(null);
     const isSpeakingRef = useRef(false);
-    const lastSpokenQuestionIdRef = useRef<string | null>(null);
+    const lastSpokenQuestionRef = useRef<string | null>(null);
+    const speakingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-    // ===== 추가: WAV 레코더 인스턴스 & 최신 오디오 Blob 참조 =====
-    const recorderRef = useRef<WavRecorder | null>(null);
-    const lastAudioBlobRef = useRef<Blob | null>(null);
-
-    // 컴포넌트 내부: 세션ID를 한 번 생성해 유지 (uuid 없어도 OK)
-    const sessionIdRef = useRef<string>(
-        `sess_${Math.random().toString(36).slice(2, 10)}_${Date.now()}`,
-    );
-    const SESSION_ID = sessionIdRef.current as any as string;
-    // // 질문ID는 q1/q2/... 형태로 쓸게요.
-    // const qid = `q${currentQuestionIndex + 1}`;
-    // const qtext = interviewData.questions[currentQuestionIndex];
-    // 현재 질문(동적). 아직 로딩 전이면 undefined
-    const currentQuestion = dynamicQuestions[currentQuestionIndex];
-    // 초기 렌더에서 더미 질문이 화면에 잠깐 보였다가 바뀌는 문제를 막기 위해,
-    // 동적 질문이 준비되기 전엔 질문 텍스트를 비워둔다.
-    const qtext = currentQuestion?.text || '';
-    // 집계/메트릭 전송에는 q1/q2/... (기존 규칙 유지)
-    const aggQid = `q${currentQuestionIndex + 1}`;
-    // 웹캠 startQuestion에는 실제 질문 ID를 전달(없으면 aggQid)
-    const currentQuestionId = currentQuestion?.id ?? aggQid;
-
-    // react-query hook
-    const interviewAnalysisMutation = useInterviewAnalysis();
-
-    // const AI_API_BASE = `${process.env.NEXT_PUBLIC_API_BASE_URL}/ai`;
-
-    // ===== API 클라이언트 유틸 =====
-    async function fetchFirstQuestion(): Promise<QuestionDto> {
-        //if (!AI_API_BASE) throw new Error('NEXT_PUBLIC_API_BASE_URL 미설정');
-        // select/page.tsx에서 저장한 선택 이력서/채용공고 URL 활용
-        type SelectedResume = {
-            id: number;
-            title?: string;
-            position?: string;
-            company?: string;
-            createdAt?: string;
-            experience?: string;
-            skills?: string[];
-        };
-
-        // 선택된 이력서 기반: 우선 ID를 서버로 전달(서버에서 PDF 텍스트/파싱 활용)
-        const selectedResumeId = sessionStorage.getItem('selectedResumeId') || undefined; // resume-file id (string)
-
-        let resumeSummary: string | null = null; // 하위 호환: 요약 텍스트 기반
-        try {
-            const raw = sessionStorage.getItem('selectedResume');
-            if (raw) {
-                const r = JSON.parse(raw) as SelectedResume;
-                const parts = [
-                    r.title,
-                    r.position ? `포지션: ${r.position}` : undefined,
-                    r.company ? `회사: ${r.company}` : undefined,
-                    r.experience ? `경력: ${r.experience}` : undefined,
-                    Array.isArray(r.skills) && r.skills.length
-                        ? `기술: ${r.skills.join(', ')}`
-                        : undefined,
-                ].filter(Boolean) as string[];
-                if (parts.length) {
-                    resumeSummary = parts.join(' | ');
-                }
-            }
-        } catch (e) {
-            console.warn('selectedResume 파싱 실패:', e);
-        }
-
-        // 폴백: 예전 로컬 저장 요약 또는 기본값
-        if (!resumeSummary) {
-            resumeSummary =
-                localStorage.getItem('resumeSummary') ||
-                '프론트엔드 경력 3년, Next.js/React, 크래프톤 정글 (부트캠프) 수료, Pintos 운영체제 프로젝트 수행 경험';
-        }
-
-        const jobPostUrl = sessionStorage.getItem('jobPostUrl') || undefined;
-        const payload: any = {};
-        // 서버가 resumeId를 우선 사용하도록 전달하고, 없으면 요약 텍스트 전달
-        if (selectedResumeId) payload.resumeFileId = selectedResumeId;
-        else payload.resumeSummary = resumeSummary;
-        if (jobPostUrl) payload.jobPostUrl = jobPostUrl;
-
-        const res = await api.post(`ai/question`, payload, { timeout: 60000 });
-        const data = res.data as { question: QuestionDto };
-        return data.question;
-    }
-
-    async function fetchFollowup(original: QuestionDto, answer: string): Promise<QuestionDto> {
-        //if (!AI_API_BASE) throw new Error('NEXT_PUBLIC_API_BASE_URL 미설정');
-        const res = await api.post(
-            `ai/followups`,
-            { originalQuestion: original, answer },
-            { timeout: 60000 },
-        );
-        const data = res.data as {
-            followups: Array<{ id: string; parentId: string; text: string; reason: string }>;
-        };
-        return { id: data.followups[0].id, text: data.followups[0].text };
-    }
-
-    const [isCompleting, setIsCompleting] = useState(false); // (선택) UI에서 버튼 비활성화 등에 사용
-
-    //const STT_API_BASE = `${process.env.NEXT_PUBLIC_API_BASE_URL}/stt`;
-
-    async function transcribeWithGoogleSTT(wavBlob: Blob): Promise<string> {
-        //if (!STT_API_BASE) throw new Error('NEXT_PUBLIC_STT_API_BASE_URL 미설정');
-        // (권장) 16kHz 리샘플 후 전송 — 이미 구현해둔 함수 재사용
-        const wav16k = await resampleTo16kHzMonoWav(wavBlob);
-
-        const form = new FormData();
-        form.append('file', wav16k, 'answer.wav'); // 필드명은 서버의 FileInterceptor('file')와 동일해야 함
-
-        const res = await api.post(`stt/transcribe-file`, form, {
-            timeout: 120000,
-            // ❗️Content-Type 수동 지정 금지(axios가 boundary 자동 설정)
-            // headers: { 'Content-Type': 'multipart/form-data' }
-        });
-
-        const data = res.data as { success: boolean; result: { transcript: string } };
-        if (!data?.success) throw new Error('STT 실패');
-        return data.result.transcript || '';
-    }
-
-    // Axios 오류에서 Blob 본문을 텍스트로 디코드해 자세한 원인을 로깅
     const logAxiosBlobError = async (ctx: string, err: any) => {
         try {
             const status = err?.response?.status;
@@ -358,17 +251,11 @@ export default function AiInterviewSessionsPage() {
     };
 
     const synthesizeSpeech = async (text: string): Promise<string> => {
-        //const TTS_API_BASE = `${process.env.NEXT_PUBLIC_API_BASE_URL}/tts`;
-        //if (!TTS_API_BASE) throw new Error('NEXT_PUBLIC_API_BASE_URL 미설정');
-
         try {
             const response = await api.post(
                 `tts/synthesize`,
                 {
-                    // 우선 최소 필드로 요청 (백엔드 기본값 사용)
                     text,
-                    // 언어/보이스는 서버가 지원하지 않을 수 있어 기본은 생략
-                    // 필요 시 환경변수로 덮어쓰기
                     ...(process.env.NEXT_PUBLIC_TTS_LANGUAGE_CODE
                         ? { languageCode: process.env.NEXT_PUBLIC_TTS_LANGUAGE_CODE }
                         : {}),
@@ -382,8 +269,6 @@ export default function AiInterviewSessionsPage() {
                 {
                     timeout: 30000,
                     responseType: 'blob',
-                    // 일부 서버에서 쿠키가 필요 없다면 크로스도메인 이슈를 줄이기 위해 비활성화 가능
-                    // withCredentials: false,
                 },
             );
 
@@ -393,10 +278,9 @@ export default function AiInterviewSessionsPage() {
             console.error('TTS 요청 실패:', error);
             await logAxiosBlobError('TTS', error);
 
-            // 400 등 유효성 실패 시, 안전한 한국어 표준 보이스로 1회 재시도
             try {
                 const fallbackVoice =
-                    process.env.NEXT_PUBLIC_TTS_FALLBACK_VOICE_NAME || 'ko-KR-Standard-A';
+                    process.env.NEXT_PUBLIC_TTS_FALLBACK_VOICE_NAME || 'ko-KR-Chirp3-HD-Charon';
                 const response2 = await api.post(
                     `tts/synthesize`,
                     {
@@ -412,15 +296,24 @@ export default function AiInterviewSessionsPage() {
                 return audioUrl2;
             } catch (retryErr) {
                 await logAxiosBlobError('TTS(retry)', retryErr);
-                throw error; // 최초 오류를 유지해 상위에서 처리
+                throw error;
             }
         }
     };
 
-    // 질문 읽기: 동기식 아바타 비디오 → 실패 시 TTS 폴백
-    const speakQuestion = async (questionText: string, overrideQuestionId?: string) => {
-        if (isSpeakingRef.current) {
-            console.log('발화가 이미 진행 중입니다. 중복 요청 무시.');
+    const simulateAISpeaking = (duration: number = 3000) => {
+        setIsSpeaking(true);
+        if (speakingTimerRef.current) {
+            clearTimeout(speakingTimerRef.current);
+        }
+        speakingTimerRef.current = setTimeout(() => {
+            setIsSpeaking(false);
+            isSpeakingRef.current = false;
+        }, duration);
+    };
+
+    const speakQuestion = async (text: string, questionId: string) => {
+        if (isSpeakingRef.current || lastSpokenQuestionRef.current === questionId) {
             return;
         }
 
@@ -429,89 +322,247 @@ export default function AiInterviewSessionsPage() {
 
         isSpeakingRef.current = true;
         setIsSpeaking(true);
-        // 현재 질문을 마지막 발화 대상으로 기록(중복 트리거 방지)
-        try {
-            lastSpokenQuestionIdRef.current = overrideQuestionId ?? currentQuestionId;
-        } catch {}
+        lastSpokenQuestionRef.current = questionId;
 
-        if (useTalkingAvatar && defaultAvatarId) {
-            try {
-                const res: SpeakSyncResponse = await speakSync({
-                    avatarId: defaultAvatarId,
-                    text: questionText,
-                    resolution: 256,
-                    stillMode: true,
-                });
-                if (res?.success) {
-                    setAvatarVideoUrl(res.videoUrl);
-                    // onEnded 핸들러에서 speakingRef 해제
-                    return;
+        try {
+            if (useTalkingAvatar && defaultAvatarId) {
+                try {
+                    const res: SpeakSyncResponse = await speakSync({
+                        avatarId: defaultAvatarId,
+                        text: text,
+                        resolution: 256,
+                        stillMode: true,
+                    });
+                    if (res?.success) {
+                        setAvatarVideoUrl(res.videoUrl);
+                        return;
+                    }
+                } catch (e) {
+                    console.warn('아바타 TTS 실패, 음성 TTS로 폴백');
                 }
-                console.warn('speak-sync 폴백 발생, TTS로 대체');
-            } catch (e) {
-                console.warn('speak-sync 실패, TTS로 폴백', e);
             }
-        }
 
-        try {
-            const audioUrl = await synthesizeSpeech(questionText);
+            const audioUrl = await synthesizeSpeech(text);
             const audio = new Audio(audioUrl);
+
             audio.onended = () => {
                 setIsSpeaking(false);
                 isSpeakingRef.current = false;
                 URL.revokeObjectURL(audioUrl);
             };
+
             audio.onerror = () => {
-                console.error('오디오 재생 실패');
                 setIsSpeaking(false);
                 isSpeakingRef.current = false;
                 URL.revokeObjectURL(audioUrl);
             };
+
             await audio.play();
         } catch (error) {
-            console.error('TTS 처리 실패:', error);
+            console.error('TTS 실패:', error);
             setIsSpeaking(false);
             isSpeakingRef.current = false;
-            // 최종 폴백: 시뮬레이션
             simulateAISpeaking(3000);
         }
     };
 
-    // 질문이 준비되면 자동으로 읽어주는 트리거 (중복 방지 가드 포함)
-    useEffect(() => {
-        const autoSpeak = process.env.NEXT_PUBLIC_AUTO_SPEAK_ON_QUESTION_READY !== 'false';
-        if (!autoSpeak) return;
-        if (!currentQuestionId || !qtext) return;
-        // 첫 렌더 시 더미 문항(qtext 기본값)으로 발화되는 문제 방지: 실제 동적 질문이 로드된 뒤에만 동작
-        if (dynamicQuestions.length === 0) return;
-        // 첫 질문은 명시적으로만 발화: 자동 발화는 2번째 질문부터
-        if (currentQuestionIndex === 0) return;
-        if (lastSpokenQuestionIdRef.current === currentQuestionId) return;
-        if (isSpeakingRef.current) return;
+    const onAvatarEnded = () => {
+        setAvatarVideoUrl(null);
+        setIsSpeaking(false);
+        isSpeakingRef.current = false;
+    };
 
-        // 비동기 호출(실패는 콘솔 경고만)
-        (async () => {
-            try {
-                await speakQuestion(qtext);
-            } catch (e) {
-                console.warn('자동 질문 읽기 실패:', e);
-            }
-        })();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentQuestionId, currentQuestionIndex]);
-
-    // AI가 말하는 시뮬레이션
-    const simulateAISpeaking = (duration: number = 3000) => {
-        setIsSpeaking(true);
+    const cleanup = () => {
         if (speakingTimerRef.current) {
             clearTimeout(speakingTimerRef.current);
         }
-        speakingTimerRef.current = setTimeout(() => {
-            setIsSpeaking(false);
-        }, duration);
     };
 
-    // 타이머 시작
+    return {
+        isSpeaking,
+        avatarVideoUrl,
+        speakQuestion,
+        onAvatarEnded,
+        simulateAISpeaking,
+        cleanup,
+        isSpeakingRef,
+    };
+};
+
+export default function AiInterviewSessionsPage() {
+    // 커스텀 훅 사용
+    const questionManager = useQuestionManager();
+    const ttsManager = useTTSManager();
+
+    const [isRecording, setIsRecording] = useState(false);
+    const [timeLeft, setTimeLeft] = useState(60);
+    const [sessions, setSessions] = useState<InterviewSession[]>([]);
+    const [currentSession, setCurrentSession] = useState<InterviewSession | null>(null);
+    const [detectionHistory, setDetectionHistory] = useState<any[]>([]);
+    const [transcribedText, setTranscribedText] = useState('');
+    const [qaList, setQaList] = useState<Array<{ question: string; answer: string }>>([]);
+    const [isCompleting, setIsCompleting] = useState(false);
+
+    const MAX_QUESTIONS = 1;
+
+    const timerRef = useRef<NodeJS.Timeout | null>(null);
+    const recognitionRef = useRef<any>(null);
+    const completingRef = useRef(false);
+    const webcamRef = useRef<WebcamHandle>(null);
+    const recorderRef = useRef<WavRecorder | null>(null);
+    const lastAudioBlobRef = useRef<Blob | null>(null);
+
+    const sessionIdRef = useRef<string>(
+        `sess_${Math.random().toString(36).slice(2, 10)}_${Date.now()}`,
+    );
+    const SESSION_ID = sessionIdRef.current as string;
+
+    const interviewAnalysisMutation = useInterviewAnalysis();
+
+    // ===== API 클라이언트 유틸 =====
+    async function fetchFirstQuestion(): Promise<QuestionDto> {
+        type SelectedResume = {
+            id: number;
+            title?: string;
+            position?: string;
+            company?: string;
+            createdAt?: string;
+            experience?: string;
+            skills?: string[];
+        };
+
+        const selectedResumeId = sessionStorage.getItem('selectedResumeId') || undefined;
+
+        let resumeSummary: string | null = null;
+        try {
+            const raw = sessionStorage.getItem('selectedResume');
+            if (raw) {
+                const r = JSON.parse(raw) as SelectedResume;
+                const parts = [
+                    r.title,
+                    r.position ? `포지션: ${r.position}` : undefined,
+                    r.company ? `회사: ${r.company}` : undefined,
+                    r.experience ? `경력: ${r.experience}` : undefined,
+                    Array.isArray(r.skills) && r.skills.length
+                        ? `기술: ${r.skills.join(', ')}`
+                        : undefined,
+                ].filter(Boolean) as string[];
+                if (parts.length) {
+                    resumeSummary = parts.join(' | ');
+                }
+            }
+        } catch (e) {
+            console.warn('selectedResume 파싱 실패:', e);
+        }
+
+        if (!resumeSummary) {
+            resumeSummary =
+                localStorage.getItem('resumeSummary') ||
+                '프론트엔드 경력 3년, Next.js/React, 크래프톤 정글 (부트캠프) 수료, Pintos 운영체제 프로젝트 수행 경험';
+        }
+
+        const jobPostUrl = sessionStorage.getItem('jobPostUrl') || undefined;
+        const payload: any = {};
+        if (selectedResumeId) payload.resumeFileId = selectedResumeId;
+        else payload.resumeSummary = resumeSummary;
+        if (jobPostUrl) payload.jobPostUrl = jobPostUrl;
+
+        const res = await api.post(`ai/question`, payload, { timeout: 60000 });
+        const data = res.data as { question: QuestionDto };
+        return data.question;
+    }
+
+    async function fetchFollowup(original: QuestionDto, answer: string): Promise<QuestionDto> {
+        const res = await api.post(
+            `ai/followups`,
+            { originalQuestion: original, answer },
+            { timeout: 60000 },
+        );
+        const data = res.data as {
+            followups: Array<{ id: string; parentId: string; text: string; reason: string }>;
+        };
+        return { id: data.followups[0].id, text: data.followups[0].text };
+    }
+
+    async function transcribeWithGoogleSTT(wavBlob: Blob): Promise<string> {
+        const wav16k = await resampleTo16kHzMonoWav(wavBlob);
+
+        const form = new FormData();
+        form.append('file', wav16k, 'answer.wav');
+
+        const res = await api.post(`stt/transcribe-file`, form, {
+            timeout: 120000,
+        });
+
+        const data = res.data as { success: boolean; result: { transcript: string } };
+        if (!data?.success) throw new Error('STT 실패');
+        return data.result.transcript || '';
+    }
+
+    // 질문 초기화
+    useEffect(() => {
+        const initializeFirstQuestion = async () => {
+            try {
+                localStorage.setItem('aiInterviewSessionId', SESSION_ID);
+
+                questionManager.setIsLoading(true);
+                const firstQuestion = await fetchFirstQuestion();
+                questionManager.addQuestion(firstQuestion);
+
+                // 첫 질문 TTS 실행
+                setTimeout(() => {
+                    if (firstQuestion.text) {
+                        ttsManager.speakQuestion(firstQuestion.text, firstQuestion.id);
+                    }
+                }, 100);
+            } catch (error) {
+                console.warn('첫 질문 생성 실패:', error);
+
+                const fallbackQuestion: QuestionDto = {
+                    id: 'q1_fallback',
+                    text: interviewData.questions[0],
+                };
+
+                questionManager.addQuestion(fallbackQuestion);
+
+                setTimeout(() => {
+                    ttsManager.speakQuestion(fallbackQuestion.text, fallbackQuestion.id);
+                }, 100);
+            } finally {
+                questionManager.setIsLoading(false);
+                ttsManager.simulateAISpeaking(3000);
+            }
+        };
+
+        initializeFirstQuestion();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // 자동 TTS (두 번째 질문부터)
+    useEffect(() => {
+        const autoSpeak = process.env.NEXT_PUBLIC_AUTO_SPEAK_ON_QUESTION_READY !== 'false';
+        if (!autoSpeak) return;
+        if (!questionManager.hasCurrentQuestion) return;
+        if (questionManager.questions.length === 0) return;
+        if (questionManager.currentIndex === 0) return; // 첫 질문은 수동
+        if (!questionManager.questionText) return;
+
+        const speakQuestionAsync = async () => {
+            try {
+                await ttsManager.speakQuestion(
+                    questionManager.questionText,
+                    questionManager.questionId,
+                );
+            } catch (e) {
+                console.warn('자동 질문 읽기 실패:', e);
+            }
+        };
+
+        speakQuestionAsync();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [questionManager.currentIndex, questionManager.hasCurrentQuestion]);
+
+    // 타이머 관리
     const startTimer = () => {
         if (timerRef.current) {
             clearInterval(timerRef.current);
@@ -520,7 +571,6 @@ export default function AiInterviewSessionsPage() {
         timerRef.current = setInterval(() => {
             setTimeLeft((prev) => {
                 if (prev <= 1) {
-                    // 시간 초과
                     handleTimeUp();
                     return 0;
                 }
@@ -529,7 +579,6 @@ export default function AiInterviewSessionsPage() {
         }, 1000);
     };
 
-    // 타이머 정지
     const stopTimer = () => {
         if (timerRef.current) {
             clearInterval(timerRef.current);
@@ -537,44 +586,213 @@ export default function AiInterviewSessionsPage() {
         }
     };
 
-    // 시간 초과 처리
     const handleTimeUp = () => {
-        if (completingRef.current) return; // ⬅️ 이미 완료 중이면 무시
+        if (completingRef.current) return;
         stopTimer();
         setIsRecording(false);
         message.warning('시간이 초과되었습니다.');
         handleCompleteAnswer();
     };
 
-    // 기존: fetch 버전 analyzeAudioBlob
-    // -> axios 버전으로 교체
-    const analyzeAudioBlob = async (
-        blob: Blob,
-        filename = 'answer.wav',
-    ): Promise<AudioFeatures> => {
-        if (!AI_API_BASE) throw new Error('AI_API_BASE 설정되지 않았습니다.');
-        const form = new FormData();
-        form.append('file', blob, filename);
+    // 답변 시작
+    const handleStartAnswer = async () => {
+        setIsRecording(true);
+        setTimeLeft(60);
+        setTranscribedText('');
+        startTimer();
 
-        // axios는 브라우저에서 multipart boundary를 자동 설정합니다. Content-Type 수동 지정 X
-        const res = await axios.post(`${AI_API_BASE}/audio/analyze`, form, {
-            timeout: 60000, // 선택: 타임아웃
-            withCredentials: false, // CORS 쿠키 미사용이면 false (기본값)
-            // headers: { 'Content-Type': 'multipart/form-data' } // 직접 지정하지 않는 것을 권장
+        const newSession: InterviewSession = {
+            questionNumber: questionManager.currentIndex + 1,
+            question: questionManager.questionText,
+            answer: '',
+            timeSpent: 0,
+            detectionData: [],
+            timestamp: new Date(),
+        };
+        setCurrentSession(newSession);
+
+        webcamRef.current?.startQuestion(questionManager.questionId, {
+            orderNo: questionManager.currentIndex + 1,
+            text: questionManager.questionText,
         });
-        return res.data?.features as AudioFeatures;
+
+        try {
+            recorderRef.current = new WavRecorder();
+            await recorderRef.current.start();
+        } catch (e) {
+            console.error('마이크 접근 실패:', e);
+            message.error('마이크 접근 권한을 확인해주세요.');
+        }
+
+        ttsManager.simulateAISpeaking(2000);
     };
 
-    // 면접 완료 처리 (API 호출 포함)
+    // 답변 완료
+    const handleCompleteAnswer = async () => {
+        if (completingRef.current) return;
+        completingRef.current = true;
+
+        let completedSession: InterviewSession | null = null;
+
+        try {
+            stopTimer();
+            setIsRecording(false);
+
+            // 웹캠 집계
+            const agg = webcamRef.current?.endQuestion();
+            if (agg) {
+                try {
+                    await api.post(
+                        `metrics/${SESSION_ID}/${questionManager.aggregateId}/aggregate`,
+                        agg,
+                        {
+                            timeout: 10000,
+                        },
+                    );
+                } catch (e) {
+                    console.warn('문항 영상 집계 업로드 실패:', e);
+                }
+            }
+
+            // WAV 처리
+            let audioUrl: string | undefined;
+            let sttTranscript: string | undefined;
+
+            try {
+                const rec = recorderRef.current;
+                recorderRef.current = null;
+
+                if (rec) {
+                    const blob = await rec.stop();
+                    lastAudioBlobRef.current = blob;
+
+                    try {
+                        const b64 = await blobToBase64(blob);
+                        audioUrl = `data:audio/wav;base64,${b64}`;
+                    } catch {
+                        audioUrl = URL.createObjectURL(blob);
+                    }
+
+                    // 백엔드 음성 분석
+                    message.loading('음성을 분석 중입니다...', 0);
+                    try {
+                        const form = new FormData();
+                        form.append('file', blob, `q${questionManager.currentIndex + 1}.wav`);
+
+                        const analysisRes = await api.post(
+                            `/audio-metrics/${SESSION_ID}/${questionManager.aggregateId}/analyze`,
+                            form,
+                            { timeout: 120000 },
+                        );
+
+                        if (analysisRes.data?.ok) {
+                            console.log('백엔드를 통한 음성 분석 완료:', analysisRes.data.features);
+                        }
+                    } catch (e) {
+                        console.warn('백엔드를 통한 음성 분석 실패:', e);
+                    } finally {
+                        message.destroy();
+                    }
+
+                    // Google STT
+                    message.loading('구글 STT로 답변을 전사 중...', 0);
+                    try {
+                        sttTranscript = await transcribeWithGoogleSTT(blob);
+                    } finally {
+                        message.destroy();
+                    }
+                }
+            } catch (e) {
+                message.destroy();
+                console.error('녹음/전사 처리 실패:', e);
+                message.warning('전사(STT)에 실패했어요. 네트워크를 확인해주세요.');
+            }
+
+            if (currentSession) {
+                const finalAnswer =
+                    (sttTranscript && sttTranscript.trim()) ||
+                    (transcribedText && transcribedText.trim()) ||
+                    `답변 ${currentSession.questionNumber}번 완료`;
+
+                completedSession = {
+                    ...currentSession,
+                    question: questionManager.questionText,
+                    answer: finalAnswer,
+                    timeSpent: 60 - timeLeft,
+                    audioUrl,
+                };
+
+                setSessions((prev) => [...prev, completedSession!]);
+                setQaList((prev) => [
+                    ...prev,
+                    { question: questionManager.questionText, answer: finalAnswer },
+                ]);
+                setCurrentSession(null);
+
+                // 다음 질문 처리
+                if (!questionManager.isLastQuestion(MAX_QUESTIONS)) {
+                    try {
+                        const originalQuestion: QuestionDto = {
+                            id: questionManager.questionId,
+                            text: questionManager.questionText,
+                        };
+
+                        message.loading('다음 질문을 생성 중...', 0);
+                        const nextQuestion = await fetchFollowup(originalQuestion, finalAnswer);
+                        questionManager.addQuestion(nextQuestion);
+
+                        setTimeout(() => {
+                            questionManager.moveToNext();
+                            setTimeLeft(60);
+                            ttsManager.speakQuestion(nextQuestion.text, nextQuestion.id);
+                        }, 1000);
+                    } catch (error) {
+                        console.warn('꼬리질문 생성 실패:', error);
+
+                        const fallback: QuestionDto = {
+                            id: `fallback_${Date.now()}`,
+                            text:
+                                interviewData.questions[
+                                    Math.min(
+                                        questionManager.currentIndex + 1,
+                                        interviewData.questions.length - 1,
+                                    )
+                                ] ||
+                                '이전 답변에서 수치/성과를 확인할 수 있는 사례를 하나 제시해 주세요.',
+                        };
+                        questionManager.addQuestion(fallback);
+
+                        setTimeout(() => {
+                            questionManager.moveToNext();
+                            setTimeLeft(60);
+                            ttsManager.speakQuestion(fallback.text, fallback.id);
+                        }, 1000);
+                    } finally {
+                        message.destroy();
+                    }
+                } else {
+                    message.success('모든 답변이 완료되었습니다!');
+                    setTimeout(() => {
+                        handleInterviewCompletion([...sessions, completedSession!]);
+                    }, 1000);
+                }
+            }
+
+            setTranscribedText('');
+        } finally {
+            completingRef.current = false;
+        }
+    };
+
+    // 면접 완료 처리
     const handleInterviewCompletion = async (finalSessions?: InterviewSession[]) => {
-        // 최신 qaList를 가져오기 위해 sessions에서 재구성
         const sessionsToUse = finalSessions || sessions;
         const latestQAList = sessionsToUse.map((session) => ({
             question: session.question,
             answer: session.answer,
         }));
 
-        // ===== 서버 API 호출로 음성 지표 가져오기 =====
+        // 서버 API 호출로 음성 지표 가져오기
         let serverAudioData = null;
         try {
             const audioRes = await api.get(`/audio-metrics/${SESSION_ID}/overall`);
@@ -586,7 +804,6 @@ export default function AiInterviewSessionsPage() {
             console.warn('서버 음성 지표 로드 실패:', e);
         }
 
-        // 서버 음성 지표를 localStorage에 저장 (결과 페이지에서 사용)
         if (serverAudioData) {
             try {
                 localStorage.setItem(
@@ -621,73 +838,7 @@ export default function AiInterviewSessionsPage() {
             }
         }
 
-        // // (선택) 오디오 종합 평균 같은 간단 요약 만들기
-        // const audioAgg = (() => {
-        //     const feats = sessionsToUse
-        //         .map((s) => s.audioFeatures)
-        //         .filter(Boolean) as AudioFeatures[];
-        //     const mean = (arr: number[]) =>
-        //         arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
-        //     const meanOf = (pick: (f: AudioFeatures) => number | undefined) =>
-        //         mean(
-        //             feats
-        //                 .map(pick)
-        //                 .filter((v): v is number => typeof v === 'number' && isFinite(v)),
-        //         );
-        //     const safeCv = (f: AudioFeatures) =>
-        //         typeof f.f0_cv === 'number' && isFinite(f.f0_cv) && f.f0_cv >= 0
-        //             ? f.f0_cv
-        //             : f.f0_mean > 0
-        //               ? (f.f0_std ?? 0) / f.f0_mean
-        //               : 0;
-        //     const approxSemitoneStd = (cv: number) => {
-        //         // 근사: 세미톤 표준편차 ≈ 12 * log2(1 + CV)
-        //         return 12 * Math.log2(1 + Math.max(0, cv));
-        //     };
-        //     return {
-        //         f0_mean: mean(feats.map((f) => f.f0_mean)),
-        //         f0_std: mean(feats.map((f) => f.f0_std)),
-        //         // 종합에도 CV/세미톤 표준편차를 포함해 톤 점수 안정화
-        //         f0_cv: mean(feats.map((f) => safeCv(f))),
-        //         f0_std_semitone: mean(feats.map((f) => approxSemitoneStd(safeCv(f)))),
-        //         rms_cv: mean(feats.map((f) => f.rms_cv)),
-        //         rms_cv_voiced: mean(
-        //             feats.map((f) =>
-        //                 typeof f.rms_cv_voiced === 'number' ? f.rms_cv_voiced : f.rms_cv || 0,
-        //             ),
-        //         ),
-        //         rms_db_std_voiced: mean(
-        //             feats.map((f) =>
-        //                 typeof f.rms_db_std_voiced === 'number' ? f.rms_db_std_voiced : 0,
-        //             ),
-        //         ),
-        //         jitter_like: mean(feats.map((f) => f.jitter_like)),
-        //         shimmer_like: mean(feats.map((f) => f.shimmer_like)),
-        //         silence_ratio: mean(feats.map((f) => f.silence_ratio)),
-        //         silence_ratio_db50: meanOf((f) => f.silence_ratio_db50),
-        //         voiced_ratio: mean(
-        //             feats.map((f) => (typeof f.voiced_ratio === 'number' ? f.voiced_ratio : 0)),
-        //         ),
-        //         voiced_ratio_speech: meanOf((f) => f.voiced_ratio_speech),
-        //         // Diagnostics 평균
-        //         voiced_prob_mean: meanOf((f) => f.voiced_prob_mean),
-        //         voiced_prob_median: meanOf((f) => f.voiced_prob_median),
-        //         voiced_prob_p90: meanOf((f) => f.voiced_prob_p90),
-        //         voiced_flag_ratio: meanOf((f) => f.voiced_flag_ratio),
-        //         voiced_prob_ge_025_ratio: meanOf((f) => f.voiced_prob_ge_025_ratio),
-        //         voiced_prob_ge_035_ratio: meanOf((f) => f.voiced_prob_ge_035_ratio),
-        //         f0_valid_ratio: meanOf((f) => f.f0_valid_ratio),
-        //         speech_frames: meanOf((f) =>
-        //             typeof f.speech_frames === 'number' && isFinite(f.speech_frames)
-        //                 ? f.speech_frames
-        //                 : undefined,
-        //         ),
-        //     };
-        // })();
-
-        // 결과를 로컬에 보관(결과 페이지에서 활용)
-        // 주의: audioUrl(data URL/Blob URL)은 매우 커서 quota를 초과할 수 있음.
-        // 1차 시도: 전체 저장, 실패 시 audioUrl 제거 후 축소 저장으로 폴백
+        // 결과를 로컬에 보관
         const audioPerQuestionFull = sessionsToUse.map((s) => ({
             questionNumber: s.questionNumber,
             question: s.question,
@@ -698,7 +849,6 @@ export default function AiInterviewSessionsPage() {
         try {
             localStorage.setItem('interviewAudioPerQuestion', JSON.stringify(audioPerQuestionFull));
         } catch (e) {
-            // QuotaExceededError 등 발생 시 audioUrl 제거하고 재시도
             try {
                 const reduced = audioPerQuestionFull.map(({ audioUrl, ...rest }) => rest);
                 localStorage.setItem('interviewAudioPerQuestion', JSON.stringify(reduced));
@@ -709,11 +859,6 @@ export default function AiInterviewSessionsPage() {
                 console.warn('Failed to store interviewAudioPerQuestion:', e2);
             }
         }
-        // try {
-        //     localStorage.setItem('interviewAudioOverall', JSON.stringify(audioAgg));
-        // } catch (e) {
-        //     console.warn('Failed to store interviewAudioOverall:', e);
-        // }
 
         try {
             const finalizeRes = await api.post(
@@ -721,10 +866,8 @@ export default function AiInterviewSessionsPage() {
                 {},
                 { timeout: 10000 },
             );
-            // 응답 형식: { ok: true, aggregate: { perQuestion: {...}, overall: {...} } }
             const visualAgg = finalizeRes.data?.aggregate;
             if (visualAgg) {
-                // 결과 페이지에서 사용하도록 보관
                 localStorage.setItem(
                     'interviewVisualPerQuestion',
                     JSON.stringify(visualAgg.perQuestion),
@@ -750,7 +893,7 @@ export default function AiInterviewSessionsPage() {
         console.log(`\n✅ 총 ${latestQAList.length}개의 질문에 답변했습니다.`);
         console.log('=====================================');
 
-        // 백엔드 리포트 분석 호출로 전환
+        // 백엔드 리포트 분석 호출
         message.loading('면접 결과를 분석 중입니다...', 0);
         try {
             const res = await api.post(
@@ -774,214 +917,6 @@ export default function AiInterviewSessionsPage() {
         }
     };
 
-    // 답변 시작 - 원래 async 없었는데 밑에서 await 쓰면서 GPT가 추가
-    const handleStartAnswer = async () => {
-        setIsRecording(true);
-        setTimeLeft(60);
-        setTranscribedText('');
-        startTimer();
-
-        // 새로운 세션 시작
-        const newSession: InterviewSession = {
-            questionNumber: currentQuestionIndex + 1,
-            question: qtext,
-            answer: '',
-            timeSpent: 0,
-            detectionData: [],
-            timestamp: new Date(),
-        };
-        setCurrentSession(newSession);
-
-        // ▼ 문항 시작: 웹캠에 문항 메타 전달 (id는 실제 질문 ID 사용, 없으면 aggQid)
-        webcamRef.current?.startQuestion(currentQuestionId, {
-            orderNo: currentQuestionIndex + 1,
-            text: qtext,
-        });
-
-        // WAV 레코더 시작
-        try {
-            recorderRef.current = new WavRecorder();
-            await recorderRef.current.start();
-        } catch (e) {
-            console.error('마이크 접근 실패:', e);
-            message.error('마이크 접근 권한을 확인해주세요.');
-        }
-
-        // AI가 말하는 시뮬레이션
-        simulateAISpeaking(2000);
-    };
-
-    // 답변 완료
-    const handleCompleteAnswer = async () => {
-        // 재진입/중복 호출 가드 (타이머 만료와 버튼 클릭이 겹칠 수 있음)
-        if (completingRef.current) return;
-        completingRef.current = true;
-
-        let completedSession: InterviewSession | null = null;
-
-        try {
-            stopTimer();
-            setIsRecording(false);
-
-            // ▼ 문항 종료: 집계 결과 받기 & 서버로 전송
-            const agg = webcamRef.current?.endQuestion();
-            if (agg) {
-                try {
-                    await api.post(`metrics/${SESSION_ID}/${aggQid}/aggregate`, agg, {
-                        timeout: 10000,
-                    });
-                } catch (e) {
-                    console.warn('문항 영상 집계 업로드 실패:', e);
-                }
-            }
-
-            // WAV 정지 → 업로드/전사
-            let audioUrl: string | undefined;
-            let audioFeatures: AudioFeatures | undefined;
-            let sttTranscript: string | undefined;
-
-            try {
-                // recorder 인스턴스를 지역 변수로 복사하고, 즉시 ref에서 떼어 재사용을 차단
-                const rec = recorderRef.current;
-                recorderRef.current = null;
-
-                if (rec) {
-                    const blob = await rec.stop(); // WavRecorder.stop()이 한 번만 호출되도록 보장
-                    lastAudioBlobRef.current = blob;
-                    // blob: URL은 다른 페이지로 이동하면 무효가 되므로, data URL로 변환해 저장
-                    try {
-                        const b64 = await blobToBase64(blob);
-                        audioUrl = `data:audio/wav;base64,${b64}`;
-                    } catch {
-                        // 폴백: 동일 탭에서는 재생 가능하므로 blob: URL도 확보
-                        audioUrl = URL.createObjectURL(blob);
-                    }
-
-                    // (선택) 오디오 분석
-                    try {
-                        audioFeatures = await analyzeAudioBlob(
-                            blob,
-                            `q${currentQuestionIndex + 1}.wav`,
-                        );
-                    } catch (e) {
-                        console.warn('오디오 분석 실패:', e);
-                    }
-
-                    // 백엔드에 오디오 지표 업서트(서버 리포트 계산용)
-                    if (audioFeatures) {
-                        try {
-                            await api.post(`audio-metrics/${SESSION_ID}/${aggQid}`, audioFeatures, {
-                                timeout: 10000,
-                            });
-                        } catch (e) {
-                            console.warn('오디오 지표 업서트 실패:', e);
-                        }
-                    }
-
-                    // ✅ Google STT 호출 (최종 답변 확정)
-                    message.loading('구글 STT로 답변을 전사 중...', 0);
-                    try {
-                        sttTranscript = await transcribeWithGoogleSTT(blob);
-                    } finally {
-                        message.destroy(); // 메시지는 finally에서 안전하게 정리
-                    }
-                }
-            } catch (e) {
-                message.destroy();
-                console.error('녹음/전사 처리 실패:', e);
-                message.warning('전사(STT)에 실패했어요. 네트워크를 확인해주세요.');
-            }
-
-            if (currentSession) {
-                // 최종 답변은 STT > 임시 자막 > 기본 문구 순으로 결정
-                const finalAnswer =
-                    (sttTranscript && sttTranscript.trim()) ||
-                    (transcribedText && transcribedText.trim()) ||
-                    `답변 ${currentSession.questionNumber}번 완료`;
-
-                completedSession = {
-                    ...currentSession,
-                    answer: finalAnswer,
-                    timeSpent: 60 - timeLeft,
-                    audioUrl,
-                    audioFeatures,
-                };
-
-                setSessions((prev) => [...prev, completedSession!]);
-                setQaList((prev) => [
-                    ...prev,
-                    { question: currentSession.question, answer: finalAnswer },
-                ]);
-                setCurrentSession(null);
-
-                // ===== 문항 종료 시: STT 답변으로 꼬리질문 생성 =====
-                if (currentQuestionIndex < MAX_QUESTIONS - 1) {
-                    try {
-                        // 현재 질문 객체(동적) 기준
-                        const original: QuestionDto = currentQuestion
-                            ? { id: currentQuestion.id, text: currentQuestion.text }
-                            : { id: aggQid, text: currentSession.question };
-                        message.loading('다음 질문을 생성 중...', 0);
-                        const nextQ = await fetchFollowup(original, finalAnswer);
-                        setDynamicQuestions((prev) => [...prev, nextQ]);
-
-                        // ✅ 질문 생성 직후 바로 다음 단계 실행
-                        setTimeout(async () => {
-                            setCurrentQuestionIndex((prev) => prev + 1);
-                            setTimeLeft(60);
-                            // nextQ를 직접 사용 (상태 업데이트를 기다리지 않음)
-                            if (nextQ?.text) {
-                                await speakQuestion(nextQ.text, nextQ.id);
-                            } else {
-                                simulateAISpeaking(1500);
-                            }
-                        }, 1000);
-                    } catch (e) {
-                        console.warn('꼬리질문 생성 실패. 더미로 폴백:', e);
-                        const fallback: QuestionDto = {
-                            id: `fallback_${Date.now()}`,
-                            text:
-                                interviewData.questions[
-                                    Math.min(
-                                        currentQuestionIndex + 1,
-                                        interviewData.questions.length - 1,
-                                    )
-                                ] ||
-                                '이전 답변에서 수치/성과를 확인할 수 있는 사례를 하나 제시해 주세요.',
-                        };
-                        setDynamicQuestions((prev) => [...prev, fallback]);
-
-                        // ✅ 폴백 질문도 직접 사용
-                        setTimeout(async () => {
-                            setCurrentQuestionIndex((prev) => prev + 1);
-                            setTimeLeft(60);
-                            if (fallback?.text) {
-                                await speakQuestion(fallback.text, fallback.id);
-                            } else {
-                                simulateAISpeaking(1500);
-                            }
-                        }, 1000);
-                    } finally {
-                        try {
-                            message.destroy();
-                        } catch {}
-                    }
-                } else {
-                    // 마지막 질문인 경우
-                    message.success('모든 답변이 완료되었습니다!');
-                    setTimeout(() => {
-                        handleInterviewCompletion([...sessions, completedSession!]);
-                    }, 1000);
-                }
-            }
-
-            setTranscribedText('');
-        } finally {
-            // 재진입 가능 상태로 복구
-            completingRef.current = false;
-        }
-    };
-
     // 웹캠 감지 데이터 처리
     const handleDetection = (data: any) => {
         setDetectionHistory((prev) => [...prev, data]);
@@ -998,75 +933,38 @@ export default function AiInterviewSessionsPage() {
         }
     };
 
-    // 마운트 시 "첫 질문" 준비 + 음성 인식 초기화
-    useEffect(() => {
-        try {
-            localStorage.setItem('aiInterviewSessionId', SESSION_ID);
-        } catch {}
-        (async () => {
-            try {
-                const q = await fetchFirstQuestion();
-                setDynamicQuestions([q]);
-
-                // 첫 질문을 TTS로 읽기
-                if (q.text) {
-                    await speakQuestion(q.text, q.id);
-                }
-            } catch (e) {
-                console.warn('첫 질문 생성 실패. 더미 사용:', e);
-                const fallbackQuestion = interviewData.questions[0];
-                const fbId = 'q1';
-                setDynamicQuestions([{ id: fbId, text: interviewData.questions[0] }]);
-                if (fallbackQuestion) {
-                    await speakQuestion(fallbackQuestion, fbId);
-                }
-            } finally {
-                simulateAISpeaking(3000);
-            }
-        })();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
     // 컴포넌트 언마운트 시 정리
     useEffect(() => {
         return () => {
             if (timerRef.current) {
                 clearInterval(timerRef.current);
             }
-            if (speakingTimerRef.current) {
-                clearTimeout(speakingTimerRef.current);
-            }
             if (recognitionRef.current) {
                 recognitionRef.current.stop();
             }
+            ttsManager.cleanup();
         };
     }, []);
 
     return (
         <div className='w-screen h-screen flex flex-col justify-end items-center bg-gradient-to-br from-blue-100 via-indigo-50 to-purple-100 relative overflow-hidden'>
-            {/* 웹캠 */}
             <Webcam ref={webcamRef} css='absolute top-0 right-0' onDetection={handleDetection} />
 
-            {/* AI 아바타 */}
             <div>
                 <Avatar
                     name={interviewData.interviewer.name}
                     title={interviewData.interviewer.title}
-                    isSpeaking={isSpeaking}
-                    videoUrl={avatarVideoUrl}
-                    onEnded={() => {
-                        setAvatarVideoUrl(null);
-                        setIsSpeaking(false);
-                        isSpeakingRef.current = false;
-                    }}
+                    isSpeaking={ttsManager.isSpeaking}
+                    videoUrl={ttsManager.avatarVideoUrl}
+                    onEnded={ttsManager.onAvatarEnded}
                 />
             </div>
 
-            {/* 질문: 동적 질문이 준비된 경우에만 렌더 */}
-            {currentQuestion && (
+            {/* 질문이 로딩되었을 때만 표시 */}
+            {questionManager.hasCurrentQuestion && (
                 <Question
-                    question={qtext}
-                    questionNumber={currentQuestionIndex + 1}
+                    question={questionManager.questionText}
+                    questionNumber={questionManager.currentIndex + 1}
                     totalQuestions={MAX_QUESTIONS}
                     isRecording={isRecording}
                     timeLeft={timeLeft}
@@ -1075,11 +973,19 @@ export default function AiInterviewSessionsPage() {
                 />
             )}
 
-            {/* 면접 진행 상태 표시 */}
+            {/* 로딩 상태 표시 */}
+            {questionManager.isLoading && (
+                <div className='absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2'>
+                    <div className='text-lg'>질문을 준비 중입니다...</div>
+                </div>
+            )}
+
+            {/* 진행 상태 */}
             <div className='absolute top-4 left-4 bg-white bg-opacity-90 rounded-lg p-4'>
                 <div className='text-sm text-gray-600'>
                     <div>
-                        진행률: {Math.round(((currentQuestionIndex + 1) / MAX_QUESTIONS) * 100)}%
+                        진행률:{' '}
+                        {Math.round(((questionManager.currentIndex + 1) / MAX_QUESTIONS) * 100)}%
                     </div>
                     <div>완료된 질문: {sessions.length}</div>
                     <div>감지된 피드백: {detectionHistory.length}</div>
