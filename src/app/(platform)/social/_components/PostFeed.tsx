@@ -1,11 +1,9 @@
 'use client';
 
-import { Spin, Typography, Button } from 'antd';
+import { Button } from '@/components/ui/button';
 import { useEffect, useRef } from 'react';
 import { usePosts } from '../_hooks';
 import PostItem from './PostItem';
-
-const { Text } = Typography;
 
 interface PostFeedProps {
     currentUserId: number;
@@ -40,7 +38,7 @@ export default function PostFeed({ currentUserId }: PostFeedProps) {
     if (isLoading) {
         return (
             <div className='flex justify-center py-8'>
-                <Spin size='large' />
+                <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary'></div>
             </div>
         );
     }
@@ -51,9 +49,8 @@ export default function PostFeed({ currentUserId }: PostFeedProps) {
             error instanceof Error ? error.message : '포스트를 불러오는데 실패했습니다.';
         return (
             <div className='text-center py-8'>
-                <Text type='danger'>{errorMessage}</Text>
-                <br />
-                <Button onClick={() => window.location.reload()} className='mt-2'>
+                <p className='text-destructive mb-4'>{errorMessage}</p>
+                <Button onClick={() => window.location.reload()} variant='outline'>
                     다시 시도
                 </Button>
             </div>
@@ -64,7 +61,7 @@ export default function PostFeed({ currentUserId }: PostFeedProps) {
     if (!data?.pages[0]?.posts.length) {
         return (
             <div className='text-center py-8'>
-                <Text type='secondary'>아직 포스트가 없습니다.</Text>
+                <p className='text-muted-foreground'>아직 포스트가 없습니다.</p>
             </div>
         );
     }
@@ -82,12 +79,12 @@ export default function PostFeed({ currentUserId }: PostFeedProps) {
             <div ref={loadMoreRef} className='py-4'>
                 {isFetchingNextPage && (
                     <div className='flex justify-center'>
-                        <Spin />
+                        <div className='animate-spin rounded-full h-6 w-6 border-b-2 border-primary'></div>
                     </div>
                 )}
                 {!hasNextPage && data.pages[0]?.posts.length > 0 && (
                     <div className='text-center py-4'>
-                        <Text type='secondary'>모든 포스트를 불러왔습니다.</Text>
+                        <p className='text-muted-foreground'>모든 포스트를 불러왔습니다.</p>
                     </div>
                 )}
             </div>
