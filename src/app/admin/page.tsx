@@ -15,10 +15,15 @@ const ADMIN_USER_IDX = 1;
 
 export default function AdminPage() {
     const [data, setData] = React.useState<Application[]>([]);
-    const [pageInfo, setPageInfo] = React.useState<ApplicationsResponse['page_info']>({
+    const [pageInfo, setPageInfo] = React.useState<{
+        page: number;
+        limit: number;
+        total_pages: number;
+        has_next: boolean;
+    }>({
         page: 1,
         limit: DEFAULT_LIMIT,
-        total: 0,
+        total_pages: 1,
         has_next: false,
     });
     const [loading, setLoading] = React.useState(true);
@@ -28,7 +33,12 @@ export default function AdminPage() {
         try {
             const res = await fetchApplications(ADMIN_USER_IDX, p, DEFAULT_LIMIT);
             setData(res.applications);
-            setPageInfo(res.page_info);
+            setPageInfo({
+                page: res.page_info.page,
+                limit: res.page_info.limit,
+                total_pages: Math.ceil(res.page_info.total / res.page_info.limit),
+                has_next: res.page_info.has_next,
+            });
         } catch (e) {
             console.error(e);
         } finally {

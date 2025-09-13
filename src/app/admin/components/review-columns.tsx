@@ -1,7 +1,6 @@
 'use client';
 
 import { ColumnDef } from '@tanstack/react-table';
-import { Badge } from '@/components/ui/badge';
 import type { MentoringReview } from '../_apis/mentoring-review-api';
 
 const formatDate = (dateString: string) => {

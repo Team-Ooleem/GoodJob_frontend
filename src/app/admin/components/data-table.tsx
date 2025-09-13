@@ -22,7 +22,7 @@ import {
 type DataTableProps<TData, TValue> = {
     columns: ColumnDef<TData, TValue>[];
     data: TData[];
-    pageInfo?: { page: number; limit: number; total: number; has_next: boolean };
+    pageInfo?: { page: number; limit: number; total_pages: number; has_next: boolean };
     onPageChange?: (page: number) => void; // 1-based
     className?: string;
 };
@@ -42,7 +42,7 @@ export function DataTable<TData, TValue>({
     });
 
     const page = pageInfo?.page ?? 1;
-    const total = pageInfo?.total ?? data.length;
+    const total = pageInfo?.total_pages ?? data.length;
     const limit = pageInfo?.limit ?? data.length;
     const totalPages = Math.max(1, Math.ceil(total / (limit || 1)));
 

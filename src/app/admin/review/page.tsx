@@ -16,7 +16,7 @@ export default function ReviewPage() {
     const [pageInfo, setPageInfo] = React.useState<MentoringReviewsResponse['page_info']>({
         page: 1,
         limit: DEFAULT_LIMIT,
-        total: 0,
+        total_pages: 0,
         has_next: false,
     });
     const [loading, setLoading] = React.useState(true);
@@ -24,7 +24,8 @@ export default function ReviewPage() {
     const load = React.useCallback(async (p: number) => {
         setLoading(true);
         try {
-            const res = await fetchMentoringReviews(p, DEFAULT_LIMIT);
+            // api 호출 - mentorIdx를 1로 고정 (관리자용)
+            const res = await fetchMentoringReviews(1, p, DEFAULT_LIMIT);
             setData(res.reviews);
             setPageInfo(res.page_info);
         } catch (e) {
