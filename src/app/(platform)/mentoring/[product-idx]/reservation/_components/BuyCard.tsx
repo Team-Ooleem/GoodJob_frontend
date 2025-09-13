@@ -1,6 +1,7 @@
 'use client';
 
 import * as PortOne from '@portone/browser-sdk/v2';
+import { useRouter } from 'next/navigation';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardFooter, CardHeader } from '@/components/ui/card';
@@ -8,9 +9,15 @@ import { Card, CardDescription, CardFooter, CardHeader } from '@/components/ui/c
 type Props = {
     price?: number;
     productTitle?: string;
+    productIdx?: string;
+    selectedDate?: Date;
+    selectedSlot?: string | null;
+    mentorName?: string;
 };
 
-export function BuyCard({ price, productTitle }: Props) {
+export function BuyCard({ price, productTitle, productIdx, selectedDate, selectedSlot, mentorName }: Props) {
+    const router = useRouter();
+
     const handlePayment = async () => {
         try {
             const response = await PortOne.requestPayment({
@@ -26,6 +33,26 @@ export function BuyCard({ price, productTitle }: Props) {
             });
 
             console.log(response);
+
+            if (response?.paymentId && productIdx) {
+                const reservationData = {
+                    paymentId: response.paymentId,
+                    productTitle,
+                    mentorName,
+                    selectedDate: selectedDate?.toISOString(),
+                    selectedSlot,
+                    price
+                };
+
+                const searchParams = new URLSearchParams();
+                Object.entries(reservationData).forEach(([key, value]) => {
+                    if (value !== undefined && value !== null) {
+                        searchParams.set(key, String(value));
+                    }
+                });
+
+                router.push(`/mentoring/${productIdx}/reservation/success?${searchParams.toString()}`);
+            }
         } catch (error) {
             console.error('Payment request failed:', error);
         }

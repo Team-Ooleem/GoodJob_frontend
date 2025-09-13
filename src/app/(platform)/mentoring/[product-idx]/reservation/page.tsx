@@ -15,7 +15,11 @@ type Props = { params: { 'product-idx': string } };
 export default function ReservationPage({ params }: Props) {
     const productId = params['product-idx'];
     const { data: product, isLoading, error } = useMentoringProduct(productId);
-    const { data: slotsData, isLoading: slotsLoading, error: slotsError } = useMentoringProductSlots(productId);
+    const {
+        data: slotsData,
+        isLoading: slotsLoading,
+        error: slotsError,
+    } = useMentoringProductSlots(productId);
     const [date, setDate] = useState<Date | undefined>(undefined);
     const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
 
@@ -40,13 +44,13 @@ export default function ReservationPage({ params }: Props) {
     const getAvailableSlotsForDate = (selectedDate: Date) => {
         if (!slotsData?.slots) return [];
         const dayOfWeek = selectedDate.getDay();
-        return slotsData.slots.filter(slot => slot.day_of_week === dayOfWeek);
+        return slotsData.slots.filter((slot) => slot.day_of_week === dayOfWeek);
     };
 
     const isDateAvailable = (checkDate: Date) => {
         if (!slotsData?.slots) return false;
         const dayOfWeek = checkDate.getDay();
-        return slotsData.slots.some(slot => slot.day_of_week === dayOfWeek);
+        return slotsData.slots.some((slot) => slot.day_of_week === dayOfWeek);
     };
 
     const availableSlots = date ? getAvailableSlotsForDate(date) : [];
@@ -124,7 +128,14 @@ export default function ReservationPage({ params }: Props) {
                     </Alert>
                 </div>
                 <div className='flex-1'>
-                    <BuyCard price={product?.price} productTitle={product?.title} />
+                    <BuyCard
+                        price={product?.price}
+                        productTitle={product?.title}
+                        productIdx={productId}
+                        selectedDate={date}
+                        selectedSlot={selectedSlot}
+                        mentorName={product?.mentor?.name}
+                    />
                     <Alert className='mt-4'>
                         <AlertDescription>
                             멘토링 환불은 멘토링 시작 시간을 기준으로 진행되며, 120시간 전 환불시
