@@ -2,13 +2,13 @@
 
 import { Flex } from 'antd';
 import Image from 'next/image';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 // local stores
 import { useCanvasStore } from '../_stores';
 
 // local hooks
-import { startRecording, stopRecording } from '../_hooks';
+import { useWebRTC } from '../_hooks/useWebRTC';
 
 // local components
 import { ReplayButton } from './ReplayButton';
@@ -25,9 +25,10 @@ export function FabricToolbar() {
     const isCamEnabled = useCanvasStore((store) => store.isCamEnabled);
     const toggleMic = useCanvasStore((store) => store.toggleMic);
     const toggleCam = useCanvasStore((store) => store.toggleCam);
+
+    // 🆕 Canvas Store의 isRecording 상태와 toggleRecording 함수 사용
     const isRecording = useCanvasStore((store) => store.isRecording);
     const toggleRecording = useCanvasStore((store) => store.toggleRecording);
-    const setRecording = useCanvasStore((store) => store.setRecording);
     const isRecordingListOpen = useCanvasStore((store) => store.isRecordingListOpen);
     const toggleRecordingList = useCanvasStore((store) => store.toggleRecordingList);
     const [hoverMic, setHoverMic] = useState(false);
@@ -66,25 +67,18 @@ export function FabricToolbar() {
                 >
                     <Image
                         src={
-                            previewCamEnabled ? '/assets/videocam.svg' : '/assets/videocam-off.svg'
+                            previewMicEnabled ? '/assets/videocam.svg' : '/assets/videocam-off.svg'
                         }
                         width={20}
                         height={20}
                         alt='camera-toggle'
                     />
                 </button>
+            </div>
 
-                <div className='w-px h-6 bg-gray-200' />
-
-                {/* 펜 / 형광펜 / 지우개 */}
-                <Flex gap={2} align='center'>
-                    {/* 선택 */}
-                    <button
-                        className='p-2 rounded hover:bg-gray-100'
-                        onClick={() => setDrawingMode(false)}
-                    >
-                        <Image src='/assets/selector.svg' width={20} height={20} alt='selector' />
-                    </button>
+            <div className='h-[55px] bg-white shadow-[0_2px_6px_rgba(0,0,0,0.25)] rounded-full px-4 py-1 flex items-center gap-1'>
+                {/* 브러시 */}
+                <Flex gap={1}>
                     <button
                         className='p-2 rounded hover:bg-gray-100'
                         onClick={() => {
@@ -94,7 +88,7 @@ export function FabricToolbar() {
                     >
                         <Image
                             src='/assets/pencel.svg'
-                            width={24}
+                            width={15}
                             height={20}
                             alt='pencil'
                             className='object-contain'
@@ -109,7 +103,7 @@ export function FabricToolbar() {
                     >
                         <Image
                             src='/assets/highlighter.svg'
-                            width={24}
+                            width={15}
                             height={20}
                             alt='highlighter'
                             className='object-contain'
@@ -125,9 +119,9 @@ export function FabricToolbar() {
                     >
                         <Image
                             src='/assets/sticky.svg'
-                            width={30}
+                            width={15}
                             height={20}
-                            alt='sticky'
+                            alt='sticky-note'
                             className='object-contain'
                         />
                     </button>
@@ -151,15 +145,7 @@ export function FabricToolbar() {
                 {/* 녹음 */}
                 <button
                     className='p-2 rounded hover:bg-gray-100'
-                    onClick={() => {
-                        if (isRecording) {
-                            stopRecording();
-                        } else {
-                            startRecording();
-                        }
-
-                        toggleRecording();
-                    }}
+                    onClick={toggleRecording} // 🆕 Canvas Store의 toggleRecording 직접 사용
                     title={isRecording ? '녹음 중지' : '녹음 시작'}
                 >
                     <Image
@@ -190,50 +176,5 @@ export function FabricToolbar() {
                 </button>
             </div>
         </div>
-        // <Flex
-        //     className='absolute bottom-[10px] left-1/2 -translate-x-1/2 transform z-[10]'
-        //     justify='center'
-        //     align='center'
-        //     gap={20}
-        // >
-        //     <Button disabled={!hasCanvas} onClick={() => setDrawingMode(false)}>
-        //         선택
-        //     </Button>
-        //     <Button
-        //         disabled={!hasCanvas}
-        //         onClick={() => {
-        //             setDrawingMode(true);
-        //             setBrushOptions({ type: 'pencil', color: '#000000', width: 3 });
-        //         }}
-        //     >
-        //         <Image src='/assets/pencel.svg' width={32} height={71} alt='pencel' />
-        //     </Button>
-        //     <Button
-        //         disabled={!hasCanvas}
-        //         onClick={() => {
-        //             setDrawingMode(true);
-        //             setBrushOptions({ type: 'highlighter', width: 20 });
-        //         }}
-        //     >
-        //         <Image src='/assets/highlighter.svg' width={32} height={71} alt='pencel' />
-        //     </Button>
-        //     <Button
-        //         disabled={!hasCanvas}
-        //         onClick={() => {
-        //             setStickyMode(true);
-        //             setDrawingMode(false);
-        //             setEraserMode(false);
-        //         }}
-        //     >
-        //         스티커 메모
-        //     </Button>
-        //     <Button disabled={!hasCanvas} onClick={() => setEraserMode(true)}>
-        //         <Image src='/assets/eraser.svg' width={32} height={71} alt='pencel' />
-        //     </Button>
-        //     <Button type='default' onClick={handleRecord}>
-        //         {isRecordingRef.current ? '녹음 중' : '녹음'}
-        //     </Button>
-        //     <ReplayButton canvasIdx={0} />
-        // </Flex>
     );
 }

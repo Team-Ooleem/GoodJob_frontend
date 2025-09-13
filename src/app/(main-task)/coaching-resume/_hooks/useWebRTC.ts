@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useCanvasStore } from '../_stores';
 import { useVoiceDetection } from './useVoiceDetection';
+import { setCanvasIdx, setWebRTCStreams, startRecording, stopRecording } from './useVoiceRecorder';
 
 export interface UseWebRTC {
     localStream: MediaStream | null;
@@ -19,12 +20,18 @@ export interface UseWebRTC {
     localVolumeLevel: number;
     remoteVolumeLevel: number;
 
+    /* 녹음 관련 */
+    isRecording: boolean;
+
     joinRoom: (roomId: string) => void;
     leaveRoom: () => void;
     startCall: () => Promise<void>;
     endCall: () => void;
     toggleMic: () => void;
     toggleCamera: () => void;
+    toggleRecording: () => void;
+
+    sendRecordingStatus: (isRecording: boolean) => void;
 
     onRemoteStream?: (stream: MediaStream) => void;
     onConnectionStateChange?: (state: RTCPeerConnectionState) => void;
@@ -48,8 +55,17 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
     const [isCameraOff, setIsCameraOff] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // 🆕 Canvas Store의 isRecording 상태를 직접 사용 (단일 소스)
+    const isRecording = useCanvasStore((s) => s.isRecording);
+    const dataChannelRef = useRef<RTCDataChannel | null>(null);
+
     const onRemoteStream = options?.onRemoteStream;
     const onConnectionStateChange = options?.onConnectionStateChange;
+
+    // 🆕 WebRTC 스트림을 useVoiceRecorder에 전달
+    useEffect(() => {
+        setWebRTCStreams(localStream, remoteStream);
+    }, [localStream, remoteStream]);
 
     // 로컬 스트림에 대한 음성 감지
     const { isSpeaking: isLocalSpeaking, volumeLevel: localVolumeLevel } = useVoiceDetection(
@@ -72,6 +88,7 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
             debounceDelay: 50, // 디바운스 지연 시간 (ms)
         },
     );
+
     const ensurePeer = useCallback((): RTCPeerConnection => {
         if (pcRef.current) return pcRef.current;
         const pc = new RTCPeerConnection({
@@ -80,6 +97,31 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
                 { urls: 'stun:stun1.l.google.com:19302' },
             ],
         });
+        // 🆕 DataChannel이 이미 있는지 확인 후 생성
+        if (!dataChannelRef.current) {
+            const dataChannel = pc.createDataChannel('recordingStatus', {
+                ordered: true,
+            });
+
+            dataChannelRef.current = dataChannel;
+
+            dataChannel.onopen = () => {
+                console.log('📡 WebRTC DataChannel 연결됨');
+            };
+
+            dataChannel.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'recordingStatus') {
+                        console.log(
+                            `🎤 다른 사용자 녹음 상태 변경: ${data.isRecording ? '시작' : '중지'}`,
+                        );
+                    }
+                } catch (error) {
+                    console.error('DataChannel 메시지 파싱 오류:', error);
+                }
+            };
+        }
 
         pc.onicecandidate = (e) => {
             if (e.candidate && roomRef.current) {
@@ -97,6 +139,23 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
             onRemoteStream?.(stream);
         };
 
+        // DataChannel 수신 처리
+        pc.ondatachannel = (event) => {
+            const channel = event.channel;
+            channel.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'recordingStatus') {
+                        console.log(
+                            `🎤 다른 사용자 녹음 상태 변경: ${data.isRecording ? '시작' : '중지'}`,
+                        );
+                    }
+                } catch (error) {
+                    console.error('DataChannel 메시지 파싱 오류:', error);
+                }
+            };
+        };
+
         pc.onconnectionstatechange = () => {
             setIsConnected(pc.connectionState === 'connected');
             onConnectionStateChange?.(pc.connectionState);
@@ -105,6 +164,23 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
         pcRef.current = pc;
         return pc;
     }, [onConnectionStateChange, onRemoteStream]);
+
+    // 🆕endRecordingStatus 함수
+    const sendRecordingStatus = useCallback((isRecording: boolean) => {
+        const dataChannel = dataChannelRef.current;
+        if (dataChannel && dataChannel.readyState === 'open') {
+            dataChannel.send(
+                JSON.stringify({
+                    type: 'recordingStatus',
+                    isRecording,
+                    timestamp: Date.now(),
+                }),
+            );
+            console.log(`📡 WebRTC로 녹음 상태 전송: ${isRecording ? '시작' : '중지'}`);
+        } else {
+            console.warn('DataChannel이 연결되지 않음 또는 준비되지 않음');
+        }
+    }, []);
 
     const attachLocalMedia = useCallback(async () => {
         if (localStream) return localStream;
@@ -122,6 +198,12 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
             throw e;
         }
     }, [ensurePeer, localStream]);
+
+    // 🆕 sendRecordingStatus 함수를 캔버스 스토어에 등록
+    useEffect(() => {
+        const setSendRecordingStatus = useCanvasStore.getState().setSendRecordingStatus;
+        setSendRecordingStatus(sendRecordingStatus);
+    }, [sendRecordingStatus]);
 
     // --- Socket listeners ---
     useEffect(() => {
@@ -184,6 +266,13 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
             roomRef.current = roomId;
             if (!socket) return;
 
+            //세션 진입시 바로 녹음 시작
+            setCanvasIdx(roomId);
+            const canvasStore = useCanvasStore.getState();
+            if (!canvasStore.isRecording) {
+                canvasStore.toggleRecording(); // 자동 녹음 시작
+            }
+
             socket.emit('joinRtc', { room: roomId }, (count: number) => {
                 console.log(`🟢 joinRtc: ${roomId}, 현재 인원 ${count}`);
                 if (count === 1) {
@@ -196,6 +285,15 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
 
     const leaveRoom = useCallback(() => {
         roomRef.current = null;
+        // 🆕 Canvas Store 상태도 함께 업데이트
+        const canvasStore = useCanvasStore.getState();
+        if (canvasStore.isRecording) {
+            canvasStore.setRecording(false);
+            console.log('🎯 WebRTC leaveRoom - 녹음 상태 false로 변경');
+        }
+
+        stopRecording();
+        // setIsRecording(false); 제거 - Canvas Store에서 자동 관리
     }, []);
 
     const startCall = useCallback(async () => {
@@ -214,11 +312,21 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
     }, [attachLocalMedia, ensurePeer]);
 
     const endCall = useCallback(() => {
+        //  통화 종료시 녹음 중지
+        const canvasStore = useCanvasStore.getState();
+        if (canvasStore.isRecording) {
+            canvasStore.setRecording(false);
+            console.log('🎯 WebRTC endCall - 녹음 상태 false로 변경');
+        }
+        stopRecording();
+        // setIsRecording(false); 제거 - Canvas Store에서 자동 관리
+
         pcRef.current?.getSenders().forEach((s) => pcRef.current?.removeTrack(s));
         pcRef.current?.close();
         pcRef.current = null;
         setRemoteStream(null);
         setIsConnected(false);
+        dataChannelRef.current = null;
     }, []);
 
     const toggleMic = useCallback(() => {
@@ -234,6 +342,9 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
         tracks.forEach((t) => (t.enabled = next));
         setIsCameraOff(!next);
     }, [localStream]);
+
+    // �� Canvas Store의 toggleRecording 사용
+    const toggleRecording = useCanvasStore((s) => s.toggleRecording);
 
     return {
         localStream,
@@ -255,5 +366,10 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
         toggleCamera,
         onRemoteStream,
         onConnectionStateChange,
+
+        // 🆕 녹음 관련 (Canvas Store 상태 반환)
+        isRecording,
+        toggleRecording,
+        sendRecordingStatus,
     };
 };

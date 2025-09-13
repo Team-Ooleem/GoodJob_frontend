@@ -126,20 +126,18 @@ export function ReplayChat({ canvasIdx, isOpen, currentUserId }: ReplayChatProps
         const extension = audioUrl.split('.').pop()?.toLowerCase();
 
         switch (extension) {
+            case 'wav':
+                return <source src={audioUrl} type='audio/wav' />;
             case 'webm':
                 return <source src={audioUrl} type='audio/webm' />;
             case 'mp4':
-            case 'm4a':
-                return <source src={audioUrl} type='audio/mp4' />;
-            case 'wav':
-                return <source src={audioUrl} type='audio/wav' />;
+            case 'flac':
+                return <source src={audioUrl} type='audio/flac' />;
             case 'mp3':
                 return <source src={audioUrl} type='audio/mpeg' />;
             default:
                 return (
                     <>
-                        <source src={audioUrl} type='audio/webm' />
-                        <source src={audioUrl} type='audio/mp4' />
                         <source src={audioUrl} type='audio/wav' />
                     </>
                 );
@@ -170,7 +168,7 @@ export function ReplayChat({ canvasIdx, isOpen, currentUserId }: ReplayChatProps
                 const sessionsWithSegments: ChatSession[] = await Promise.all(
                     res.data.messages.map(async (msg: any) => {
                         const contextRes = await axios.get(
-                            `${API_BASE_URL}/stt/context/${msg.messageId}`,
+                            `${API_BASE_URL}/stt/context/${msg.messageIdx}`,
                         );
                         const segments: SpeakerSegment[] = contextRes.data.speakers.map(
                             (seg: any) => ({
@@ -182,7 +180,7 @@ export function ReplayChat({ canvasIdx, isOpen, currentUserId }: ReplayChatProps
                             }),
                         );
                         return {
-                            sessionId: msg.messageId,
+                            sessionId: msg.messageIdx,
                             segments,
                             timestamp: msg.timestamp,
                             mentor_idx: msg.mentor_idx,

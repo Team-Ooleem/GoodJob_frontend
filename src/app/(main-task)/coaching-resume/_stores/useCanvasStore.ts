@@ -3,6 +3,7 @@
 import { create } from 'zustand';
 import { Socket } from 'socket.io-client';
 import * as fabric from 'fabric';
+import { startRecording, stopRecording } from '../_hooks/useVoiceRecorder'; // 🆕 녹음 함수 import
 
 type BrushKind = 'pencil' | 'highlighter';
 
@@ -53,10 +54,12 @@ type CanvasStoreState = {
     setMicEnabled: (enabled: boolean) => void;
     setCamEnabled: (enabled: boolean) => void;
     // recording
-    toggleRecording: () => void;
+    toggleRecording: () => void; // 🆕 실제 녹음 로직 포함
     setRecording: (enabled: boolean) => void;
     toggleRecordingList: () => void;
     setRecordingListOpen: (open: boolean) => void;
+    sendRecordingStatus?: (isRecording: boolean) => void;
+    setSendRecordingStatus: (fn: (isRecording: boolean) => void) => void;
 
     // objects
     deleteActiveObject: () => void;
@@ -92,6 +95,8 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     isLocked: false,
     history: [],
     socket: null,
+
+    setSendRecordingStatus: (fn) => set({ sendRecordingStatus: fn }),
 
     setSocket: (socket) => set({ socket }),
 
@@ -131,7 +136,29 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     toggleCam: () => set((state) => ({ isCamEnabled: !state.isCamEnabled })),
     setMicEnabled: (enabled: boolean) => set({ isMicEnabled: enabled }),
     setCamEnabled: (enabled: boolean) => set({ isCamEnabled: enabled }),
-    toggleRecording: () => set((state) => ({ isRecording: !state.isRecording })),
+
+    // �� toggleRecording: 실제 녹음 로직 + 상태 토글
+    toggleRecording: () => {
+        const currentState = get();
+        const socket = currentState.socket;
+        if (currentState.isRecording) {
+            set({ isRecording: false }); // 즉시 상태 업데이트
+            stopRecording();
+
+            // WebRTC DataChannel로 녹음 중지 알림
+            if (currentState.sendRecordingStatus) {
+                currentState.sendRecordingStatus(false);
+            }
+        } else {
+            set({ isRecording: true }); // 즉시 상태 업데이트
+            startRecording();
+            // WebRTC DataChannel로 녹음 시작 알림
+            if (currentState.sendRecordingStatus) {
+                currentState.sendRecordingStatus(true);
+            }
+        }
+    },
+
     setRecording: (enabled: boolean) => set({ isRecording: enabled }),
     toggleRecordingList: () =>
         set((state) => ({ isRecordingListOpen: !state.isRecordingListOpen })),
