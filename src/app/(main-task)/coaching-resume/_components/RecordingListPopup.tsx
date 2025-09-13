@@ -10,7 +10,7 @@ import { useSessionData } from '../_hooks/useSessionData';
 import { useDragPosition } from '../_hooks/useDragPosition';
 import TranscriptList from './TranscriptList';
 import RecordingList from './RecordingList';
-import { ChatSession, SpeakerSegment, TranscriptItem } from '@/apis/recofing-api';
+import { ChatSession, SpeakerSegment, TranscriptItem } from '@/apis/recoding-api';
 
 export type RecordingItem = {
     id: string;

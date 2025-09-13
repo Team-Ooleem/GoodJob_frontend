@@ -1,7 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
-import { ChatSession, RecordingItem } from '@/apis/recofing-api';
+import { ChatSession, RecordingItem } from '@/apis/recoding-api';
 
 interface RecordingState {
     // 상태

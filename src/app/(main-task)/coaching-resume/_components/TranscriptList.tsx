@@ -3,7 +3,7 @@
 import { List } from 'antd';
 import AudioPlayer from './AudioPlayer';
 
-import { ChatSession, SpeakerSegment, TranscriptItem } from '@/apis/recofing-api';
+import { ChatSession, SpeakerSegment, TranscriptItem } from '@/apis/recoding-api';
 
 function TranscriptList({
     transcripts,
