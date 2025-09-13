@@ -124,7 +124,7 @@ export default function PostItem({
 
     // 사용자 이름 클릭 핸들러
     const handleUserNameClick = (userId: number) => {
-        router.push(`/user/social/profile/${userId}`);
+        router.push(`/social/profile/${userId}`);
     };
 
     // 본인이 작성한 글인지 확인
