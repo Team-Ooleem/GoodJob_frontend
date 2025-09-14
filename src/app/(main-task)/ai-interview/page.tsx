@@ -1,9 +1,13 @@
-'use client';
-
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { AiInterviewInfoCard, aiInterviewData } from './_components';
+import AiInterviewInfoSection from './_components/AiInterviewInfoSection';
+import { Metadata } from 'next';
+
+export const metadata: Metadata = {
+    title: 'AI 모의면접 - 랜딩페이지 | GoodJob',
+    description: 'AI 모의면접 서비스 | 베타버전 체험하기',
+};
 
 export default function AiInterviewPage() {
     return (
@@ -68,19 +72,7 @@ export default function AiInterviewPage() {
                 </div>
 
                 {/* 하단 AI 면접 정보 카드 섹션 */}
-                <div className='flex-shrink-0 pb-8'>
-                    <div className='grid grid-cols-1 lg:grid-cols-3 gap-6 justify-center'>
-                        <div className='w-full'>
-                            <AiInterviewInfoCard {...aiInterviewData.main} />
-                        </div>
-                        <div className='w-full'>
-                            <AiInterviewInfoCard {...aiInterviewData.features[0]} />
-                        </div>
-                        <div className='w-full'>
-                            <AiInterviewInfoCard {...aiInterviewData.features[1]} />
-                        </div>
-                    </div>
-                </div>
+                <AiInterviewInfoSection />
             </div>
         </div>
     );
