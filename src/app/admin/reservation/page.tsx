@@ -86,6 +86,7 @@ export default function AdminPage() {
         page: 1,
         limit: DEFAULT_LIMIT,
         total: 0,
+        total_pages: 0,
         has_next: false,
     });
     const [loading, setLoading] = React.useState(true);
