@@ -93,3 +93,32 @@ export interface BackendSessionMessage {
     }>;
     audioDuration: number;
 }
+
+// 전역 상태 관리
+export interface VoiceRecorderState {
+    mediaRecorder: MediaRecorder | null;
+    audioChunks: Blob[];
+    stream: MediaStream | null;
+    canvasIdx: string;
+    webrtcStreams: {
+        localStream: MediaStream | null;
+        remoteStream: MediaStream | null;
+    };
+    logFlags: {
+        streamCreated: boolean;
+        formatSelected: boolean;
+        sttProcessed: boolean;
+        recordingStarted: boolean;
+        recordingStopped: boolean;
+        alreadyRecording: boolean;
+        participantsError: boolean;
+        fallbackWarning: boolean;
+        directMic: boolean;
+        durationCalculated: boolean;
+        durationFailed: boolean;
+        sttCompleted: boolean;
+        sttFailed: boolean;
+        micAccessFailed: boolean;
+        [key: string]: boolean;
+    };
+}

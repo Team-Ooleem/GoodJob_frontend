@@ -99,6 +99,7 @@ function TranscriptList({
                     isPlaying={isPlaying}
                     onPlayPause={onPlayPause}
                     onClose={onClose}
+                    audioRef={audioRef}
                 />
             </div>
         </div>

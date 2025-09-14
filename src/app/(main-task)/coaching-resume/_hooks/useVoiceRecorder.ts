@@ -3,41 +3,18 @@ import axios from 'axios';
 import { API_BASE_URL } from '@/constants/config';
 import { useUserStore } from '@/stores/user-store';
 import { useCanvasStore } from '../_stores';
+import { VoiceRecorderState } from '@/apis/recoding-api';
 
-// 전역 상태 관리
-interface VoiceRecorderState {
-    mediaRecorder: MediaRecorder | null;
-    audioChunks: Blob[];
-    stream: MediaStream | null;
-    canvasIdx: string;
-    webrtcStreams: {
-        localStream: MediaStream | null;
-        remoteStream: MediaStream | null;
-    };
-    logFlags: {
-        streamCreated: boolean;
-        formatSelected: boolean;
-        sttProcessed: boolean;
-        recordingStarted: boolean;
-        recordingStopped: boolean;
-        alreadyRecording: boolean;
-        participantsError: boolean;
-        fallbackWarning: boolean;
-        directMic: boolean;
-        durationCalculated: boolean;
-        durationFailed: boolean;
-        sttCompleted: boolean;
-        sttFailed: boolean;
-        micAccessFailed: boolean;
-    };
-}
+const CHUNK_DURATION = 300000; // 300초마다 청크 생성
+let chunkIndex = 0;
+let totalChunks = 0; // ✅ 이 줄 추가
 
 // 전역 상태 관리
 const globalState: VoiceRecorderState = {
     mediaRecorder: null,
     audioChunks: [],
     stream: null,
-    canvasIdx: 'default-canvas-uuid',
+    canvasIdx: 'resume-room',
     webrtcStreams: {
         localStream: null,
         remoteStream: null,
@@ -225,6 +202,78 @@ const calculateDuration = async (audioBlob: Blob, mimeType: string): Promise<num
     return memoizedFunctions.calculateDuration(audioBlob, mimeType);
 };
 
+const processSTTChunk = async (
+    audioBlob: Blob,
+    mimeType: string,
+    currentChunkIndex: number,
+    isFinal: boolean,
+) => {
+    try {
+        // Canvas 참여자 정보 가져오기
+        const participants = await getCanvasParticipants(globalState.canvasIdx);
+
+        let mentorIdx: number;
+        let menteeIdx: number;
+
+        if (!participants || participants.length < 2) {
+            logOnce('participantsError', 'Canvas 참여자 조회 실패, 기본값 사용', 'warn');
+            mentorIdx = 1;
+            menteeIdx = 2;
+        } else {
+            const currentUser = useUserStore.getState().user;
+
+            if (currentUser && currentUser.idx) {
+                menteeIdx = currentUser.idx;
+                const mentor = participants.find((p: any) => p.user_id !== currentUser.idx);
+                mentorIdx = mentor ? mentor.user_id : participants[0].user_id;
+            } else {
+                mentorIdx = participants[0].user_id;
+                menteeIdx = participants[1].user_id;
+            }
+        }
+
+        // Base64 변환
+        const base64Data = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const result = reader.result as string;
+                resolve(result.split(',')[1]);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(audioBlob);
+        });
+
+        // Duration 계산
+        const duration = await calculateDuration(audioBlob, mimeType);
+
+        const requestData = {
+            audioData: base64Data,
+            mimeType: mimeType,
+            canvasId: globalState.canvasIdx,
+            mentorIdx: mentorIdx,
+            menteeIdx: menteeIdx,
+            isFinalChunk: isFinal, // ✅ 실제 최종 청크 여부
+            chunkIndex: currentChunkIndex, // ✅ 실제 청크 인덱스
+            totalChunks: isFinal ? totalChunks : -1, // ✅ 최종 청크일 때만 총 청크 수
+            duration: duration,
+            isNewRecordingSession: currentChunkIndex === 0, // ✅ 첫 번째 청크
+        };
+
+        logOnce(`sttChunk${currentChunkIndex}`, `🎵 청크 ${currentChunkIndex} STT 처리 시작`);
+        await axios.post(`${API_BASE_URL}/stt/transcribe-with-context`, requestData);
+        logOnce(
+            `sttChunk${currentChunkIndex}Complete`,
+            `✅ 청크 ${currentChunkIndex} STT 처리 완료`,
+        );
+    } catch (err) {
+        logOnce(
+            `sttChunk${currentChunkIndex}Failed`,
+            `❌ 청크 ${currentChunkIndex} STT 처리 실패`,
+            'error',
+        );
+    }
+};
+
 /**STT 처리 함수 */
 const processSTT = async (audioBlob: Blob, mimeType: string) => {
     try {
@@ -301,6 +350,10 @@ const cleanupStream = () => {
 
     globalState.mediaRecorder = null;
     globalState.audioChunks = [];
+
+    // ✅ 청크 카운터 초기화
+    chunkIndex = 0;
+    totalChunks = 0;
 };
 
 /**녹음 시작 함수 */
@@ -320,27 +373,43 @@ export const startRecording = async () => {
         globalState.mediaRecorder = new MediaRecorder(stream, { mimeType: selectedType });
         globalState.audioChunks = [];
 
+        // ✅ 청크 카운터 초기화
+        chunkIndex = 0;
+        totalChunks = 0;
+
         canvasStore.setRecording(true);
 
-        globalState.mediaRecorder.ondataavailable = (event) => {
+        // ✅ 청크별 실시간 STT 처리
+        globalState.mediaRecorder.ondataavailable = async (event) => {
             if (event.data.size > 0) {
                 globalState.audioChunks.push(event.data);
+
+                // ✅ 청크별 즉시 STT 처리
+                await processSTTChunk(event.data, mimeType, chunkIndex, false);
+                chunkIndex++;
             }
         };
 
+        // ✅ 최종 청크 처리
         globalState.mediaRecorder.onstop = async () => {
-            logOnce('recordingStopped', ' 녹음 중지됨 - STT 처리 시작');
-            const audioBlob = new Blob(globalState.audioChunks, { type: selectedType });
-            await processSTT(audioBlob, mimeType);
+            logOnce('recordingStopped', '��️ 녹음 중지됨 - 최종 청크 처리 시작');
 
+            // ✅ 최종 청크 처리
+            if (globalState.audioChunks.length > 0) {
+                const finalBlob = new Blob(globalState.audioChunks, { type: selectedType });
+                await processSTTChunk(finalBlob, mimeType, chunkIndex, true);
+            }
+
+            totalChunks = chunkIndex + 1;
             const canvasStore = useCanvasStore.getState();
             canvasStore.setRecording(false);
 
             cleanupStream();
         };
 
-        globalState.mediaRecorder.start();
-        logOnce('recordingStarted', '🎙️ 녹음 시작됨');
+        // ✅ 60초마다 청크 생성
+        globalState.mediaRecorder.start(CHUNK_DURATION);
+        logOnce('recordingStarted', '🎙️ 60초 청크 분할 녹음 시작됨');
     } catch (err) {
         logOnce('micAccessFailed', '마이크 접근 실패', 'error');
         cleanupStream();

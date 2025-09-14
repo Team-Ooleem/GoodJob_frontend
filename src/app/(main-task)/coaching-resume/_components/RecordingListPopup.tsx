@@ -29,7 +29,7 @@ export function RecordingListPopup() {
     // 커스텀 훅들
     const { pos, handleMouseDown } = useDragPosition();
     const { sessions, loading, error, fetchSessionMessages, loadMore, setSessions } =
-        useSessionData('default-canvas-uuid');
+        useSessionData('resume-room');
     const { loadAudioMetadata } = useAudioMetadata();
 
     // 오디오 플레이어 훅
@@ -104,10 +104,11 @@ export function RecordingListPopup() {
             const session = sessions.find((s) => `rec-${s.sessionIdx}` === selectedRecording.id);
             if (session) {
                 setCurrentSession(session as unknown as ChatSession);
-                setPlayingSegment(session.segments[0]);
-                setCurrentSegment(session.segments[0]);
+                setPlayingSegment(null);
+                setCurrentSegment(null);
                 setIsFullSessionMode(true);
                 setCurrentTime(0);
+                setIsPlaying(false);
 
                 const audioUrl = session.segments[0]?.audioUrl;
                 if (audioUrl) {
@@ -118,6 +119,7 @@ export function RecordingListPopup() {
     }, [
         selectedRecording,
         sessions,
+        setIsPlaying,
         setCurrentSession,
         setPlayingSegment,
         setCurrentSegment,
@@ -142,7 +144,7 @@ export function RecordingListPopup() {
         return sessions.map((session) => ({
             id: `rec-${session.sessionIdx}`,
             title: `음성 메모 ${session.segmentIndex}`,
-            durationSec: getTotalDuration(session), // 🆕 타입 캐스팅 제거
+            durationSec: Math.floor(getTotalDuration(session)), // 🆕 타입 캐스팅 제거
             createdAt: new Date(session.timestamp).toLocaleString(),
         }));
     }, [sessions]);
