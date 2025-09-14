@@ -18,12 +18,12 @@ const navigationItems: NavigationItem[] = [
         icon: Home,
     },
     {
-        href: '/ai-interview',
+        href: '/my-page/ai-interview-result',
         label: 'AI 인터뷰',
         icon: Bot,
     },
     {
-        href: '/coaching-resume',
+        href: '/my-page/coaching-resume-result',
         label: '이력서 코칭',
         icon: FileText,
     },

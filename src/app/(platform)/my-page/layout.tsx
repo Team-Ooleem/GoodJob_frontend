@@ -74,15 +74,21 @@ export default async function MyPageLayout({ children }: { children: React.React
             </div>
 
             <div className='mx-auto max-w-[1300px] w-full px-4 md:px-6 py-6'>
-                <div className='w-80 flex-shrink-0 space-y-6'>
-                    {/* 프로필 섹션 */}
-                    <ProfileSection />
+                <div className='flex gap-6'>
+                    {/* 사이드바 */}
+                    <div className='w-80 flex-shrink-0 space-y-6'>
+                        {/* 프로필 섹션 */}
+                        <ProfileSection />
 
-                    {/* 네비게이션 */}
-                    <div className='bg-card rounded-lg border p-4'>
-                        <h3 className='font-semibold mb-4'>네비게이션</h3>
-                        <SidebarNavigation />
+                        {/* 네비게이션 */}
+                        <div className='bg-card rounded-lg border p-4'>
+                            <h3 className='font-semibold mb-4'>네비게이션</h3>
+                            <SidebarNavigation />
+                        </div>
                     </div>
+
+                    {/* 메인 콘텐츠 영역 */}
+                    <div className='flex-1 min-w-0'>{children}</div>
                 </div>
             </div>
         </div>
