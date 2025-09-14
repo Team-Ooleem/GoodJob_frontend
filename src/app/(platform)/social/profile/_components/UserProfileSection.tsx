@@ -3,9 +3,11 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { User, Users, Star, Briefcase, Heart, MessageSquare } from 'lucide-react';
+import { User, Star, Heart, MessageSquare, Loader2 } from 'lucide-react';
 import { useUserProfile } from '../_hooks/useUserProfile';
 import { useFollowMutations } from '../../_hooks/useFollowMutations';
+import { useChatStore } from '@/stores/chat-store';
+import { ChatUser } from '@/types/chat';
 
 interface UserProfileSectionProps {
     userId: number;
@@ -18,6 +20,27 @@ export function UserProfileSection({ userId, currentUserId }: UserProfileSection
 
     // 팔로우 관련 뮤테이션
     const { toggleFollow } = useFollowMutations(currentUserId);
+
+    // 채팅 스토어
+    const { startChatWithUser } = useChatStore();
+
+    // 메시지 보내기 핸들러
+    const handleSendMessage = () => {
+        if (!userProfile || !currentUserId) return;
+
+        // ChatUser 타입으로 변환
+        const chatUser: ChatUser = {
+            user_id: userProfile.userIdx,
+            name: userProfile.name,
+            email: '', // UserProfileResponse에는 email이 없음
+            short_bio: userProfile.bio || '',
+            profile_img: userProfile.profileImage || '',
+            job_info: '', // UserProfileResponse에는 jobInfo가 없음
+        };
+
+        // 채팅 시작
+        startChatWithUser(chatUser, currentUserId);
+    };
 
     // 로딩 상태
     if (isLoading) {
@@ -147,16 +170,36 @@ export function UserProfileSection({ userId, currentUserId }: UserProfileSection
                 )}
             </div>
 
-            {/* 팔로우 버튼 (내 프로필이 아닌 경우에만 표시) */}
+            {/* 팔로우 버튼과 메시지 보내기 버튼 (내 프로필이 아닌 경우에만 표시) */}
             {!isOwnProfile && (
-                <div className='mt-6'>
-                    <Button
-                        onClick={() => toggleFollow.mutate(userId)}
-                        className='w-full'
-                        variant={userProfile.isFollowing ? 'outline' : 'default'}
-                    >
-                        {userProfile.isFollowing ? '팔로우 취소' : '팔로우'}
-                    </Button>
+                <div className='mt-6 space-y-3'>
+                    <div className='grid grid-cols-2 gap-3'>
+                        <Button
+                            onClick={() => toggleFollow.mutate(userId)}
+                            variant={userProfile.isFollowing ? 'outline' : 'default'}
+                            className='flex items-center gap-2'
+                            disabled={toggleFollow.isPending}
+                        >
+                            {toggleFollow.isPending ? (
+                                <Loader2 className='h-4 w-4 animate-spin' />
+                            ) : (
+                                <Heart className='h-4 w-4' />
+                            )}
+                            {toggleFollow.isPending
+                                ? '처리 중...'
+                                : userProfile.isFollowing
+                                  ? '팔로우 취소'
+                                  : '팔로우'}
+                        </Button>
+                        <Button
+                            onClick={handleSendMessage}
+                            variant='outline'
+                            className='flex items-center gap-2'
+                        >
+                            <MessageSquare className='h-4 w-4' />
+                            메시지 보내기
+                        </Button>
+                    </div>
                 </div>
             )}
         </div>
