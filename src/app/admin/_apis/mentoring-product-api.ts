@@ -60,6 +60,7 @@ export type MentoringProductsResponse = {
         page: number;
         limit: number;
         total: number;
+        total_pages: number;
         has_next: boolean;
     };
 };
@@ -206,12 +207,16 @@ export async function fetchMentoringProducts(
         const endIndex = startIndex + limit;
         const paginatedProducts = mockProducts.slice(startIndex, endIndex);
 
+        const total = mockProducts.length;
+        const total_pages = Math.ceil(total / limit);
+
         return {
             products: paginatedProducts,
             page_info: {
                 page,
                 limit,
-                total: mockProducts.length,
+                total,
+                total_pages,
                 has_next: endIndex < mockProducts.length,
             },
         };
