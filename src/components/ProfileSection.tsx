@@ -1,22 +1,43 @@
 'use client';
 
+import { useRef } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { User, Users, Star, Building2, Briefcase } from 'lucide-react';
+import { User, Users, Star, Building2, Briefcase, Camera } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMyProfile } from '@/app/(platform)/social/_hooks';
 import { useAuth } from '@/hooks/use-auth';
+import { useProfileImageUpload } from '@/hooks/use-profile-image-upload';
 
 export default function ProfileSection() {
     const router = useRouter();
     const { user, isLoading: authLoading } = useAuth();
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const { uploadProfileImage, isUploading } = useProfileImageUpload();
 
     // 내 프로필 클릭 핸들러
     const handleMyProfileClick = () => {
         if (user?.idx) {
             router.push(`/social/profile/${user.idx}`);
+        }
+    };
+
+    // 아바타 클릭 핸들러 (파일 선택 창 열기)
+    const handleAvatarClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    // 파일 선택 핸들러
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            await uploadProfileImage(file);
+        }
+        // 파일 입력 초기화
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
         }
     };
 
@@ -67,12 +88,44 @@ export default function ProfileSection() {
         <div className='w-80 flex-shrink-0'>
             <Card className='sticky top-16'>
                 <CardContent className='text-center p-6'>
-                    <Avatar className='h-20 w-20 mx-auto mb-4'>
-                        <AvatarImage src={profile?.profileImage} alt={profile?.name || '사용자'} />
-                        <AvatarFallback>
-                            <User className='h-8 w-8' />
-                        </AvatarFallback>
-                    </Avatar>
+                    <div className='relative group'>
+                        <Avatar
+                            className='h-20 w-20 mx-auto mb-4 cursor-pointer hover:opacity-80 transition-opacity'
+                            onClick={handleAvatarClick}
+                        >
+                            <AvatarImage
+                                src={profile?.profileImage}
+                                alt={profile?.name || '사용자'}
+                            />
+                            <AvatarFallback>
+                                <User className='h-8 w-8' />
+                            </AvatarFallback>
+                        </Avatar>
+
+                        {/* 카메라 아이콘 오버레이 */}
+                        <div
+                            className='absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer'
+                            onClick={handleAvatarClick}
+                        >
+                            <Camera className='h-6 w-6 text-white' />
+                        </div>
+
+                        {/* 업로드 중 로딩 표시 */}
+                        {isUploading && (
+                            <div className='absolute inset-0 bg-black/50 rounded-full flex items-center justify-center'>
+                                <div className='animate-spin rounded-full h-6 w-6 border-b-2 border-white'></div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* 숨겨진 파일 입력 */}
+                    <input
+                        ref={fileInputRef}
+                        type='file'
+                        accept='image/jpeg,image/jpg,image/png,image/gif,image/webp'
+                        onChange={handleFileChange}
+                        className='hidden'
+                    />
 
                     <h3
                         className='text-xl font-semibold mb-2 cursor-pointer hover:text-primary transition-colors'
