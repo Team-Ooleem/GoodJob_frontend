@@ -183,19 +183,22 @@ export const useVoiceDetection = (
         setIsSpeaking(false);
         setVolumeLevel(0);
     }, []);
-
-    // isSpeakingRef와 isSpeaking 상태 동기화 (개발 중에만 사용)
+    // 조건부 동기화로 성능 대폭 개선
     useEffect(() => {
-        // if (process.env.NODE_ENV === 'development') {
-        const interval = setInterval(() => {
-            if (isSpeakingRef.current !== isSpeaking) {
-                console.log(`🔄 상태 동기화: ${isSpeaking} → ${isSpeakingRef.current}`);
-                setIsSpeaking(isSpeakingRef.current);
-            }
-        }, 16); // 60fps
+        let syncInterval: NodeJS.Timeout | null = null;
 
-        return () => clearInterval(interval);
-        // }
+        if (process.env.NODE_ENV === 'development') {
+            syncInterval = setInterval(() => {
+                if (isSpeakingRef.current !== isSpeaking) {
+                    console.log(`🔄 상태 동기화: ${isSpeaking} → ${isSpeakingRef.current}`);
+                    setIsSpeaking(isSpeakingRef.current);
+                }
+            }, 100); // 60fps → 10fps로 감소
+        }
+
+        return () => {
+            if (syncInterval) clearInterval(syncInterval);
+        };
     }, [isSpeaking]);
 
     // 컴포넌트 언마운트 시 정리
