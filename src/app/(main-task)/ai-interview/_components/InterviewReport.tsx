@@ -135,6 +135,21 @@ interface InterviewReportProps {
     };
     onPrint?: () => void;
     onShare?: () => void;
+    // 비교용 (선택)
+    viewMode?: 'raw' | 'compare';
+    calibrationCompare?: {
+        visual?: {
+            baseline?: any;
+            normalizedOverall?: any;
+            normalizedPerQuestion?: Record<string, any> | null;
+            serverQuestionScores?: Record<string, { score: number; calibrationApplied?: boolean }> | null;
+        };
+        audio?: {
+            baseline?: any;
+            ratiosOverall?: Record<string, number> | null;
+            ratiosPerQuestion?: Record<string, Record<string, number>> | null;
+        };
+    };
 }
 
 export default function InterviewReport({
@@ -153,6 +168,8 @@ export default function InterviewReport({
     },
     onPrint,
     onShare,
+    viewMode = 'raw',
+    calibrationCompare,
 }: InterviewReportProps) {
     const [showFullFeedback, setShowFullFeedback] = useState(!displayOptions.compact);
     const [showAudioDetails, setShowAudioDetails] = useState(false);
@@ -204,6 +221,14 @@ export default function InterviewReport({
                 console.log('Share failed');
             }
         }
+    };
+
+    // 숫자 포맷 보조
+    const fmt = (n: any, digits: number = 3) => {
+        if (n == null || Number.isNaN(Number(n))) return '-';
+        const num = Number(n);
+        if (!Number.isFinite(num)) return '-';
+        return Number(num.toFixed(digits));
     };
 
     return (
@@ -429,6 +454,54 @@ export default function InterviewReport({
                 </Row>
             )}
 
+            {/* 질문별 비주얼 비교 (캘리브레이션) */}
+            {displayOptions.showVisualAnalysis &&
+                calibrationCompare?.visual?.normalizedPerQuestion &&
+                visualData?.perQuestion && (
+                    <Card title='질문별 비주얼 비교' className='!border-0 !shadow-lg mb-8'>
+                        <List
+                            dataSource={Object.keys(visualData.perQuestion)}
+                            renderItem={(qid, idx) => {
+                                const raw = (visualData.perQuestion as any)[qid] || {};
+                                const norm = calibrationCompare?.visual?.normalizedPerQuestion?.[qid];
+                                const svr = calibrationCompare?.visual?.serverQuestionScores?.[qid];
+                                return (
+                                    <List.Item>
+                                        <div className='w-full'>
+                                            <div className='flex justify-between items-start mb-2'>
+                                                <Text strong>Q{idx + 1} ({qid})</Text>
+                                                {svr?.score != null && (
+                                                    <Tag color={getScoreColor(svr.score)}>
+                                                        정규화 {svr.score.toFixed(0)}
+                                                        {svr.calibrationApplied ? ' ✓' : ''}
+                                                    </Tag>
+                                                )}
+                                            </div>
+                                            <div className='grid grid-cols-1 md:grid-cols-3 gap-3'>
+                                                <Card size='small'>
+                                                    <div className='text-gray-500 text-sm mb-1'>Raw</div>
+                                                    <div className='text-sm'>confidence_mean: {fmt(raw?.confidence_mean)}</div>
+                                                    <div className='text-sm'>smile_mean: {fmt(raw?.smile_mean)}</div>
+                                                </Card>
+                                                <Card size='small'>
+                                                    <div className='text-gray-500 text-sm mb-1'>Calibrated</div>
+                                                    <div className='text-sm'>confidence_mean: {fmt(norm?.confidence_mean)}</div>
+                                                    <div className='text-sm'>smile_mean: {fmt(norm?.smile_mean)}</div>
+                                                </Card>
+                                                <Card size='small'>
+                                                    <div className='text-gray-500 text-sm mb-1'>Presence/Level</div>
+                                                    <div className='text-xs text-gray-600'>good/avg/need: {raw?.presence_dist ? `${raw.presence_dist.good}/${raw.presence_dist.average}/${raw.presence_dist.needs_improvement}` : '-'}</div>
+                                                    <div className='text-xs text-gray-600'>warn/crit: {raw?.level_dist ? `${raw.level_dist.warning}/${raw.level_dist.critical}` : '-'}</div>
+                                                </Card>
+                                            </div>
+                                        </div>
+                                    </List.Item>
+                                );
+                            }}
+                        />
+                    </Card>
+                )}
+
             {/* 상세 음성 지표 */}
             {audioData?.overall && showAudioDetails && displayOptions.showAudioAnalysis && (
                 <Card title='종합 음성 지표' className='!border-0 !shadow-lg mb-8'>
@@ -610,17 +683,17 @@ export default function InterviewReport({
             {audioData?.perQuestion &&
                 audioData.perQuestion.length > 0 &&
                 displayOptions.showAudioAnalysis && (
-                    <Card title='질문별 음성 분석' className='!border-0 !shadow-lg mb-8'>
-                        <List
-                            dataSource={audioData.perQuestion}
-                            renderItem={(item) => (
-                                <List.Item>
-                                    <div className='w-full'>
-                                        <div className='flex justify-between items-start mb-3'>
-                                            <Text strong className='text-lg'>
-                                                Q{item.questionNumber}. {item.question}
-                                            </Text>
-                                            <Space>
+                <Card title='질문별 음성 분석' className='!border-0 !shadow-lg mb-8'>
+                    <List
+                        dataSource={audioData.perQuestion}
+                        renderItem={(item) => (
+                            <List.Item>
+                                <div className='w-full'>
+                                    <div className='flex justify-between items-start mb-3'>
+                                        <Text strong className='text-lg'>
+                                            Q{item.questionNumber}. {item.question}
+                                        </Text>
+                                        <Space>
                                                 {typeof item.tone_score === 'number' && (
                                                     <Tag color={getScoreColor(item.tone_score)}>
                                                         <SoundOutlined /> 톤 {item.tone_score}
@@ -637,20 +710,58 @@ export default function InterviewReport({
                                                         {item.pace_score}
                                                     </Tag>
                                                 )}
-                                            </Space>
-                                        </div>
-                                        {item.audioUrl && (
-                                            <audio
-                                                controls
-                                                src={item.audioUrl}
-                                                className='w-full'
-                                            />
-                                        )}
+                                                {typeof (item as any).normalized_score === 'number' && (
+                                                    <Tag color={getScoreColor((item as any).normalized_score as number)}>
+                                                        <ThunderboltOutlined /> 정규화{' '}
+                                                        {((item as any).normalized_score as number).toFixed(2)}
+                                                    </Tag>
+                                                )}
+                                        </Space>
                                     </div>
-                                </List.Item>
-                            )}
-                        />
-                    </Card>
+                                    {item.audioUrl && (
+                                        <audio
+                                            controls
+                                            src={item.audioUrl}
+                                            className='w-full'
+                                        />
+                                    )}
+                                    {calibrationCompare?.audio?.ratiosPerQuestion && (
+                                        (() => {
+                                            const key = String(item.questionNumber);
+                                            const ratios = calibrationCompare?.audio?.ratiosPerQuestion?.[key];
+                                            if (!ratios) return null;
+                                            return (
+                                                <div className='mt-2 text-xs text-gray-600'>
+                                                    <span className='mr-2'>정규화 비율:</span>
+                                                    <Space size={8} wrap>
+                                                        {'f0_mean' in ratios && (
+                                                            <Tag>f0 {fmt(ratios.f0_mean)}</Tag>
+                                                        )}
+                                                        {'f0_std' in ratios && (
+                                                            <Tag>f0σ {fmt(ratios.f0_std)}</Tag>
+                                                        )}
+                                                        {'rms_cv' in ratios && (
+                                                            <Tag>rms_cv {fmt(ratios.rms_cv)}</Tag>
+                                                        )}
+                                                        {'jitter_like' in ratios && (
+                                                            <Tag>jitter {fmt(ratios.jitter_like)}</Tag>
+                                                        )}
+                                                        {'shimmer_like' in ratios && (
+                                                            <Tag>shimmer {fmt(ratios.shimmer_like)}</Tag>
+                                                        )}
+                                                        {'silence_ratio' in ratios && (
+                                                            <Tag>silence {fmt(ratios.silence_ratio)}</Tag>
+                                                        )}
+                                                    </Space>
+                                                </div>
+                                            );
+                                        })()
+                                    )}
+                                </div>
+                            </List.Item>
+                        )}
+                    />
+                </Card>
                 )}
 
             {/* 종합 평가 */}
