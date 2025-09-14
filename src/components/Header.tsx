@@ -41,6 +41,9 @@ export function Header() {
                             <Button variant='ghost' onClick={handleLogout}>
                                 로그아웃
                             </Button>
+                            <Button variant='ghost' onClick={() => router.push('/my-page')}>
+                                마이페이지
+                            </Button>
                         </div>
                     ) : (
                         <Button

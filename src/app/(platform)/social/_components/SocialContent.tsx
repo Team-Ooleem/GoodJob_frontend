@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import ProfileSection from './ProfileSection';
+import { ProfileSection } from '@/components';
 import PostComposer from './PostComposer';
 import PostFeed from './PostFeed';
 import { useAuth } from '@/hooks/use-auth';
@@ -29,7 +29,7 @@ export default function SocialContent() {
         <div className='min-h-screen bg-muted/30 p-6'>
             <div className='max-w-4xl mx-auto flex gap-6'>
                 {/* 왼쪽 프로필 섹션 */}
-                <ProfileSection currentUserId={currentUserId} />
+                <ProfileSection />
 
                 {/* 가운데 메인 콘텐츠 */}
                 <div className='flex-1 flex flex-col gap-6'>
