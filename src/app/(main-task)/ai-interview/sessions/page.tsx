@@ -413,7 +413,10 @@ export default function AiInterviewSessionsPage() {
     const lastAudioBlobRef = useRef<Blob | null>(null);
 
     const sessionIdRef = useRef<string>(
-        `sess_${Math.random().toString(36).slice(2, 10)}_${Date.now()}`,
+        typeof window !== 'undefined'
+            ? localStorage.getItem('aiInterviewSessionId') ||
+              `sess_${Math.random().toString(36).slice(2, 10)}_${Date.now()}`
+            : `sess_${Math.random().toString(36).slice(2, 10)}_${Date.now()}`,
     );
     const SESSION_ID = sessionIdRef.current as string;
 
@@ -485,10 +488,10 @@ export default function AiInterviewSessionsPage() {
     }
 
     async function transcribeWithGoogleSTT(wavBlob: Blob): Promise<string> {
-        const wav16k = await resampleTo16kHzMonoWav(wavBlob);
+        //const wav16k = await resampleTo16kHzMonoWav(wavBlob);
 
         const form = new FormData();
-        form.append('file', wav16k, 'answer.wav');
+        form.append('file', wavBlob, 'answer.wav');
 
         const res = await api.post(`stt/transcribe-file`, form, {
             timeout: 120000,

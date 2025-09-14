@@ -2,14 +2,14 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, Video, Mic } from 'lucide-react';
-import axios from 'axios';
+import { api } from '@/apis/api';
 
 import { Webcam, WebcamHandle } from '../_components/Webcam';
 import { VisualAggregatePayload } from '../_components/RealMediaPipeAnalyzer';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
-// 간단 WAV 레코더 (레벨 콜백은 사용하지 않음)
+// 간단 WAV 레코더
 class WavRecorder {
     private audioCtx: AudioContext | null = null;
     private stream: MediaStream | null = null;
@@ -18,6 +18,7 @@ class WavRecorder {
     private buffers: Float32Array[] = [];
     private recording = false;
     private stopped = false;
+
     async start() {
         if (this.recording) return;
         this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -35,6 +36,7 @@ class WavRecorder {
             this.buffers.push(new Float32Array(ch0));
         };
     }
+
     async stop(): Promise<Blob> {
         if (this.stopped) {
             return this.encodeWAV(new Float32Array(0), this.audioCtx?.sampleRate || 44100);
@@ -66,6 +68,7 @@ class WavRecorder {
         this.buffers = [];
         return wav;
     }
+
     private merge(chunks: Float32Array[]) {
         const total = chunks.reduce((a, b) => a + b.length, 0);
         const out = new Float32Array(total);
@@ -76,6 +79,7 @@ class WavRecorder {
         }
         return out;
     }
+
     private encodeWAV(samples: Float32Array, sampleRate: number) {
         const buffer = new ArrayBuffer(44 + samples.length * 2);
         const view = new DataView(buffer);
@@ -107,15 +111,6 @@ class WavRecorder {
     }
 }
 
-const AUDIO_API_BASE = process.env.NEXT_PUBLIC_AUDIO_API_BASE;
-async function analyzeAudioBlob(blob: Blob) {
-    if (!AUDIO_API_BASE) return null;
-    const form = new FormData();
-    form.append('file', blob, 'calibration.wav');
-    const res = await axios.post(`${AUDIO_API_BASE}/audio/analyze`, form, { timeout: 60000 });
-    return res.data?.features ?? null;
-}
-
 export default function AiInterviewSettingCalibrationCombined() {
     const webcamRef = useRef<WebcamHandle>(null);
     const recRef = useRef<WavRecorder | null>(null);
@@ -129,6 +124,7 @@ export default function AiInterviewSettingCalibrationCombined() {
     const [webcamOk, setWebcamOk] = useState(false);
     const [micOk, setMicOk] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [sessionId, setSessionId] = useState<string | null>(null);
 
     const CALI_TEXT = '나는 핀토스를 부순다.';
 
@@ -161,7 +157,7 @@ export default function AiInterviewSettingCalibrationCombined() {
         };
     }, [phase]);
 
-    // 장치 존재 체크(간단)
+    // 초기 세션 생성 + 장치 존재 체크
     useEffect(() => {
         (async () => {
             try {
@@ -169,9 +165,26 @@ export default function AiInterviewSettingCalibrationCombined() {
                 setWebcamOk(devices.some((d) => d.kind === 'videoinput'));
                 setMicOk(devices.some((d) => d.kind === 'audioinput'));
             } catch (e) {
-                // 권한 미부여 등으로 실패 시 버튼 비활성 유지
                 setWebcamOk(false);
                 setMicOk(false);
+            }
+            // 세션 ID 준비: 없다면 생성 후 서버에 세션 업서트(최소 보장)
+            try {
+                let sid = localStorage.getItem('aiInterviewSessionId');
+                if (!sid) {
+                    sid = `sess_${Math.random().toString(36).slice(2, 10)}_${Date.now()}`;
+                    localStorage.setItem('aiInterviewSessionId', sid);
+                }
+                setSessionId(sid);
+                // 인터뷰 세션 보장: finalize를 호출하면 interview_sessions에 INSERT IGNORE 됨
+                try {
+                    await api.post(`/metrics/${sid}/finalize`, {}, { timeout: 10000 });
+                } catch (e) {
+                    // 비어있는 세션 finalize는 실패해도 무방하므로 로그만
+                    console.warn('세션 보장(finalize) 실패 또는 무시 가능:', e);
+                }
+            } catch (e) {
+                console.warn('세션 ID 초기화 실패:', e);
             }
         })();
     }, []);
@@ -205,25 +218,63 @@ export default function AiInterviewSettingCalibrationCombined() {
 
     const finishCalibration: () => Promise<void> = async () => {
         try {
+            const startTime = Date.now();
+
+            // 영상 집계 데이터 수집
             const vAgg = webcamRef.current?.endQuestion() ?? null;
             if (vAgg) setVisualAgg(vAgg);
-            let feats: any | null = null;
+
+            // 음성 데이터 수집
+            let audioBlob: Blob | null = null;
             if (recRef.current) {
-                const wav = await recRef.current.stop();
-                try {
-                    feats = await analyzeAudioBlob(wav);
-                } catch (err) {
-                    console.warn('오디오 분석 서버 미응답 또는 실패', err);
+                audioBlob = await recRef.current.stop();
+            }
+
+            const endTime = Date.now();
+            const durationMs = endTime - startTime;
+
+            // 백엔드로 캘리브레이션 데이터 전송
+            if (audioBlob || vAgg) {
+                const formData = new FormData();
+
+                if (audioBlob) {
+                    formData.append('file', audioBlob, 'calibration.wav');
+                }
+
+                if (vAgg) {
+                    formData.append('visualData', JSON.stringify(vAgg));
+                }
+
+                formData.append('durationMs', durationMs.toString());
+
+                if (!sessionId) throw new Error('세션 ID가 준비되지 않았습니다. 새로고침 후 다시 시도해주세요.');
+                const response = await api.post(`calibration/${sessionId}/combined`, formData, {
+                    timeout: 60000,
+                });
+
+                if (response.data?.ok) {
+                    setAudioFeatures(response.data.audioFeatures);
+
+                    // 로컬 저장소에도 저장 (호환성)
+                    localStorage.setItem(
+                        'aiInterviewCalibration',
+                        JSON.stringify({
+                            createdAt: new Date().toISOString(),
+                            sessionId,
+                            audio: response.data.audioFeatures,
+                            visual: vAgg,
+                        }),
+                    );
+
+                    // 세션 ID 저장 (면접에서 사용)
+                    localStorage.setItem('calibrationSessionId', sessionId);
                 }
             }
-            setAudioFeatures(feats);
-            localStorage.setItem(
-                'aiInterviewCalibration',
-                JSON.stringify({ createdAt: new Date().toISOString(), audio: feats, visual: vAgg }),
-            );
+
             setPhase('done');
         } catch (e: any) {
-            setError(e?.message || '환경설정 실패');
+            console.error('캘리브레이션 저장 실패:', e);
+            setError(e?.response?.data?.message || e?.message || '환경설정 실패');
             setPhase('idle');
         }
     };
@@ -237,7 +288,10 @@ export default function AiInterviewSettingCalibrationCombined() {
     };
 
     const goToSession: () => void = () => {
-        window.location.href = '/ai-interview/sessions';
+        // 캘리브레이션이 완료된 상태에서만 면접 시작 가능
+        if (phase === 'done') {
+            window.location.href = '/ai-interview/sessions';
+        }
     };
 
     return (
@@ -316,36 +370,27 @@ export default function AiInterviewSettingCalibrationCombined() {
                                 )}
                             </div>
 
-                            {/* 진행률/타이머 UI 제거 (요청) */}
-
                             {/* 캘리브레이션 문장 */}
-                            <blockquote className='text-2xl text-green-500/80 italic text-center px-6 py-4 border rounded-2xl bg-green-50/40'>
-                                "{CALI_TEXT}"
-                            </blockquote>
-
-                            {/* 액션들 */}
-                            <div className='mt-6 flex gap-3'>
-                                <Button
-                                    onClick={resetCalibration}
-                                    size='lg'
-                                    className='h-12 px-6 text-base rounded-xl'
-                                    disabled={isProcessing}
-                                >
-                                    AI 모의면접 시작하기
-                                </Button>
+                            <div className='mt-6'>
+                                <blockquote className='text-2xl text-green-500/80 italic text-center px-6 py-4 border rounded-2xl bg-green-50/40'>
+                                    "{CALI_TEXT}"
+                                </blockquote>
                             </div>
 
-                            <Button
-                                size='lg'
-                                className='h-16 px-12 text-xl font-bold bg-green-600 hover:bg-green-700 border-0 rounded-2xl shadow-lg text-white'
-                                onClick={goToSession}
-                                disabled={!(webcamOk && micOk && phase === 'done')}
-                            >
-                                <ArrowRight className='mr-2' />
-                                {phase === 'done'
-                                    ? 'AI 모의면접 시작하기'
-                                    : '환경 테스트를 완료해주세요'}
-                            </Button>
+                            {/* 최종 버튼 */}
+                            <div className='mt-8 flex justify-center'>
+                                <Button
+                                    size='lg'
+                                    className='h-16 px-12 text-xl font-bold bg-green-600 hover:bg-green-700 border-0 rounded-2xl shadow-lg text-white'
+                                    onClick={goToSession}
+                                    disabled={!(webcamOk && micOk && phase === 'done')}
+                                >
+                                    <ArrowRight className='mr-2' />
+                                    {phase === 'done'
+                                        ? 'AI 모의면접 시작하기'
+                                        : '환경 테스트를 완료해주세요'}
+                                </Button>
+                            </div>
                         </div>
                     </div>
 

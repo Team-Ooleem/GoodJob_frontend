@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, Alert, Button, Spin, Space } from 'antd';
+import { Card, Alert, Button, Spin, Space, Divider, Tag } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import Link from 'next/link';
 import { api } from '@/apis/api';
@@ -95,6 +95,14 @@ export default function AiInterviewResultPage() {
     const [error, setError] = useState<string | null>(null);
     const [dataSource, setDataSource] = useState<DataSource>('server');
     const [sessionId, setSessionId] = useState<string | null>(null);
+    // 캘리브레이션 및 정규화 비교용 상태
+    const [calibration, setCalibration] = useState<any | null>(null);
+    const [visualNormalizedOverall, setVisualNormalizedOverall] = useState<any | null>(null);
+    const [visualDeviation, setVisualDeviation] = useState<number | null>(null);
+    const [audioNormalizedRatios, setAudioNormalizedRatios] = useState<Record<string, number> | null>(null);
+    const [visualNormalizedPerQuestion, setVisualNormalizedPerQuestion] = useState<Record<string, any> | null>(null);
+    const [audioNormalizedRatiosPerQuestion, setAudioNormalizedRatiosPerQuestion] = useState<Record<string, Record<string, number>> | null>(null);
+    const [visualServerQuestionScores, setVisualServerQuestionScores] = useState<Record<string, { score: number; calibrationApplied?: boolean }> | null>(null);
 
     useEffect(() => {
         loadInterviewResult();
@@ -125,7 +133,53 @@ export default function AiInterviewResultPage() {
             try {
                 const response = await api.get(`/report/${storedSessionId}`);
                 if (response.data?.success && response.data?.data) {
-                    setAnalysisResult(response.data.data);
+                    const report = response.data.data;
+                    setAnalysisResult(report);
+                    // audio_summary를 우선 반영하여 폴백 없이 점수 표시
+                    try {
+                        const s = report?.audio_summary;
+                        if (s) {
+                            const audioOverall: any = {
+                                tone_score: Number(s.toneScore) || undefined,
+                                vibrato_score: Number(s.vibratoScore) || undefined,
+                                pace_score: Number(s.paceScore) || undefined,
+                                overall_voice_score: Number(s.overallScore10) * 10 || undefined,
+                                // 평균 특성값(있으면 표시용)
+                                ...(s.averages || {}),
+                            };
+                            const perQ = Array.isArray(s.questionScores)
+                                ? (s.questionScores as Array<any>).map((q: any, idx: number) => ({
+                                      questionNumber: (q.index as number) ?? idx + 1,
+                                      question: qaList[idx]?.question || `질문 ${idx + 1}`,
+                                      normalized_score: typeof q.score === 'number' ? q.score : undefined,
+                                      calibrationApplied: !!q.calibrationApplied,
+                                  }))
+                                : [];
+                            setAudioData({ overall: audioOverall, perQuestion: perQ });
+                        }
+                    } catch {}
+                    // visual_summary 반영: confidence/behavior 점수 제공 + overall 집계 포함 시 사용
+                    try {
+                        const vs = report?.visual_summary;
+                        if (vs) {
+                            const overall: any = { ...(vs.overall || {}) };
+                            if (typeof vs.confidenceScore === 'number')
+                                overall.confidence_score = vs.confidenceScore;
+                            if (typeof vs.behaviorScore === 'number')
+                                overall.behavior_score = vs.behaviorScore;
+                            const vpack = { overall, perQuestion: undefined } as VisualAnalysisData;
+                            setVisualData((prev) => enrichVisualScores(mergeVisualData(prev, vpack)));
+                            if (Array.isArray(vs.questionScores)) {
+                                const map: Record<string, { score: number; calibrationApplied?: boolean }> = {};
+                                for (const q of vs.questionScores) {
+                                    if (q?.questionId) {
+                                        map[q.questionId] = { score: Math.round(Number(q.score) || 0), calibrationApplied: !!q.calibrationApplied };
+                                    }
+                                }
+                                setVisualServerQuestionScores(map);
+                            }
+                        }
+                    } catch {}
                     setDataSource('server');
                     console.log('✅ 서버에서 리포트 로드 성공');
                 } else {
@@ -171,7 +225,7 @@ export default function AiInterviewResultPage() {
                         const audioOverall = audioRes.data.overall;
 
                         // 문항별 음성 지표도 로드
-                        let audioPerQuestion = [];
+                        let audioPerQuestion = [] as any[];
                         try {
                             const audioPerQRes = await api.get(`/audio-metrics/${urlSessionId}`);
                             if (audioPerQRes.data?.ok && audioPerQRes.data?.rows) {
@@ -181,10 +235,8 @@ export default function AiInterviewResultPage() {
                             console.warn('문항별 음성 지표 로드 실패:', e);
                         }
 
-                        setAudioData({
-                            overall: audioOverall,
-                            perQuestion: audioPerQuestion,
-                        });
+                        const nextPack = { overall: audioOverall, perQuestion: audioPerQuestion };
+                        setAudioData((prev) => mergeAudioData(prev, nextPack));
                         console.log('✅ 서버에서 음성 지표 로드 성공');
                     }
                 } catch (e) {
@@ -195,10 +247,11 @@ export default function AiInterviewResultPage() {
                     // 영상 지표 로드
                     const visualRes = await api.post(`/metrics/${urlSessionId}/finalize`, {});
                     if (visualRes.data?.ok && visualRes.data?.aggregate) {
-                        setVisualData({
+                        const rawPack = {
                             overall: visualRes.data.aggregate.overall,
                             perQuestion: visualRes.data.aggregate.perQuestion,
-                        });
+                        } as VisualAnalysisData;
+                        setVisualData(enrichVisualScores(rawPack));
                         console.log('✅ 서버에서 영상 지표 로드 성공');
                     }
                 } catch (e) {
@@ -215,16 +268,14 @@ export default function AiInterviewResultPage() {
 
                     if (serverAudioOverall) {
                         const audioOverall = JSON.parse(serverAudioOverall);
-                        let audioPerQuestion = [];
+                        let audioPerQuestion = [] as any[];
 
                         if (serverAudioPerQuestion) {
                             audioPerQuestion = JSON.parse(serverAudioPerQuestion);
                         }
 
-                        setAudioData({
-                            overall: audioOverall,
-                            perQuestion: audioPerQuestion,
-                        });
+                        const nextPack = { overall: audioOverall, perQuestion: audioPerQuestion };
+                        setAudioData((prev) => mergeAudioData(prev, nextPack));
                         console.log('✅ localStorage 서버 음성 지표 로드 성공');
                     } else {
                         // 클라이언트 계산 음성 지표 폴백
@@ -251,7 +302,7 @@ export default function AiInterviewResultPage() {
                                 }));
                             }
 
-                            setAudioData({
+                            const nextPack = {
                                 overall: {
                                     ...audioOverall,
                                     // 클라이언트 데이터에 점수 추가 (기본값)
@@ -261,7 +312,8 @@ export default function AiInterviewResultPage() {
                                     overall_voice_score: 75,
                                 },
                                 perQuestion: audioPerQuestion,
-                            });
+                            } as any;
+                            setAudioData((prev) => mergeAudioData(prev, nextPack));
                             console.log('⚠️ 클라이언트 음성 지표로 폴백');
                         }
                     }
@@ -275,14 +327,147 @@ export default function AiInterviewResultPage() {
                     const visualPerQuestion = localStorage.getItem('interviewVisualPerQuestion');
 
                     if (visualOverall) {
-                        setVisualData({
+                        const rawPack = {
                             overall: JSON.parse(visualOverall),
                             perQuestion: visualPerQuestion ? JSON.parse(visualPerQuestion) : {},
-                        });
+                        } as VisualAnalysisData;
+                        setVisualData(enrichVisualScores(rawPack));
                         console.log('✅ localStorage 영상 지표 로드 성공');
                     }
                 } catch (e) {
                     console.warn('localStorage 영상 지표 로드 실패:', e);
+                }
+            }
+            // === 캘리브레이션 및 정규화 비교 로드 ===
+            try {
+                const sid = urlSessionId || storedSessionId;
+                if (sid) {
+                    const calibRes = await api.get(`/calibration/${sid}`);
+                    if (calibRes.data?.ok) {
+                        setCalibration(calibRes.data.calibration || null);
+                        // 비주얼 정규화: 서버 API 이용 (overall 기준)
+                        const currentVisual = visualResFromStateOrLocal();
+                        const overall = currentVisual?.overall;
+                        if (overall) {
+                            try {
+                                const visNorm = await api.post(
+                                    `/calibration/${sid}/test/visual-normalize`,
+                                    overall,
+                                );
+                                if (visNorm.data?.ok && visNorm.data?.result) {
+                                    setVisualNormalizedOverall(visNorm.data.result.normalized || null);
+                                    setVisualDeviation(
+                                        typeof visNorm.data.result.deviationScore === 'number'
+                                            ? visNorm.data.result.deviationScore
+                                            : null,
+                                    );
+                                }
+                            } catch (e) {
+                                console.warn('비주얼 정규화 비교 실패:', e);
+                            }
+                        }
+                        // 오디오 정규화: 클라이언트에서 baseline 대비 비율 계산
+                        const rawAudio = audioResFromStateOrLocal();
+                        const audioBaseline = calibRes.data?.calibration?.audioBaseline;
+                        if (rawAudio?.overall && audioBaseline) {
+                            setAudioNormalizedRatios(
+                                computeAudioNormalizedRatios(rawAudio.overall, audioBaseline),
+                            );
+                        }
+                    }
+                }
+            } catch (e) {
+                // 서버 캘리브레이션 없음 → 로컬 비주얼 baseline으로만 가벼운 비교 가능
+                const localCalib = safeParseLocalCalibration();
+                if (localCalib?.visual && visualData?.overall) {
+                    setCalibration({ visualBaseline: localCalib.visual });
+                }
+            }
+
+            // === 캘리브레이션 및 정규화 비교 로드 ===
+            try {
+                const sid = urlSessionId || storedSessionId;
+                if (sid) {
+                    const calibRes = await api.get(`/calibration/${sid}`);
+                    if (calibRes.data?.ok) {
+                        setCalibration(calibRes.data.calibration || null);
+                        // 비주얼 정규화: 서버 API 이용 (overall 기준)
+                        const currentVisual = visualResFromStateOrLocal();
+                        const overall = currentVisual?.overall;
+                        if (overall) {
+                            try {
+                                const visNorm = await api.post(
+                                    `/calibration/${sid}/test/visual-normalize`,
+                                    overall,
+                                );
+                                if (visNorm.data?.ok && visNorm.data?.result) {
+                                    setVisualNormalizedOverall(visNorm.data.result.normalized || null);
+                                    setVisualDeviation(
+                                        typeof visNorm.data.result.deviationScore === 'number'
+                                            ? visNorm.data.result.deviationScore
+                                            : null,
+                                    );
+                                }
+                            } catch (e) {
+                                console.warn('비주얼 정규화 비교 실패:', e);
+                            }
+                        }
+
+                        // 오디오 정규화: 클라이언트에서 baseline 대비 비율 계산
+                        const rawAudio = audioResFromStateOrLocal();
+                        const audioBaseline = calibRes.data?.calibration?.audioBaseline;
+                        if (rawAudio?.overall && audioBaseline) {
+                            setAudioNormalizedRatios(
+                                computeAudioNormalizedRatios(rawAudio.overall as any, audioBaseline as any),
+                            );
+                        }
+
+                        // 오디오 per-question 정규화 비율
+                        if (rawAudio?.perQuestion && Array.isArray(rawAudio.perQuestion) && audioBaseline) {
+                            const per: Record<string, Record<string, number>> = {};
+                            rawAudio.perQuestion.forEach((item: any, idx: number) => {
+                                const features = item?.audioFeatures || item;
+                                const ratios = computeAudioNormalizedRatios(features || {}, audioBaseline as any);
+                                if (Object.keys(ratios).length > 0) {
+                                    const key = String(item?.questionNumber || idx + 1);
+                                    per[key] = ratios;
+                                }
+                            });
+                            if (Object.keys(per).length > 0) setAudioNormalizedRatiosPerQuestion(per);
+                        }
+
+                        // 비주얼 per-question 정규화
+                        const vpq = (currentVisual?.perQuestion || null) as Record<string, any> | null;
+                        if (vpq && typeof vpq === 'object') {
+                            try {
+                                const entries = Object.entries(vpq) as Array<[string, any]>;
+                                const results = await Promise.all(
+                                    entries.map(async ([qid, agg]) => {
+                                        try {
+                                            const r = await api.post(
+                                                `/calibration/${sid}/test/visual-normalize`,
+                                                agg,
+                                            );
+                                            return [qid, r.data?.result?.normalized || null] as const;
+                                        } catch {
+                                            return [qid, null] as const;
+                                        }
+                                    }),
+                                );
+                                const map: Record<string, any> = {};
+                                for (const [qid, norm] of results) map[qid] = norm;
+                                setVisualNormalizedPerQuestion(map);
+                            } catch (e) {
+                                console.warn('질문별 비주얼 정규화 실패:', e);
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                // 서버 캘리브레이션 없음 → 로컬 비주얼 baseline으로만 가벼운 비교 가능
+                const localCalib = safeParseLocalCalibration();
+                if (localCalib?.visual && visualData?.overall) {
+                    setCalibration({ visualBaseline: localCalib.visual });
                 }
             }
         } catch (err: any) {
@@ -292,6 +477,145 @@ export default function AiInterviewResultPage() {
         } finally {
             setLoading(false);
         }
+    };
+
+    // 오디오 지표 병합: 기존 값(prev)을 우선 보존하고, next에서 없는 값만 보충
+    const mergeAudioData = (
+        prev: AudioAnalysisData | null,
+        next: AudioAnalysisData | null,
+    ): AudioAnalysisData | null => {
+        if (!prev) return next;
+        if (!next) return prev;
+        const mergedOverall = {
+            ...(next.overall || {}),
+            ...(prev.overall || {}),
+        } as any;
+        // perQuestion: questionNumber 기준 병합
+        const prevArr = Array.isArray(prev.perQuestion) ? prev.perQuestion : [];
+        const nextArr = Array.isArray(next.perQuestion) ? next.perQuestion : [];
+        const map = new Map<number, any>();
+        for (const it of nextArr) {
+            if (!it) continue;
+            map.set(Number(it.questionNumber) || map.size + 1, { ...it });
+        }
+        for (const it of prevArr) {
+            if (!it) continue;
+            const key = Number(it.questionNumber) || map.size + 1;
+            map.set(key, { ...(map.get(key) || {}), ...it });
+        }
+        const mergedPerQ = Array.from(map.entries())
+            .sort((a, b) => a[0] - b[0])
+            .map(([_, v]) => v);
+        return { overall: mergedOverall, perQuestion: mergedPerQ };
+    };
+
+    // 비주얼 데이터 병합: next 우선(overall 구조), prev의 점수 필드는 보존
+    const mergeVisualData = (
+        prev: VisualAnalysisData | null,
+        next: VisualAnalysisData | null,
+    ): VisualAnalysisData | null => {
+        if (!prev) return next;
+        if (!next) return prev;
+        const mergedOverall: any = {
+            ...(prev.overall || {}),
+            ...(next.overall || {}),
+        };
+        // 점수 필드 명시 보존/갱신
+        if ((next.overall as any)?.confidence_score != null)
+            mergedOverall.confidence_score = (next.overall as any).confidence_score;
+        if ((next.overall as any)?.behavior_score != null)
+            mergedOverall.behavior_score = (next.overall as any).behavior_score;
+        return { overall: mergedOverall, perQuestion: next.perQuestion ?? prev.perQuestion };
+    };
+
+    // 최신 visual/audio 상태를 안전하게 캡처하기 위한 헬퍼들
+    const visualResFromStateOrLocal = (): VisualAnalysisData | null => {
+        try {
+            if (visualData?.overall) return visualData;
+            const visualOverall = localStorage.getItem('interviewVisualOverall');
+            const visualPerQuestion = localStorage.getItem('interviewVisualPerQuestion');
+            if (visualOverall) {
+                return {
+                    overall: JSON.parse(visualOverall),
+                    perQuestion: visualPerQuestion ? JSON.parse(visualPerQuestion) : {},
+                } as VisualAnalysisData;
+            }
+        } catch {}
+        return null;
+    };
+
+    const audioResFromStateOrLocal = (): AudioAnalysisData | null => {
+        try {
+            if (audioData?.overall) return audioData;
+            const serverAudioOverall = localStorage.getItem('interviewAudioOverallServer');
+            const serverAudioPerQuestion = localStorage.getItem('interviewAudioPerQuestionServer');
+            if (serverAudioOverall) {
+                return {
+                    overall: JSON.parse(serverAudioOverall),
+                    perQuestion: serverAudioPerQuestion ? JSON.parse(serverAudioPerQuestion) : [],
+                } as AudioAnalysisData;
+            }
+        } catch {}
+        return null;
+    };
+
+    const safeParseLocalCalibration = () => {
+        try {
+            const raw = localStorage.getItem('aiInterviewCalibration');
+            if (!raw) return null;
+            return JSON.parse(raw);
+        } catch {
+            return null;
+        }
+    };
+
+    const computeAudioNormalizedRatios = (
+        rawOverall: Record<string, any>,
+        baseline: Record<string, any>,
+    ): Record<string, number> => {
+        const keys = ['f0_mean', 'f0_std', 'rms_cv', 'jitter_like', 'shimmer_like', 'silence_ratio'];
+        const out: Record<string, number> = {};
+        for (const k of keys) {
+            const v = Number((rawOverall as any)?.[k]);
+            const b = Number((baseline as any)?.[k]);
+            if (Number.isFinite(v) && Number.isFinite(b) && b !== 0) {
+                out[k] = v / b;
+            }
+        }
+        return out;
+    };
+
+    const fmt = (n: any, digits = 3) => {
+        if (n == null || Number.isNaN(Number(n))) return '-';
+        const num = Number(n);
+        if (!Number.isFinite(num)) return '-';
+        return Number(num.toFixed(digits));
+    };
+
+    // 비주얼 점수 폴백 계산: confidence_score/behavior_score가 없을 때 채워넣음
+    const enrichVisualScores = (
+        pack: VisualAnalysisData | null,
+    ): VisualAnalysisData | null => {
+        if (!pack?.overall) return pack;
+        const o: any = { ...(pack.overall as any) };
+        if (o.confidence_score == null && typeof o.confidence_mean === 'number') {
+            o.confidence_score = Math.max(0, Math.min(100, Math.round(o.confidence_mean * 100)));
+        }
+        if (o.behavior_score == null) {
+            const count = Number(o.count) || 0;
+            const smile = typeof o.smile_mean === 'number' ? o.smile_mean : 0;
+            const presGood = Number(o.presence_dist?.good) || 0;
+            const warn = Number(o.level_dist?.warning) || 0;
+            const crit = Number(o.level_dist?.critical) || 0;
+            const goodRatio = count > 0 ? presGood / count : 0;
+            const alertRatio = count > 0 ? (warn + crit) / count : 0;
+            const score01 = Math.max(
+                0,
+                Math.min(1, 0.6 * smile + 0.25 * goodRatio + 0.15 * (1 - alertRatio)),
+            );
+            o.behavior_score = Math.round(score01 * 100);
+        }
+        return { ...pack, overall: o } as VisualAnalysisData;
     };
 
     // 로딩 상태
@@ -347,6 +671,80 @@ export default function AiInterviewResultPage() {
                     />
                 )}
 
+                {/* 캘리브레이션 비교 블록 */}
+                <Card className='!border-0 !shadow-lg mb-6' title='캘리브레이션 비교'>
+                    {!calibration ? (
+                        <Alert type='info' message='이 세션에는 저장된 캘리브레이션이 없습니다.' />
+                    ) : (
+                        <div className='space-y-6'>
+                            {/* 비주얼 비교 */}
+                            <div>
+                                <div className='flex items-center justify-between mb-2'>
+                                    <div className='font-semibold'>비주얼 (시선/자신감/미소)</div>
+                                    {typeof visualDeviation === 'number' && (
+                                        <Tag color={visualDeviation < 0.3 ? 'green' : visualDeviation < 0.6 ? 'orange' : 'red'}>
+                                            편차 {fmt(visualDeviation, 2)}
+                                        </Tag>
+                                    )}
+                                </div>
+                                <div className='grid grid-cols-1 md:grid-cols-3 gap-3'>
+                                    <Card size='small'>
+                                        <div className='text-gray-500 text-sm mb-1'>Baseline</div>
+                                        <div className='text-sm'>confidence_mean: {fmt((calibration as any)?.visualBaseline?.confidence_mean ?? (calibration as any)?.visualBaseline?.overall?.confidence_mean)}</div>
+                                        <div className='text-sm'>smile_mean: {fmt((calibration as any)?.visualBaseline?.smile_mean ?? (calibration as any)?.visualBaseline?.overall?.smile_mean)}</div>
+                                    </Card>
+                                    <Card size='small'>
+                                        <div className='text-gray-500 text-sm mb-1'>Session Raw</div>
+                                        <div className='text-sm'>confidence_mean: {fmt(visualData?.overall?.confidence_mean)}</div>
+                                        <div className='text-sm'>smile_mean: {fmt(visualData?.overall?.smile_mean)}</div>
+                                    </Card>
+                                    <Card size='small'>
+                                        <div className='text-gray-500 text-sm mb-1'>Calibrated</div>
+                                        <div className='text-sm'>confidence_mean: {fmt(visualNormalizedOverall?.confidence_mean)}</div>
+                                        <div className='text-sm'>smile_mean: {fmt(visualNormalizedOverall?.smile_mean)}</div>
+                                    </Card>
+                                </div>
+                            </div>
+
+                            <Divider className='!my-2' />
+
+                            {/* 오디오 비교 */}
+                            <div>
+                                <div className='font-semibold mb-2'>오디오 (피치/변동/지터/쉬머/무음)</div>
+                                <div className='grid grid-cols-1 md:grid-cols-3 gap-3'>
+                                    <Card size='small'>
+                                        <div className='text-gray-500 text-sm mb-1'>Baseline</div>
+                                        <div className='text-sm'>f0_mean: {fmt((calibration as any)?.audioBaseline?.f0_mean)}</div>
+                                        <div className='text-sm'>f0_std: {fmt((calibration as any)?.audioBaseline?.f0_std)}</div>
+                                        <div className='text-sm'>rms_cv: {fmt((calibration as any)?.audioBaseline?.rms_cv)}</div>
+                                        <div className='text-sm'>jitter_like: {fmt((calibration as any)?.audioBaseline?.jitter_like)}</div>
+                                        <div className='text-sm'>shimmer_like: {fmt((calibration as any)?.audioBaseline?.shimmer_like)}</div>
+                                        <div className='text-sm'>silence_ratio: {fmt((calibration as any)?.audioBaseline?.silence_ratio)}</div>
+                                    </Card>
+                                    <Card size='small'>
+                                        <div className='text-gray-500 text-sm mb-1'>Session Raw</div>
+                                        <div className='text-sm'>f0_mean: {fmt(audioData?.overall?.f0_mean)}</div>
+                                        <div className='text-sm'>f0_std: {fmt(audioData?.overall?.f0_std)}</div>
+                                        <div className='text-sm'>rms_cv: {fmt(audioData?.overall?.rms_cv)}</div>
+                                        <div className='text-sm'>jitter_like: {fmt(audioData?.overall?.jitter_like)}</div>
+                                        <div className='text-sm'>shimmer_like: {fmt(audioData?.overall?.shimmer_like)}</div>
+                                        <div className='text-sm'>silence_ratio: {fmt(audioData?.overall?.silence_ratio)}</div>
+                                    </Card>
+                                    <Card size='small'>
+                                        <div className='text-gray-500 text-sm mb-1'>Ratio (raw / baseline)</div>
+                                        <div className='text-sm'>f0_mean: {fmt(audioNormalizedRatios?.f0_mean)}</div>
+                                        <div className='text-sm'>f0_std: {fmt(audioNormalizedRatios?.f0_std)}</div>
+                                        <div className='text-sm'>rms_cv: {fmt(audioNormalizedRatios?.rms_cv)}</div>
+                                        <div className='text-sm'>jitter_like: {fmt(audioNormalizedRatios?.jitter_like)}</div>
+                                        <div className='text-sm'>shimmer_like: {fmt(audioNormalizedRatios?.shimmer_like)}</div>
+                                        <div className='text-sm'>silence_ratio: {fmt(audioNormalizedRatios?.silence_ratio)}</div>
+                                    </Card>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </Card>
+
                 {/* 리포트 컴포넌트 */}
                 <InterviewReport
                     analysisResult={analysisResult}
@@ -364,6 +762,20 @@ export default function AiInterviewResultPage() {
                         showAudioAnalysis: true,
                         showVisualAnalysis: true,
                         compact: false,
+                    }}
+                    viewMode={'compare'}
+                    calibrationCompare={{
+                        visual: {
+                            baseline: (calibration as any)?.visualBaseline || (calibration as any)?.visualBaseline?.overall || undefined,
+                            normalizedOverall: visualNormalizedOverall || undefined,
+                            normalizedPerQuestion: visualNormalizedPerQuestion || undefined,
+                            serverQuestionScores: visualServerQuestionScores || undefined,
+                        },
+                        audio: {
+                            baseline: (calibration as any)?.audioBaseline || undefined,
+                            ratiosOverall: audioNormalizedRatios || undefined,
+                            ratiosPerQuestion: audioNormalizedRatiosPerQuestion || undefined,
+                        },
                     }}
                 />
 

@@ -113,6 +113,7 @@ export default function ReportsPage() {
     const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
     const [selectedAudioData, setSelectedAudioData] = useState<AudioAnalysisData | null>(null);
     const [selectedVisualData, setSelectedVisualData] = useState<VisualAnalysisData | null>(null);
+    const [selectedVisualQuestionScores, setSelectedVisualQuestionScores] = useState<Record<string, { score: number; calibrationApplied?: boolean }> | null>(null);
 
     const router = useRouter();
 
@@ -209,14 +210,74 @@ export default function ReportsPage() {
             // 리포트 데이터 로드
             const response = await api.get(`/report/${sessionId}`);
             if (response.data?.success) {
-                setSelectedReport(response.data.data);
+                const report = response.data.data;
+                setSelectedReport(report);
+                // audio_summary를 먼저 audioData에 반영
+                try {
+                    const s = report?.audio_summary;
+                    if (s) {
+                        const audioOverall: any = {
+                            tone_score: Number(s.toneScore) || undefined,
+                            vibrato_score: Number(s.vibratoScore) || undefined,
+                            pace_score: Number(s.paceScore) || undefined,
+                            overall_voice_score: Number(s.overallScore10) * 10 || undefined,
+                            ...(s.averages || {}),
+                        };
+                        const perQ = Array.isArray(s.questionScores)
+                            ? (s.questionScores as Array<any>).map((q: any, idx: number) => ({
+                                  questionNumber: (q.index as number) ?? idx + 1,
+                                  question: `질문 ${((q.index as number) ?? idx) + 1}`,
+                                  normalized_score: typeof q.score === 'number' ? q.score : undefined,
+                                  calibrationApplied: !!q.calibrationApplied,
+                              }))
+                            : [];
+                        setSelectedAudioData({ overall: audioOverall, perQuestion: perQ });
+                    }
+                } catch {}
+                // visual_summary 반영(자신감/행동 점수 제공 + 질문별 점수)
+                try {
+                    const vs = report?.visual_summary;
+                    if (vs) {
+                        const overall: any = { ...(vs.overall || {}) };
+                        if (typeof vs.confidenceScore === 'number')
+                            overall.confidence_score = vs.confidenceScore;
+                        if (typeof vs.behaviorScore === 'number')
+                            overall.behavior_score = vs.behaviorScore;
+                        setSelectedVisualData((prev) => ({
+                            overall: { ...(prev?.overall || {}), ...overall },
+                            perQuestion: prev?.perQuestion || undefined,
+                        }));
+                        if (Array.isArray(vs.questionScores)) {
+                            const map: Record<string, { score: number; calibrationApplied?: boolean }> = {};
+                            for (const q of vs.questionScores) {
+                                if (q?.questionId) map[q.questionId] = { score: Math.round(Number(q.score) || 0), calibrationApplied: !!q.calibrationApplied };
+                            }
+                            setSelectedVisualQuestionScores(map);
+                        }
+                    }
+                } catch {}
             } else {
                 throw new Error('리포트 로드 실패');
             }
 
             // 음성/영상 지표 데이터 로드
             const { audioData, visualData } = await loadMetricsData(sessionId);
-            setSelectedAudioData(audioData);
+            // audio_summary가 먼저 세팅돼 있을 수 있으므로 병합
+            setSelectedAudioData((prev) => {
+                if (!prev) return audioData;
+                if (!audioData) return prev;
+                const mergedOverall = { ...(audioData.overall || {}), ...(prev.overall || {}) } as any;
+                const prevArr = Array.isArray(prev.perQuestion) ? prev.perQuestion : [];
+                const nextArr = Array.isArray(audioData.perQuestion) ? audioData.perQuestion : [];
+                const map = new Map<number, any>();
+                for (const it of nextArr) map.set(Number((it as any).questionNumber) || map.size + 1, { ...it });
+                for (const it of prevArr) {
+                    const key = Number((it as any).questionNumber) || map.size + 1;
+                    map.set(key, { ...(map.get(key) || {}), ...it });
+                }
+                const mergedPerQ = Array.from(map.entries()).sort((a,b)=>a[0]-b[0]).map(([_,v])=>v);
+                return { overall: mergedOverall, perQuestion: mergedPerQ } as any;
+            });
             setSelectedVisualData(visualData);
         } catch (error) {
             console.error('리포트 상세 로드 실패:', error);
@@ -363,6 +424,14 @@ export default function ReportsPage() {
                             showAudioAnalysis: true,
                             showVisualAnalysis: true,
                             compact: true,
+                        }}
+                        viewMode={'compare'}
+                        calibrationCompare={{
+                            visual: {
+                                serverQuestionScores:
+                                    selectedVisualQuestionScores || undefined,
+                            },
+                            audio: {},
                         }}
                     />
                 ) : (
