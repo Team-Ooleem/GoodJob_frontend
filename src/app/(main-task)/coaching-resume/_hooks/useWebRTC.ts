@@ -12,6 +12,7 @@ export interface UseWebRTC {
     isMuted: boolean;
     isCameraOff: boolean;
     isRemoteMuted: boolean;
+    isRemoteCameraOff: boolean;
     error: string | null;
     isLocalSpeaking: boolean;
     isRemoteSpeaking: boolean;
@@ -46,6 +47,7 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
     const [isMuted, setIsMuted] = useState(false);
     const [isCameraOff, setIsCameraOff] = useState(false);
     const [isRemoteMuted, setIsRemoteMuted] = useState(false);
+    const [isRemoteCameraOff, setIsRemoteCameraOff] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     // 🆕 Canvas Store의 isRecording 상태를 직접 사용 (단일 소스)
@@ -95,6 +97,11 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
                     setIsRemoteMuted(data.isMuted);
                     console.log(
                         `🔊 상대방 마이크 상태: ${data.isMuted ? '음소거' : '음소거 해제'}`,
+                    );
+                } else if (data.type === 'cameraStatus') {
+                    setIsRemoteCameraOff(data.isCameraOff);
+                    console.log(
+                        `📹 상대방 카메라 상태: ${data.isCameraOff ? '꺼짐' : '켜짐'}`,
                     );
                 }
             } catch (error) {
@@ -185,6 +192,11 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
                         console.log(
                             `🔊 상대방 마이크 상태: ${data.isMuted ? '음소거' : '음소거 해제'}`,
                         );
+                    } else if (data.type === 'cameraStatus') {
+                        setIsRemoteCameraOff(data.isCameraOff);
+                        console.log(
+                            `📹 상대방 카메라 상태: ${data.isCameraOff ? '꺼짐' : '켜짐'}`,
+                        );
                     }
                 } catch (error) {
                     if (!logFlags.current.messageParseError) {
@@ -241,6 +253,33 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
                     }),
                 );
                 console.log(`📡 WebRTC로 마이크 상태 전송: ${isMuted ? '음소거' : '음소거 해제'}`);
+            } else {
+                console.warn('DataChannel이 연결되지 않음 또는 준비되지 않음');
+            }
+        },
+        [isConnected],
+    );
+
+    const sendCameraStatus = useCallback(
+        (isCameraOff: boolean) => {
+            const dataChannel = dataChannelRef.current;
+
+            if (!isConnected) {
+                console.log(
+                    `🔧 [로컬 모드] WebRTC 연결 없음 - 카메라 상태: ${isCameraOff ? '꺼짐' : '켜짐'}`,
+                );
+                return;
+            }
+
+            if (dataChannel && dataChannel.readyState === 'open') {
+                dataChannel.send(
+                    JSON.stringify({
+                        type: 'cameraStatus',
+                        isCameraOff,
+                        timestamp: Date.now(),
+                    }),
+                );
+                console.log(`📡 WebRTC로 카메라 상태 전송: ${isCameraOff ? '꺼짐' : '켜짐'}`);
             } else {
                 console.warn('DataChannel이 연결되지 않음 또는 준비되지 않음');
             }
@@ -458,7 +497,12 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
         const next = !tracks[0]?.enabled;
         tracks.forEach((t) => (t.enabled = next));
         setIsCameraOff(!next);
-    }, [localStream]);
+        sendCameraStatus(!next);
+
+        console.log(
+            `📹 카메라 ${next ? '켜짐' : '꺼짐'}, 상태 전송: isCameraOff=${!next}`,
+        );
+    }, [localStream, sendCameraStatus]);
 
     // 🆕 WebRTC toggle 함수들을 캔버스 스토어에 등록
     useEffect(() => {
@@ -504,6 +548,7 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
         isMuted,
         isCameraOff,
         isRemoteMuted,
+        isRemoteCameraOff,
         error,
         // 음성 감지 관련
         isLocalSpeaking,

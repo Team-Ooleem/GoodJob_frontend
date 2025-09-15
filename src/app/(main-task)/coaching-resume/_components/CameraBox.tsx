@@ -10,6 +10,7 @@ interface ICameraBox {
     isLocal: boolean;
     isSpeaking: boolean;
     isMuted?: boolean;
+    isCamMuted?: boolean;
     profileImg?: string;
     stream?: MediaStream | null;
     size?: 'sm' | 'md' | 'lg';
@@ -20,6 +21,7 @@ export function CameraBox({
     isLocal,
     isSpeaking,
     isMuted,
+    isCamMuted,
     profileImg,
     stream,
     size,
@@ -31,6 +33,29 @@ export function CameraBox({
 
     // 마이크 음소거 상태 결정
     const micMuted = isLocal ? !isMicEnabled : (isMuted ?? false);
+    // 카메라 음소거 상태 결정
+    const camMuted = isLocal ? !isCamEnabled : (isCamMuted ?? false);
+
+    // 디버깅: 상대방 카메라일 때 상세 상태 확인
+    useEffect(() => {
+        if (!isLocal) {
+            const videoTracks = stream?.getVideoTracks() || [];
+            console.log('🎥 Remote camera debug:', {
+                name,
+                camMuted,
+                hasStream: !!stream,
+                videoTracksCount: videoTracks.length,
+                videoTracksEnabled: videoTracks.map((track) => ({
+                    id: track.id,
+                    enabled: track.enabled,
+                    readyState: track.readyState,
+                    kind: track.kind,
+                })),
+                streamActive: stream?.active,
+            });
+        }
+    }, [isLocal, name, camMuted, stream]);
+
     // Use shadcn/ui design tokens - 마이크가 꺼져있으면 speaking 효과 비활성화
     const speakingStyle = isSpeaking && !micMuted ? 'ring-2 ring-primary' : '';
     const bgClass = 'bg-muted';
@@ -39,8 +64,6 @@ export function CameraBox({
         const base = (name || (isLocal ? 'You' : '')).trim();
         return base.charAt(0).toUpperCase() || 'U';
     }, [isLocal, name]);
-
-    const showProfileFallback = isLocal && !isCamEnabled;
 
     const sizeClass = useMemo(() => {
         const variant = size ?? (isLocal ? 'sm' : 'lg');
@@ -71,12 +94,31 @@ export function CameraBox({
         }
     }, [isLocal, stream, isMicEnabled]);
 
+    // 카메라 상태에 따라 비디오 트랙 제어
+    useEffect(() => {
+        if (isLocal && stream) {
+            const videoTracks = stream.getVideoTracks();
+            videoTracks.forEach((track) => {
+                track.enabled = isCamEnabled;
+            });
+        }
+    }, [isLocal, stream, isCamEnabled]);
+
     return (
         <div
             className={`${sizeClass} overflow-hidden ${bgClass} rounded-xl relative ${speakingStyle}`}
         >
-            {showProfileFallback && (
-                <div className='w-full h-full flex items-center justify-center'>
+            <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted={isLocal}
+                className={`w-full h-full object-cover ${camMuted ? 'opacity-0' : 'opacity-100'}`}
+                style={{ transform: isLocal ? 'scaleX(-1)' : 'none' }}
+            />
+
+            {camMuted && (
+                <div className='absolute inset-0 w-full h-full flex items-center justify-center bg-muted'>
                     <div className='w-14 h-14 rounded-full overflow-hidden border-2 border-primary flex items-center justify-center bg-muted-foreground/40'>
                         {profileImg ? (
                             <Image src={profileImg} alt='profile' width={64} height={64} />
@@ -86,15 +128,6 @@ export function CameraBox({
                     </div>
                 </div>
             )}
-
-            <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted={isLocal}
-                className={`w-full h-full object-cover ${!showProfileFallback ? 'opacity-100' : 'opacity-0'}`}
-                style={{ transform: isLocal ? 'scaleX(-1)' : 'none' }}
-            />
 
             {/* 이름 뱃지 + 마이크 상태 */}
             <div className='absolute left-2 bottom-1.5 font-medium text-sm flex items-center gap-1'>

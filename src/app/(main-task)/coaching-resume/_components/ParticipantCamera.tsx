@@ -10,8 +10,16 @@ type Props = {
 };
 
 export function ParticipantCamera({ mentorName, menteeName }: Props) {
-    const { localStream, remoteStream, joinRoom, isLocalSpeaking, isRemoteSpeaking, isMuted, isRemoteMuted } =
-        useWebRTC('resume-room');
+    const {
+        localStream,
+        remoteStream,
+        joinRoom,
+        isLocalSpeaking,
+        isRemoteSpeaking,
+        isMuted,
+        isRemoteMuted,
+        isRemoteCameraOff,
+    } = useWebRTC('resume-room');
 
     useEffect(() => {
         joinRoom('resume-room');
@@ -24,6 +32,7 @@ export function ParticipantCamera({ mentorName, menteeName }: Props) {
                     isLocal={false}
                     isSpeaking={isRemoteSpeaking}
                     isMuted={isRemoteMuted}
+                    isCamMuted={isRemoteCameraOff}
                     name={mentorName ?? '상대방'}
                     stream={remoteStream}
                     size='lg'
