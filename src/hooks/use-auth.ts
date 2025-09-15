@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { authApi } from '@/apis/api';
 
@@ -13,10 +12,6 @@ export interface User {
 export interface AuthState {
     authenticated: boolean;
     user?: User;
-    onboarding?: {
-        isOnboarded: boolean;
-        redirectUrl: string;
-    };
 }
 
 export const useAuth = () => {
@@ -30,7 +25,6 @@ export const useAuth = () => {
         queryFn: authApi.me,
         retry: false,
         refetchOnWindowFocus: false,
-        staleTime: 5 * 60 * 1000, // 5분간 캐시
     });
 
     const logout = async () => {
@@ -50,7 +44,6 @@ export const useAuth = () => {
     return {
         user: authData?.user,
         isAuthenticated: authData?.authenticated || false,
-        onboarding: authData?.onboarding,
         isLoading,
         error,
         refetch,
