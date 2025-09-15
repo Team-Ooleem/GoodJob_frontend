@@ -140,14 +140,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     },
 
     addMessage: (message, currentUserId) => {
-        console.log('📥 [STORE] addMessage 시작:', {
-            message,
-            currentUserId,
-            timestamp: new Date().toISOString(),
-        });
-
         if (!currentUserId) {
-            console.log('❌ [STORE] addMessage 실패 - currentUserId 없음');
             return;
         }
 
@@ -155,36 +148,17 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         const otherUserId =
             message.sender_id === currentUserId ? message.receiver_id : message.sender_id;
 
-        console.log('👥 [STORE] 사용자 정보:', {
-            currentUserId,
-            otherUserId,
-            messageSenderId: message.sender_id,
-            messageReceiverId: message.receiver_id,
-        });
-
         // conversations에서 해당 상대방과의 대화 찾기
         const state = get();
         let conversation = state.conversations.find((conv) => conv.other_user_id === otherUserId);
 
-        console.log('🔍 [STORE] 대화 찾기 결과:', {
-            conversations: state.conversations,
-            otherUserId,
-            foundConversation: conversation,
-        });
-
         // 대화를 찾지 못한 경우 처리
         if (!conversation) {
-            console.log('⚠️ [STORE] 대화를 찾지 못함 - 임시 conversation 생성');
             // 임시 conversation 생성하여 메시지 저장
             const tempConversationId = `temp_${otherUserId}`;
 
             set((currentState) => {
                 const existingMessages = currentState.messages[tempConversationId] || [];
-                console.log('💾 [STORE] 임시 conversation에 메시지 추가:', {
-                    tempConversationId,
-                    existingMessagesCount: existingMessages.length,
-                    newMessageId: message.message_id,
-                });
 
                 return {
                     messages: {
@@ -238,18 +212,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
 
         const conversationKey = conversation.conversation_id.toString();
 
-        console.log('✅ [STORE] 정식 conversation 찾음:', {
-            conversationId: conversation.conversation_id,
-            conversationKey,
-        });
-
         set((state) => {
             const existingMessages = state.messages[conversationKey] || [];
-            console.log('✅ [STORE] 새 메시지 추가 중...', {
-                existingMessagesCount: existingMessages.length,
-                newMessageId: message.message_id,
-                newMessageContent: message.content,
-            });
 
             // sender 정보는 웹소켓 메시지에서 제공되는 정보 사용
             const senderName =
@@ -269,12 +233,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
                 sender_name: senderName,
                 sender_profile_img: senderProfileImg,
             };
-
-            console.log('💾 [STORE] 메시지 추가 완료:', {
-                conversationKey,
-                newMessage,
-                totalMessages: existingMessages.length + 1,
-            });
 
             return {
                 messages: {
@@ -312,20 +270,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
                 throw new Error('로그인이 필요합니다.');
             }
 
-            console.log('🚀 [STORE] sendMessage 시작:', {
-                senderId: currentUserId,
-                receiverId,
-                content,
-                timestamp: new Date().toISOString(),
-            });
-
             // 1. 먼저 API를 통해 메시지를 DB에 저장
-            console.log('📡 [STORE] API 호출 시작 - sendMessageApi');
             const result = await sendMessageApi(currentUserId, receiverId, content);
-            console.log('✅ [STORE] API 호출 완료 - sendMessageApi:', result);
 
             // 2. 임시 메시지를 로컬에 즉시 추가 (UI 즉시 반영)
-            console.log('💾 [STORE] 로컬 메시지 추가 시작');
             const tempMessage: WebSocketMessage = {
                 message_id: result.messageId,
                 sender_id: currentUserId,
@@ -337,13 +285,10 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             };
 
             get().addMessage(tempMessage, currentUserId);
-            console.log('✅ [STORE] 로컬 메시지 추가 완료');
 
             // 3. WebSocket을 통해 실시간 전송 (상대방에게 알림)
             if (webSocketSendMessage) {
-                console.log('🌐 [STORE] WebSocket 전송 시작');
                 webSocketSendMessage(receiverId, content);
-                console.log('✅ [STORE] WebSocket 전송 완료');
             } else {
                 console.log('⚠️ [STORE] WebSocket 함수가 없음');
             }

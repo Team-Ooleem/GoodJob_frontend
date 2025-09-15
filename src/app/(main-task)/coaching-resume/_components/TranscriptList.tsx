@@ -2,8 +2,7 @@
 
 import { List } from 'antd';
 import AudioPlayer from './AudioPlayer';
-
-import { ChatSession, SpeakerSegment, TranscriptItem } from '@/apis/Recording-api';
+import { ChatSession, SpeakerSegment, TranscriptItem } from '@/apis/recoding-api';
 
 function TranscriptList({
     transcripts,
@@ -99,6 +98,8 @@ function TranscriptList({
                     isPlaying={isPlaying}
                     onPlayPause={onPlayPause}
                     onClose={onClose}
+                    audioRef={audioRef}
+
                 />
             </div>
         </div>

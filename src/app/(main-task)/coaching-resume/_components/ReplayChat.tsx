@@ -82,15 +82,26 @@ export function ReplayChat({ canvasIdx, isOpen, currentUserId }: ReplayChatProps
         return actualUserId === currentUserId ? 0 : 1;
     };
 
+    const calculateDynamicOffset = (segment: SpeakerSegment) => {
+        const segmentDuration = segment.endTime - segment.startTime;
+
+        if (segmentDuration < 2) {
+            return 0.2; // 짧은 발화: 0.2초
+        } else if (segmentDuration < 5) {
+            return 0.3; // 중간 발화: 0.3초
+        } else {
+            return 0.5; // 긴 발화: 0.5초
+        }
+    };
+
     // 오디오 시작 위치 설정 및 자동재생
     useEffect(() => {
         if (audioRef.current && currentSegment) {
             const audio = audioRef.current;
 
             const handleLoadedMetadata = () => {
-                // 시간 오프셋 보정 (0.5초 빼기)
-                const timeOffset = 0.5;
-                const correctedStartTime = Math.max(0, currentSegment.startTime - timeOffset);
+                const dynamicOffset = calculateDynamicOffset(currentSegment);
+                const correctedStartTime = Math.max(0, currentSegment.startTime - dynamicOffset);
                 audio.currentTime = correctedStartTime;
                 // 자동재생 시작
                 audio.play().catch(console.error);
