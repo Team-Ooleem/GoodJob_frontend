@@ -4,7 +4,12 @@ import { useEffect } from 'react';
 import { CameraBox } from './CameraBox';
 import { useWebRTC } from '../_hooks';
 
-export function ParticipantCamera() {
+type Props = {
+    mentorName?: string;
+    menteeName?: string;
+};
+
+export function ParticipantCamera({ mentorName, menteeName }: Props) {
     const { localStream, remoteStream, joinRoom, isLocalSpeaking, isRemoteSpeaking } =
         useWebRTC('resume-room');
 
@@ -13,14 +18,23 @@ export function ParticipantCamera() {
     }, [joinRoom]);
 
     return (
-        <div className='flex flex-col justify-center items-center gap-3 absolute top-5 right-5 z-10'>
-            <CameraBox
-                isLocal={false}
-                isSpeaking={isRemoteSpeaking}
-                name='상대방'
-                stream={remoteStream}
-            />
-            <CameraBox isLocal={true} isSpeaking={isLocalSpeaking} name='나' stream={localStream} />
+        <div className='absolute top-5 right-5 z-40'>
+            <div className='relative flex flex-col items-end gap-3'>
+                <CameraBox
+                    isLocal={false}
+                    isSpeaking={isRemoteSpeaking}
+                    name={mentorName ?? '상대방'}
+                    stream={remoteStream}
+                    size='lg'
+                />
+                <CameraBox
+                    isLocal={true}
+                    isSpeaking={isLocalSpeaking}
+                    name={menteeName ?? '나'}
+                    stream={localStream}
+                    size='sm'
+                />
+            </div>
         </div>
     );
 }

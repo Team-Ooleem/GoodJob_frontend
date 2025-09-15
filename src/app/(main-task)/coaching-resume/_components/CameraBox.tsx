@@ -10,6 +10,7 @@ interface ICameraBox {
     isSpeaking: boolean;
     profileImg?: string;
     stream?: MediaStream | null;
+    size?: 'sm' | 'md' | 'lg';
 }
 
 export function CameraBox({
@@ -18,6 +19,7 @@ export function CameraBox({
     isSpeaking,
     profileImg,
     stream,
+    size,
 }: ICameraBox) {
     const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -27,11 +29,23 @@ export function CameraBox({
     const bgClass = 'bg-[#0b1b2b]'; // 어두운 파란색 배경
 
     const initial = useMemo(() => {
-        const base = isLocal ? 'You' : name || '';
-        return base.trim().charAt(0).toUpperCase() || 'U';
+        const base = (name || (isLocal ? 'You' : '')).trim();
+        return base.charAt(0).toUpperCase() || 'U';
     }, [isLocal, name]);
 
     const showProfileFallback = isLocal && !isCamEnabled;
+
+    const sizeClass = useMemo(() => {
+        const variant = size ?? (isLocal ? 'sm' : 'lg');
+        switch (variant) {
+            case 'sm':
+                return 'w-[180px] h-[116px]';
+            case 'lg':
+                return 'w-[360px] h-[220px]';
+            default:
+                return 'w-[230px] h-[150px]';
+        }
+    }, [size, isLocal]);
 
     // ✅ stream이 바뀔 때 video에 연결
     useEffect(() => {
@@ -41,9 +55,7 @@ export function CameraBox({
     }, [stream]);
 
     return (
-        <div
-            className={`w-[230px] h-[150px] overflow-hidden ${bgClass} rounded-xl relative ${speakingStyle}`}
-        >
+        <div className={`${sizeClass} overflow-hidden ${bgClass} rounded-xl relative ${speakingStyle}`}>
             {showProfileFallback ? (
                 <div className='w-full h-full flex items-center justify-center'>
                     <div className='w-14 h-14 rounded-full overflow-hidden border-2 border-blue-500 flex items-center justify-center bg-slate-600'>
@@ -61,14 +73,14 @@ export function CameraBox({
                     playsInline
                     muted={isLocal}
                     className='w-full h-full object-cover'
-                    style={{ transform: 'scaleX(-1)' }}
+                    style={{ transform: isLocal ? 'scaleX(-1)' : 'none' }}
                 />
             )}
 
             {/* null 자리에 여기에 video 넣으면 됩니다! */}
 
             <p className='text-white absolute left-2 bottom-1.5 font-medium text-sm flex items-center gap-1'>
-                <span>{isLocal ? 'You' : name}</span>
+                <span>{name ?? (isLocal ? 'You' : '이름없음')}</span>
                 {isLocal && !isMicEnabled && (
                     <span className='inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-500'>
                         <Image
