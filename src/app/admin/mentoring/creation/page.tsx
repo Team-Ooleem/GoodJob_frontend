@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { X } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import MentoringProductForm from './_components/MentoringProductForm';
 import {
@@ -21,6 +22,17 @@ export default function AdminProductCreationPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [isDataLoading, setIsDataLoading] = useState(true);
     const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+    // Alert 자동 사라짐 효과
+    useEffect(() => {
+        if (alert) {
+            const timer = setTimeout(() => {
+                setAlert(null);
+            }, 3000); // 3초 후 자동 사라짐
+
+            return () => clearTimeout(timer);
+        }
+    }, [alert]);
 
     // 초기 데이터 로드
     useEffect(() => {
@@ -160,10 +172,16 @@ export default function AdminProductCreationPage() {
             </div>
 
             {alert && (
-                <div className='mb-8'>
+                <div className='fixed top-4 left-1/2 transform -translate-x-1/2 z-50 w-full max-w-2xl px-4'>
                     <Alert
-                        className={alert.type === 'error' ? 'border-red-500' : 'border-green-500'}
+                        className={`${alert.type === 'error' ? 'border-red-500 bg-red-50' : 'border-green-500 bg-green-50'} shadow-lg relative`}
                     >
+                        <button
+                            onClick={() => setAlert(null)}
+                            className='absolute top-2 right-2 p-1 hover:bg-gray-200 rounded-full transition-colors'
+                        >
+                            <X className='h-4 w-4' />
+                        </button>
                         <AlertTitle>{alert.type === 'error' ? '오류' : '성공'}</AlertTitle>
                         <AlertDescription>{alert.message}</AlertDescription>
                     </Alert>
