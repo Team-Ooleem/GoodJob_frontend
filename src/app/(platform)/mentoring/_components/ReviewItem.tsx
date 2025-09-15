@@ -1,18 +1,35 @@
 import { StarRating } from '@/components/mentoring';
 import { Separator } from '@/components/ui/separator';
 
-export function ReviewItem() {
+type Props = {
+    menteeName: string;
+    rating: number;
+    content: string;
+    createdAt: string; // ISO string
+};
+
+function formatDateTimeKST(iso: string) {
+    if (!iso) return '';
+    const date = new Date(iso);
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    const hh = String(date.getHours()).padStart(2, '0');
+    const mm = String(date.getMinutes()).padStart(2, '0');
+    return `${y}. ${m}. ${d}. ${hh}:${mm}`;
+}
+
+export function ReviewItem({ menteeName, rating, content, createdAt }: Props) {
     return (
         <div className='pb-8 flex flex-col gap-3'>
-            <p className='text-base text-foreground'>2025. 09. 07. 22:58</p>
+            <p className='text-base text-foreground'>{formatDateTimeKST(createdAt)}</p>
             <div className='flex flex-col gap-1 pb-8'>
                 <div className='flex justify-start items-center gap-1.5'>
-                    <StarRating rating={5} size={20} />
-                    <span className='text-base'>5.0</span>
+                    <StarRating rating={rating} size={20} />
+                    <span className='text-base'>{rating.toFixed(1)}</span>
+                    <span className='text-sm text-muted-foreground'>· {menteeName}</span>
                 </div>
-                <p className='whitespace-pre-line text-base'>
-                    {`모의면접 진행했고 중요한 부분들 꼭 집어서 피드백 해주셔서 너무 좋았습니다. 다음에는\n커리어 멘토링으로 신청하려고 해요. 감사합니다 멘토님.`}
-                </p>
+                <p className='whitespace-pre-line text-base'>{content}</p>
             </div>
             <Separator />
         </div>

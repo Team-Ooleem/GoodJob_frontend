@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { format } from 'date-fns';
+import { ko } from 'date-fns/locale';
 import {
     Card,
     CardContent,
@@ -19,10 +21,22 @@ import {
     PersonIcon,
 } from '@radix-ui/react-icons';
 
-type Props = { params: { 'product-idx': string } };
+type Props = {
+    params: { 'product-idx': string };
+    searchParams: { [key: string]: string | string[] | undefined };
+};
 
-export default function ReservationSuccessPage({ params }: Props) {
+export default function ReservationSuccessPage({ params, searchParams }: Props) {
     const productId = params['product-idx'];
+
+    const paymentId = searchParams.paymentId as string;
+    const productTitle = searchParams.productTitle as string;
+    const mentorName = searchParams.mentorName as string;
+    const selectedDateString = searchParams.selectedDate as string;
+    const selectedSlot = searchParams.selectedSlot as string;
+    const price = searchParams.price ? parseInt(searchParams.price as string) : undefined;
+
+    const selectedDate = selectedDateString ? new Date(selectedDateString) : null;
 
     return (
         <main className='w-full px-4 py-12 bg-muted/30'>
@@ -51,7 +65,9 @@ export default function ReservationSuccessPage({ params }: Props) {
                                 <CalendarIcon className='h-5 w-5 text-muted-foreground' />
                                 <div>
                                     <p className='text-sm text-muted-foreground'>결제 일시</p>
-                                    <p className='font-medium'>주문이 접수되었습니다</p>
+                                    <p className='font-medium'>
+                                        {format(new Date(), 'yyyy년 M월 d일 HH:mm', { locale: ko })}
+                                    </p>
                                 </div>
                             </div>
                             <div className='flex items-center gap-3'>
@@ -63,6 +79,17 @@ export default function ReservationSuccessPage({ params }: Props) {
                                     </div>
                                 </div>
                             </div>
+                            {selectedDate && selectedSlot && (
+                                <div className='flex items-center gap-3'>
+                                    <CalendarIcon className='h-5 w-5 text-muted-foreground' />
+                                    <div>
+                                        <p className='text-sm text-muted-foreground'>예약 일정</p>
+                                        <p className='font-medium'>
+                                            {format(selectedDate, 'yyyy년 M월 d일 (E)', { locale: ko })} {selectedSlot.split('-')[1]}:00
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div className='rounded-lg border bg-card'>
@@ -73,12 +100,12 @@ export default function ReservationSuccessPage({ params }: Props) {
                             <div className='grid grid-cols-1 gap-x-6 gap-y-4 p-4'>
                                 <div>
                                     <p className='text-sm text-muted-foreground'>상품명</p>
-                                    <p className='font-medium'>결제한 멘토링 상품</p>
+                                    <p className='font-medium'>{productTitle || '멘토링 상품'}</p>
                                 </div>
                                 <div className='flex items-start gap-2'>
                                     <div>
                                         <p className='text-sm text-muted-foreground'>멘토</p>
-                                        <p className='font-medium'>멘토 이름</p>
+                                        <p className='font-medium'>{mentorName || '멘토'}</p>
                                     </div>
                                 </div>
                                 <div>
@@ -87,11 +114,18 @@ export default function ReservationSuccessPage({ params }: Props) {
                                 </div>
                                 <div>
                                     <p className='text-sm text-muted-foreground'>예약 번호</p>
-                                    <p className='font-mono text-sm'>#{productId}-SUCCESS</p>
+                                    <p className='font-mono text-sm'>#{paymentId || `${productId}-SUCCESS`}</p>
                                 </div>
                                 <div>
                                     <p className='text-sm text-muted-foreground'>결제 금액</p>
-                                    <p className='font-medium'>확인 가능</p>
+                                    <p className='font-medium'>
+                                        {typeof price === 'number'
+                                            ? new Intl.NumberFormat('ko-KR', {
+                                                style: 'currency',
+                                                currency: 'KRW',
+                                            }).format(price)
+                                            : '확인 가능'}
+                                    </p>
                                 </div>
                                 <div>
                                     <p className='text-sm text-muted-foreground'>진행 방식</p>

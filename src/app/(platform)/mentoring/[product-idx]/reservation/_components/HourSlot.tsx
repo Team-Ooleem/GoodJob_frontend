@@ -6,14 +6,16 @@ interface IHourSlot {
     endTime: string;
     selected?: boolean;
     disabled?: boolean;
+    onClick?: () => void;
 }
 
-export function HourSlot({ startTime, endTime, selected = false, disabled = false }: IHourSlot) {
+export function HourSlot({ startTime, endTime, selected = false, disabled = false, onClick }: IHourSlot) {
     return (
         <Button
             className={`w-auto text-sm ${selected ? 'font-semibold' : 'font-medium'}`}
             variant={selected ? 'default' : 'outline'}
             disabled={disabled}
+            onClick={onClick}
         >
             {startTime}~{endTime}
             <Badge
