@@ -257,6 +257,7 @@ const processSTTChunk = async (
             totalChunks: isFinal ? totalChunks : -1, // ✅ 최종 청크일 때만 총 청크 수
             duration: duration,
             isNewRecordingSession: currentChunkIndex === 0, // ✅ 첫 번째 청크
+            usePynoteDiarization: true,
         };
 
         logOnce(`sttChunk${currentChunkIndex}`, `🎵 청크 ${currentChunkIndex} STT 처리 시작`);
@@ -324,6 +325,7 @@ const processSTT = async (audioBlob: Blob, mimeType: string) => {
             chunkIndex: 0,
             totalChunks: 1,
             duration: duration,
+            usePynoteDiarization: true,
         };
 
         logOnce('sttProcessed', '🎵 녹음 완료 - STT 처리 시작');
