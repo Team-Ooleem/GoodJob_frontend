@@ -75,7 +75,7 @@ export function CameraBox({
         <div
             className={`${sizeClass} overflow-hidden ${bgClass} rounded-xl relative ${speakingStyle}`}
         >
-            {showProfileFallback ? (
+            {showProfileFallback && (
                 <div className='w-full h-full flex items-center justify-center'>
                     <div className='w-14 h-14 rounded-full overflow-hidden border-2 border-primary flex items-center justify-center bg-muted-foreground/40'>
                         {profileImg ? (
@@ -85,16 +85,16 @@ export function CameraBox({
                         )}
                     </div>
                 </div>
-            ) : (
-                <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted={isLocal}
-                    className='w-full h-full object-cover'
-                    style={{ transform: isLocal ? 'scaleX(-1)' : 'none' }}
-                />
             )}
+
+            <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted={isLocal}
+                className={`w-full h-full object-cover ${!showProfileFallback ? 'opacity-100' : 'opacity-0'}`}
+                style={{ transform: isLocal ? 'scaleX(-1)' : 'none' }}
+            />
 
             {/* 이름 뱃지 + 마이크 상태 */}
             <div className='absolute left-2 bottom-1.5 font-medium text-sm flex items-center gap-1'>
