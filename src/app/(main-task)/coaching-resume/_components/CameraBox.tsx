@@ -57,7 +57,7 @@ export function CameraBox({
     }, [isLocal, name, camMuted, stream]);
 
     // Use shadcn/ui design tokens - 마이크가 꺼져있으면 speaking 효과 비활성화
-    const speakingStyle = isSpeaking && !micMuted ? 'ring-2 ring-primary' : '';
+    const speakingStyle = isSpeaking && !micMuted ? 'ring-2 ring-primary' : 'border';
     const bgClass = 'bg-muted';
 
     const initial = useMemo(() => {
@@ -131,7 +131,7 @@ export function CameraBox({
 
             {/* 이름 뱃지 + 마이크 상태 */}
             <div className='absolute left-2 bottom-1.5 font-medium text-sm flex items-center gap-1'>
-                <Badge variant='secondary' className='px-2 py-0.5'>
+                <Badge variant={camMuted ? 'default' : 'secondary'} className='px-2 py-0.5'>
                     {name ?? (isLocal ? 'You' : '이름없음')}
                 </Badge>
                 {micMuted && (
