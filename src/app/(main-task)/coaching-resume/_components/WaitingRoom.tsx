@@ -118,10 +118,10 @@ export function WaitingRoom() {
     };
 
     return (
-        <div className='w-full min-h-[calc(100vh-40px)] grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-10 items-center px-6 md:px-12 py-10'>
+        <div className='w-full h-screen flex justify-center items-center px-40 gap-12'>
             {/* Left: Preview */}
-            <div className='flex items-center justify-center'>
-                <div className='w-full max-w-3xl'>
+            <div className='flex-1'>
+                <div className='w-full'>
                     <Card className='relative overflow-hidden rounded-2xl aspect-video bg-muted'>
                         <video
                             ref={videoRef}
@@ -172,7 +172,7 @@ export function WaitingRoom() {
                     </Card>
 
                     {/* Device selectors */}
-                    <div className='mt-4 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm'>
+                    <div className='mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm'>
                         <Select value={selectedMic} onValueChange={setSelectedMic}>
                             <SelectTrigger>
                                 <SelectValue placeholder='마이크 선택' />
@@ -203,15 +203,17 @@ export function WaitingRoom() {
             </div>
 
             {/* Right: Info + CTA */}
-            <div className='flex flex-col items-start gap-6 mx-auto w-full max-w-sm'>
-                <div className='space-y-1'>
-                    <h2 className='text-2xl font-semibold'>참여할 준비가 되셨나요?</h2>
-                    <p className='text-sm text-muted-foreground'>다른 참석자는 없습니다.</p>
-                </div>
+            <div className='flex-1 flex justify-center items-center flex-col'>
+                <div className='w-full space-y-6'>
+                    <div className='space-y-1'>
+                        <h2 className='text-2xl font-semibold'>참여할 준비가 되셨나요?</h2>
+                        <p className='text-sm text-muted-foreground'>다른 참석자는 없습니다.</p>
+                    </div>
 
-                <Button size='lg' className='w-full' onClick={startSession}>
-                    지금 참여하기
-                </Button>
+                    <Button size='lg' className='w-1/2' onClick={startSession}>
+                        지금 참여하기
+                    </Button>
+                </div>
             </div>
         </div>
     );
