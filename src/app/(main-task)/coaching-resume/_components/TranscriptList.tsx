@@ -1,37 +1,16 @@
 'use client';
 
 import { List } from 'antd';
-import AudioPlayer from './AudioPlayer';
 import { ChatSession, SpeakerSegment, TranscriptItem } from '@/apis/recoding-api';
 
 function TranscriptList({
     transcripts,
     playingSegment,
     onPlaySegment,
-    isFullSessionMode = false,
-    audioRef,
-    // AudioPlayer에 필요한 props 추가
-    currentSegment,
-    currentSession,
-    currentTime,
-    duration,
-    isPlaying,
-    onPlayPause,
-    onClose,
 }: {
     transcripts: TranscriptItem[];
     playingSegment: SpeakerSegment | null;
     onPlaySegment: (segment: SpeakerSegment, session: ChatSession) => void;
-    isFullSessionMode?: boolean;
-    audioRef?: React.RefObject<HTMLAudioElement>;
-    // AudioPlayer props 추가
-    currentSegment: SpeakerSegment | null;
-    currentSession: ChatSession | null;
-    currentTime: number;
-    duration: number;
-    isPlaying: boolean;
-    onPlayPause: () => void;
-    onClose: () => void;
 }) {
     const handleSegmentClick = (line: TranscriptItem) => {
         // 특정 세그먼트 클릭 시 해당 부분으로 이동
@@ -84,22 +63,6 @@ function TranscriptList({
                             </List.Item>
                         );
                     }}
-                />
-            </div>
-
-            {/* AudioPlayer - 바닥에 고정 */}
-            <div className='flex-shrink-0'>
-                <AudioPlayer
-                    playingSegment={playingSegment}
-                    currentSegment={currentSegment}
-                    currentSession={currentSession}
-                    currentTime={currentTime}
-                    duration={duration}
-                    isPlaying={isPlaying}
-                    onPlayPause={onPlayPause}
-                    onClose={onClose}
-                    audioRef={audioRef}
-
                 />
             </div>
         </div>
