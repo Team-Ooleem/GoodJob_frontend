@@ -27,6 +27,56 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i);
 type DragPoint = { day: number; hour: number } | null;
 type DragMode = 'select' | 'deselect' | null;
 
+// ---- helpers for summary ----
+const hh = (n: number) => n.toString().padStart(2, '0');
+
+function getSortedUniqueSlots(slots: TimeSlot[]) {
+    const map = new Map<string, TimeSlot>();
+    for (const s of slots) map.set(`${s.day_of_week}-${s.hour_slot}`, s);
+    const unique = Array.from(map.values());
+    unique.sort((a, b) =>
+        a.day_of_week === b.day_of_week ? a.hour_slot - b.hour_slot : a.day_of_week - b.day_of_week,
+    );
+    return unique;
+}
+
+// group consecutive hours per day into [start, endExclusive]
+function groupRangesByDay(sortedSlots: TimeSlot[]) {
+    const byDay = new Map<number, number[]>();
+    for (const s of sortedSlots) {
+        if (!byDay.has(s.day_of_week)) byDay.set(s.day_of_week, []);
+        byDay.get(s.day_of_week)!.push(s.hour_slot);
+    }
+
+    const grouped = new Map<number, Array<{ start: number; end: number }>>();
+    for (const [day, hours] of byDay) {
+        const ranges: Array<{ start: number; end: number }> = [];
+        let start = hours[0];
+        let prev = hours[0];
+
+        for (let i = 1; i < hours.length; i++) {
+            const h = hours[i];
+            if (h === prev + 1) {
+                prev = h;
+            } else {
+                ranges.push({ start, end: prev + 1 });
+                start = h;
+                prev = h;
+            }
+        }
+        ranges.push({ start, end: prev + 1 });
+        grouped.set(day, ranges);
+    }
+    return grouped;
+}
+
+const dayLabel = (value: number, full = false) =>
+    (DAYS_OF_WEEK.find((d) => d.value === value) as { label: string; fullLabel: string })[
+        full ? 'fullLabel' : 'label'
+    ];
+
+// -----------------------------
+
 export default function TimeTable({ timeSlots, onTimeSlotsChange }: TimeTableProps) {
     const [isDragging, setIsDragging] = useState(false);
     const [dragStart, setDragStart] = useState<DragPoint>(null);
@@ -126,7 +176,6 @@ export default function TimeTable({ timeSlots, onTimeSlotsChange }: TimeTablePro
         setDragMode(null);
 
         // 드래그 사이클 끝났으니 click에서 추가 토글하지 않게 유지
-        // 다음 tick에서만 false로 내려 중복 토글 방지
         setTimeout(() => {
             handledByDragRef.current = false;
         }, 0);
@@ -232,7 +281,7 @@ export default function TimeTable({ timeSlots, onTimeSlotsChange }: TimeTablePro
                                                     handleMouseEnter(day.value, hour)
                                                 }
                                                 onMouseUp={handleMouseUp}
-                                                onClick={(e) => {
+                                                onClick={() => {
                                                     if (handledByDragRef.current) return;
                                                     toggleOne(day.value, hour);
                                                 }}
@@ -246,27 +295,38 @@ export default function TimeTable({ timeSlots, onTimeSlotsChange }: TimeTablePro
                         </div>
                     </div>
 
-                    {/* 선택된 시간대 요약 */}
-                    {selectedCount > 0 && (
-                        <div className='mt-4 p-3 bg-blue-50 rounded-lg'>
-                            <h4 className='text-sm font-medium text-blue-900 mb-2'>
-                                선택된 시간대
-                            </h4>
-                            <div className='flex flex-wrap gap-1'>
-                                {timeSlots.map((slot, index) => {
-                                    const day = DAYS_OF_WEEK.find(
-                                        (d) => d.value === slot.day_of_week,
-                                    );
-                                    return (
-                                        <Badge key={index} variant='outline' className='text-xs'>
-                                            {day?.fullLabel}{' '}
-                                            {slot.hour_slot.toString().padStart(2, '0')}:00
-                                        </Badge>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
+                    {/* 선택된 시간대 요약 (정렬 + 연속 구간 묶기) */}
+                    {selectedCount > 0 &&
+                        (() => {
+                            const sorted = getSortedUniqueSlots(timeSlots);
+                            const grouped = groupRangesByDay(sorted);
+                            const dayKeys = Array.from(grouped.keys()).sort((a, b) => a - b);
+
+                            return (
+                                <div className='mt-4 p-3 bg-blue-50 rounded-lg'>
+                                    <h4 className='text-sm font-medium text-blue-900 mb-2'>
+                                        선택된 시간대
+                                    </h4>
+
+                                    <div className='space-y-1'>
+                                        {dayKeys.map((day) => {
+                                            const ranges = grouped.get(day)!; // [{start, end(exclusive)}...]
+                                            const pretty = ranges
+                                                .map((r) => `${hh(r.start)}:00~${hh(r.end)}:00`)
+                                                .join(', ');
+                                            return (
+                                                <div key={day} className='text-sm text-blue-900'>
+                                                    <span className='font-medium mr-2'>
+                                                        {dayLabel(day, true)}
+                                                    </span>
+                                                    <span>{pretty}</span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            );
+                        })()}
                 </div>
             </CardContent>
         </Card>
