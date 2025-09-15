@@ -6,7 +6,7 @@ import { HeaderNavigationAnchor } from './HeaderNavigationAnchor';
 export function HeaderNavigation() {
     return (
         <div className='flex justify-center items-center gap-10'>
-            <HeaderNavigationAnchor href='/'>채용</HeaderNavigationAnchor>
+            <HeaderNavigationAnchor href='/'>홈</HeaderNavigationAnchor>
             <HeaderNavigationAnchor href='/ai-interview' target='_blank'>
                 AI 인터뷰
             </HeaderNavigationAnchor>
