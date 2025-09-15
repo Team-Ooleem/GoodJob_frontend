@@ -14,6 +14,7 @@ interface ICameraBox {
     profileImg?: string;
     stream?: MediaStream | null;
     size?: 'sm' | 'md' | 'lg';
+    isConnected?: boolean; // WebRTC 연결 상태
 }
 
 export function CameraBox({
@@ -25,6 +26,7 @@ export function CameraBox({
     profileImg,
     stream,
     size,
+    isConnected = false,
 }: ICameraBox) {
     const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -33,8 +35,10 @@ export function CameraBox({
 
     // 마이크 음소거 상태 결정
     const micMuted = isLocal ? !isMicEnabled : (isMuted ?? false);
-    // 카메라 음소거 상태 결정
-    const camMuted = isLocal ? !isCamEnabled : (isCamMuted ?? false);
+    // 카메라 음소거 상태 결정 - 로컬/원격 모두 카메라 꺼짐, 연결 안됨, 스트림 없음 시 대체화면 표시
+    const camMuted = isLocal
+        ? !isCamEnabled || !stream
+        : !isConnected || !stream || (isCamMuted ?? false);
 
     // 디버깅: 상대방 카메라일 때 상세 상태 확인
     useEffect(() => {
@@ -118,14 +122,23 @@ export function CameraBox({
             />
 
             {camMuted && (
-                <div className='absolute inset-0 w-full h-full flex items-center justify-center bg-muted'>
-                    <div className='w-14 h-14 rounded-full overflow-hidden border-2 border-primary flex items-center justify-center bg-muted-foreground/40'>
+                <div className='absolute inset-0 w-full h-full flex flex-col items-center justify-center bg-muted'>
+                    <div className='w-16 h-16 rounded-full overflow-hidden border-2 border-primary flex items-center justify-center bg-muted-foreground/40 mb-3'>
                         {profileImg ? (
                             <Image src={profileImg} alt='profile' width={64} height={64} />
                         ) : (
                             <span className='text-foreground text-xl font-semibold'>{initial}</span>
                         )}
                     </div>
+                    {!isLocal && !isConnected && (
+                        <p className='text-sm text-muted-foreground text-center px-4'>연결 중...</p>
+                    )}
+                    {!isLocal && isConnected && !stream && (
+                        <p className='text-sm text-muted-foreground text-center px-4'>연결 중...</p>
+                    )}
+                    {isLocal && !stream && (
+                        <p className='text-sm text-muted-foreground text-center px-4'>연결 중...</p>
+                    )}
                 </div>
             )}
 

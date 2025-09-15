@@ -19,6 +19,7 @@ export function ParticipantCamera({ mentorName, menteeName }: Props) {
         isMuted,
         isRemoteMuted,
         isRemoteCameraOff,
+        isConnected,
     } = useWebRTC('resume-room');
 
     useEffect(() => {
@@ -36,6 +37,7 @@ export function ParticipantCamera({ mentorName, menteeName }: Props) {
                     name={mentorName ?? '상대방'}
                     stream={remoteStream}
                     size='lg'
+                    isConnected={isConnected}
                 />
                 <CameraBox
                     isLocal={true}
@@ -44,6 +46,7 @@ export function ParticipantCamera({ mentorName, menteeName }: Props) {
                     name={menteeName ?? '나'}
                     stream={localStream}
                     size='sm'
+                    isConnected={isConnected}
                 />
             </div>
         </div>
