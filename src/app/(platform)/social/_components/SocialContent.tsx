@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import ProfileSection from './ProfileSection';
+import { ProfileSection } from '@/components';
 import PostComposer from './PostComposer';
 import PostFeed from './PostFeed';
 import { useAuth } from '@/hooks/use-auth';
@@ -18,17 +18,21 @@ export default function SocialContent() {
 
     // 로딩 중이거나 currentUserId가 없으면 아무것도 렌더링하지 않음
     if (authLoading || !currentUserId) {
-        return <div>Loading...</div>;
+        return (
+            <div className='min-h-screen bg-background flex items-center justify-center'>
+                <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary'></div>
+            </div>
+        );
     }
 
     return (
-        <div className='min-h-screen bg-gray-50 p-6'>
+        <div className='min-h-screen bg-muted/30 p-6'>
             <div className='max-w-4xl mx-auto flex gap-6'>
                 {/* 왼쪽 프로필 섹션 */}
-                <ProfileSection currentUserId={currentUserId} />
+                <ProfileSection />
 
                 {/* 가운데 메인 콘텐츠 */}
-                <div className='flex-1 flex flex-col gap-2 space-y-6'>
+                <div className='flex-1 flex flex-col gap-6'>
                     {/* 글쓰기 UI */}
                     <PostComposer currentUserId={currentUserId} />
 

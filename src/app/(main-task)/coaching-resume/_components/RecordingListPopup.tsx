@@ -110,6 +110,7 @@ export function RecordingListPopup() {
                 setCurrentTime(0);
                 setIsPlaying(false);
 
+
                 const audioUrl = session.segments[0]?.audioUrl;
                 if (audioUrl) {
                     loadAudioWithDuration(audioUrl, session as unknown as ChatSession);
@@ -145,6 +146,7 @@ export function RecordingListPopup() {
             id: `rec-${session.sessionIdx}`,
             title: `음성 메모 ${session.segmentIndex}`,
             durationSec: Math.floor(getTotalDuration(session)), // 🆕 타입 캐스팅 제거
+
             createdAt: new Date(session.timestamp).toLocaleString(),
         }));
     }, [sessions]);

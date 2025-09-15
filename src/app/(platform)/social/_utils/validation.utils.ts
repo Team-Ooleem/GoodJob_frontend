@@ -23,10 +23,3 @@ export const validateImageFile = (file: File): { isValid: boolean; error?: strin
 
     return { isValid: true };
 };
-
-/**
- * 텍스트 길이 유효성 검사
- */
-export const validateTextLength = (text: string, maxLength: number = 500): boolean => {
-    return text.length <= maxLength;
-};
