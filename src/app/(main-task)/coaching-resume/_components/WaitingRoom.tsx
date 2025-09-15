@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -12,7 +13,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { Mic, MicOff, Video, VideoOff, ChevronDown, User } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, ChevronDown, User, ChevronLeft } from 'lucide-react';
 import { useSessionStore } from '../_stores';
 
 type MediaDevice = {
@@ -21,7 +22,9 @@ type MediaDevice = {
 };
 
 export function WaitingRoom() {
-    const startSession = useSessionStore((s) => s.startSession);
+    const router = useRouter();
+    const { mentorReady, menteeReady, setMentorReady, setMenteeReady, startSession } =
+        useSessionStore();
 
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const [stream, setStream] = useState<MediaStream | null>(null);
@@ -118,144 +121,201 @@ export function WaitingRoom() {
         setCamOn(next);
     };
 
+    // 현재 사용자가 멘토인지 멘티인지 결정 (실제로는 props나 context에서 가져와야 함)
+    const userRole = 'mentee'; // 임시로 멘티로 설정
+    const isUserReady = userRole === 'mentor' ? mentorReady : menteeReady;
+    const otherUserReady = userRole === 'mentor' ? menteeReady : mentorReady;
+    const otherUserRole = userRole === 'mentor' ? '멘티' : '멘토';
+
+    const toggleReady = () => {
+        if (userRole === 'mentor') {
+            setMentorReady(!mentorReady);
+        } else {
+            setMenteeReady(!menteeReady);
+        }
+    };
+
+    const getButtonText = () => {
+        if (isUserReady) {
+            if (otherUserReady) {
+                return '지금 참여하기';
+            } else {
+                return `준비 취소하기 (${otherUserRole} 대기 중)`;
+            }
+        } else {
+            return '준비 완료';
+        }
+    };
+
+    const handleButtonClick = () => {
+        if (isUserReady && otherUserReady) {
+            startSession();
+        } else {
+            toggleReady();
+        }
+    };
+
     return (
-        <div className='w-full h-screen flex justify-center items-center px-40 gap-12'>
-            {/* Left: Preview */}
-            <div className='flex-1'>
-                <div className='w-full'>
-                    <Card className='relative overflow-hidden rounded-2xl aspect-video bg-muted'>
-                        <video
-                            ref={videoRef}
-                            className={cn(
-                                'h-full w-full object-cover scale-x-[-1]',
-                                !camOn && 'opacity-0',
-                            )}
-                            autoPlay
-                            muted
-                            playsInline
-                        />
+        <div className='w-full h-screen relative'>
+            {/* Back Button */}
+            <button
+                className='absolute top-6 left-6 z-10 size-10 rounded-full bg-background/80 backdrop-blur-sm border border-border shadow-sm hover:bg-background/90 flex items-center justify-center transition-colors'
+                onClick={() => router.back()}
+                aria-label='뒤로가기'
+            >
+                <ChevronLeft className='h-5 w-5' />
+            </button>
 
-                        {/* Overlay top-left: name placeholder */}
-                        <div className='absolute left-4 top-4 rounded-md bg-black/40 text-white text-sm px-2 py-1'>
-                            나
-                        </div>
+            <div className='w-full h-full flex justify-center items-center px-40 gap-12'>
+                {/* Left: Preview */}
+                <div className='flex-2'>
+                    <div className='w-full'>
+                        <Card className='relative overflow-hidden rounded-2xl aspect-video bg-muted max-w-2xl mx-auto'>
+                            <video
+                                ref={videoRef}
+                                className={cn(
+                                    'h-full w-full object-cover scale-x-[-1]',
+                                    !camOn && 'opacity-0',
+                                )}
+                                autoPlay
+                                muted
+                                playsInline
+                            />
 
-                        {/* Dim when camera off */}
-                        {!camOn && (
-                            <div className='absolute inset-0 flex items-center justify-center bg-black/50 text-white'>
-                                카메라가 꺼져 있습니다
+                            {/* Overlay top-left: name placeholder */}
+                            <div className='absolute left-4 top-4 rounded-md bg-black/40 text-white text-sm px-2 py-1'>
+                                나
                             </div>
-                        )}
 
-                        {/* Bottom controls */}
-                        <div className='absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3'>
-                            <button
-                                onClick={toggleMic}
-                                className={cn(
-                                    'size-11 rounded-full bg-background text-foreground shadow hover:bg-background/90 flex items-center justify-center',
-                                    !micOn && 'bg-red-600 text-white hover:bg-red-600/90',
-                                )}
-                                aria-label='toggle microphone'
-                            >
-                                {micOn ? <Mic /> : <MicOff />}
-                            </button>
-                            <button
-                                onClick={toggleCam}
-                                className={cn(
-                                    'size-11 rounded-full bg-background text-foreground shadow hover:bg-background/90 flex items-center justify-center',
-                                    !camOn && 'bg-red-600 text-white hover:bg-red-600/90',
-                                )}
-                                aria-label='toggle camera'
-                            >
-                                {camOn ? <Video /> : <VideoOff />}
-                            </button>
+                            {/* Dim when camera off */}
+                            {!camOn && (
+                                <div className='absolute inset-0 flex items-center justify-center bg-black/50 text-white'>
+                                    카메라가 꺼져 있습니다
+                                </div>
+                            )}
+
+                            {/* Bottom controls */}
+                            <div className='absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3'>
+                                <button
+                                    onClick={toggleMic}
+                                    className={cn(
+                                        'size-11 rounded-full bg-background text-foreground shadow hover:bg-background/90 flex items-center justify-center',
+                                        !micOn && 'bg-red-600 text-white hover:bg-red-600/90',
+                                    )}
+                                    aria-label='toggle microphone'
+                                >
+                                    {micOn ? <Mic /> : <MicOff />}
+                                </button>
+                                <button
+                                    onClick={toggleCam}
+                                    className={cn(
+                                        'size-11 rounded-full bg-background text-foreground shadow hover:bg-background/90 flex items-center justify-center',
+                                        !camOn && 'bg-red-600 text-white hover:bg-red-600/90',
+                                    )}
+                                    aria-label='toggle camera'
+                                >
+                                    {camOn ? <Video /> : <VideoOff />}
+                                </button>
+                            </div>
+                        </Card>
+
+                        {/* Device selectors */}
+                        <div className='mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm max-w-2xl mx-auto'>
+                            <Select value={selectedMic} onValueChange={setSelectedMic}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder='마이크 선택' />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {mics.map((d) => (
+                                        <SelectItem key={d.deviceId} value={d.deviceId}>
+                                            {d.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+
+                            <Select value={selectedCam} onValueChange={setSelectedCam}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder='카메라 선택' />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {cams.map((d) => (
+                                        <SelectItem key={d.deviceId} value={d.deviceId}>
+                                            {d.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
-                    </Card>
-
-                    {/* Device selectors */}
-                    <div className='mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm'>
-                        <Select value={selectedMic} onValueChange={setSelectedMic}>
-                            <SelectTrigger>
-                                <SelectValue placeholder='마이크 선택' />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {mics.map((d) => (
-                                    <SelectItem key={d.deviceId} value={d.deviceId}>
-                                        {d.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-
-                        <Select value={selectedCam} onValueChange={setSelectedCam}>
-                            <SelectTrigger>
-                                <SelectValue placeholder='카메라 선택' />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {cams.map((d) => (
-                                    <SelectItem key={d.deviceId} value={d.deviceId}>
-                                        {d.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
                     </div>
                 </div>
-            </div>
 
-            {/* Right: Participants + CTA */}
-            <div className='flex-1 flex justify-center items-center flex-col'>
-                <div className='w-full space-y-6'>
-                    <div className='w-1/2 space-y-4'>
-                        <h2 className='text-2xl font-semibold'>참석자 목록</h2>
+                {/* Right: Participants + CTA */}
+                <div className='flex-1 flex justify-center items-center flex-col'>
+                    <div className='w-full space-y-6'>
+                        <div className='space-y-4 pr-30'>
+                            <h2 className='text-2xl font-semibold'>참석자 목록</h2>
 
-                        {/* Mentor Card */}
-                        <div className='flex gap-2'>
-                            <Card className='flex-1 p-0'>
-                                <CardContent className='flex items-center space-x-4 p-4'>
-                                    <div className='w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center'>
-                                        <User className='h-6 w-6 text-primary' />
-                                    </div>
-                                    <div className='flex-1 space-y-1'>
-                                        <p className='font-medium'>김코치</p>
-                                        <p className='text-sm text-muted-foreground'>멘토</p>
-                                    </div>
-                                </CardContent>
-                                <CardFooter className='bg-green-50 dark:bg-green-950 p-3'>
-                                    <Badge
-                                        variant='secondary'
-                                        className='bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+                            {/* Mentor Card */}
+                            <div className='flex gap-2'>
+                                <Card className='flex-1 p-0'>
+                                    <CardContent className='flex items-center space-x-4 p-4'>
+                                        <div className='w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center'>
+                                            <User className='h-6 w-6 text-primary' />
+                                        </div>
+                                        <div className='flex-1 space-y-1'>
+                                            <p className='font-medium'>김코치</p>
+                                            <p className='text-sm text-muted-foreground'>멘토</p>
+                                        </div>
+                                    </CardContent>
+                                    <CardFooter
+                                        className={`p-3 rounded-b-lg ${mentorReady ? 'bg-green-50 dark:bg-green-950' : 'bg-gray-50 dark:bg-gray-950'}`}
                                     >
-                                        준비됨
-                                    </Badge>
-                                </CardFooter>
-                            </Card>
+                                        <Badge
+                                            variant={mentorReady ? 'secondary' : 'outline'}
+                                            className={
+                                                mentorReady
+                                                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+                                                    : 'border-gray-200 text-gray-600 dark:border-gray-700 dark:text-gray-400'
+                                            }
+                                        >
+                                            {mentorReady ? '준비됨' : '대기중'}
+                                        </Badge>
+                                    </CardFooter>
+                                </Card>
 
-                            {/* Mentee Card */}
-                            <Card className='flex-1  p-0'>
-                                <CardContent className='flex items-center space-x-4 p-4'>
-                                    <div className='w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center'>
-                                        <User className='h-6 w-6 text-primary' />
-                                    </div>
-                                    <div className='flex-1 space-y-1'>
-                                        <p className='font-medium'>이멘티</p>
-                                        <p className='text-sm text-muted-foreground'>멘티</p>
-                                    </div>
-                                </CardContent>
-                                <CardFooter className='bg-amber-50 dark:bg-amber-950 p-3'>
-                                    <Badge
-                                        variant='outline'
-                                        className='border-amber-200 text-amber-800 dark:border-amber-800 dark:text-amber-300'
+                                {/* Mentee Card */}
+                                <Card className='flex-1  p-0'>
+                                    <CardContent className='flex items-center space-x-4 p-4'>
+                                        <div className='w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center'>
+                                            <User className='h-6 w-6 text-primary' />
+                                        </div>
+                                        <div className='flex-1 space-y-1'>
+                                            <p className='font-medium'>이멘티</p>
+                                            <p className='text-sm text-muted-foreground'>멘티</p>
+                                        </div>
+                                    </CardContent>
+                                    <CardFooter
+                                        className={`p-3 rounded-b-lg ${menteeReady ? 'bg-green-50 dark:bg-green-950' : 'bg-gray-50 dark:bg-gray-950'}`}
                                     >
-                                        대기중
-                                    </Badge>
-                                </CardFooter>
-                            </Card>
+                                        <Badge
+                                            variant={menteeReady ? 'secondary' : 'outline'}
+                                            className={
+                                                menteeReady
+                                                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+                                                    : 'border-gray-200 text-gray-600 dark:border-gray-700 dark:text-gray-400'
+                                            }
+                                        >
+                                            {menteeReady ? '준비됨' : '대기중'}
+                                        </Badge>
+                                    </CardFooter>
+                                </Card>
+                            </div>
+
+                            <Button size='lg' className='w-full' onClick={handleButtonClick}>
+                                {getButtonText()}
+                            </Button>
                         </div>
-
-                        <Button size='lg' className='w-full' onClick={startSession}>
-                            지금 참여하기
-                        </Button>
                     </div>
                 </div>
             </div>
