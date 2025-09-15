@@ -56,6 +56,21 @@ interface InterviewAnalysisResult {
     };
     overall_evaluation: string;
     recommendations: string[];
+    // NEW: 백엔드 텍스트(내용/맥락) 분석 요약
+    text_analysis_summary?: {
+        content_avg100: number;
+        context_avg100: number;
+        overall_llm10: number;
+        top_reasons?: string[];
+        top_improvements?: string[];
+    };
+    // NEW: 상위 근거 링크
+    evidence_links?: Array<{
+        answer_span: string;
+        resume_ref?: string;
+        similarity?: number;
+        explanation?: string;
+    }>;
 }
 
 interface QAPair {
@@ -120,6 +135,26 @@ interface InterviewReportProps {
     qaList?: QAPair[];
     audioData?: AudioAnalysisData;
     visualData?: VisualAnalysisData;
+    // NEW: 문항별 텍스트 분석(옵션)
+    perQuestionTextAnalyses?: Array<{
+        questionId: string;
+        content?: {
+            content_score: number;
+            reasoning?: string[];
+            improvements?: string[];
+            star?: { situation?: string; task?: string; action?: string; result?: string };
+        };
+        context?: {
+            context_score: number;
+            links?: Array<{
+                answer_span: string;
+                resume_ref?: string;
+                similarity?: number;
+                explanation?: string;
+            }>;
+            consistency?: { contradiction: boolean; notes?: string };
+        };
+    }>;
     sessionMeta?: {
         sessionId: string;
         createdAt?: string;
@@ -158,6 +193,7 @@ export default function InterviewReport({
     audioData,
     visualData,
     sessionMeta,
+    perQuestionTextAnalyses,
     displayOptions = {
         showHeader: true,
         showActions: true,
@@ -350,6 +386,228 @@ export default function InterviewReport({
                     </Card>
                 </Col>
             </Row>
+
+            {/* 텍스트 분석 요약 (내용/맥락) */}
+            {analysisResult.text_analysis_summary && (
+                <Card className='!border-0 !shadow-lg mb-8' title='텍스트 분석 요약(내용·맥락)'>
+                    <Row gutter={[16, 16]}>
+                        <Col xs={24} md={8}>
+                            <Card size='small'>
+                                <div className='text-center mb-2'>LLM 종합</div>
+                                <div
+                                    className='text-4xl font-bold'
+                                    style={{
+                                        color: getScoreColor(
+                                            (analysisResult.text_analysis_summary.overall_llm10 || 0) * 10,
+                                        ),
+                                    }}
+                                >
+                                    {analysisResult.text_analysis_summary.overall_llm10 || 0}
+                                    <span className='text-base ml-1'>/ 10</span>
+                                </div>
+                            </Card>
+                        </Col>
+                        <Col xs={24} md={8}>
+                            <Card size='small'>
+                                <div className='mb-2'>내용 적합도</div>
+                                <Progress
+                                    percent={analysisResult.text_analysis_summary.content_avg100 || 0}
+                                    strokeColor={getScoreColor(
+                                        analysisResult.text_analysis_summary.content_avg100 || 0,
+                                    )}
+                                />
+                            </Card>
+                        </Col>
+                        <Col xs={24} md={8}>
+                            <Card size='small'>
+                                <div className='mb-2'>맥락 일치도</div>
+                                <Progress
+                                    percent={analysisResult.text_analysis_summary.context_avg100 || 0}
+                                    strokeColor={getScoreColor(
+                                        analysisResult.text_analysis_summary.context_avg100 || 0,
+                                    )}
+                                />
+                            </Card>
+                        </Col>
+                    </Row>
+                    <Divider />
+                    <Row gutter={[16, 16]}>
+                        <Col xs={24} md={12}>
+                            <div className='mb-2 font-semibold'>상위 근거</div>
+                            <List
+                                size='small'
+                                dataSource={analysisResult.text_analysis_summary.top_reasons || []}
+                                locale={{ emptyText: '근거 정보 없음' }}
+                                renderItem={(item) => (
+                                    <List.Item>
+                                        <Space>
+                                            <CheckCircleOutlined className='text-green-500' />
+                                            <span>{item}</span>
+                                        </Space>
+                                    </List.Item>
+                                )}
+                            />
+                        </Col>
+                        <Col xs={24} md={12}>
+                            <div className='mb-2 font-semibold'>개선 팁</div>
+                            <List
+                                size='small'
+                                dataSource={analysisResult.text_analysis_summary.top_improvements || []}
+                                locale={{ emptyText: '개선 팁 없음' }}
+                                renderItem={(item) => (
+                                    <List.Item>
+                                        <Space>
+                                            <RiseOutlined className='text-blue-500' />
+                                            <span>{item}</span>
+                                        </Space>
+                                    </List.Item>
+                                )}
+                            />
+                        </Col>
+                    </Row>
+                    {!!analysisResult.evidence_links?.length && (
+                        <>
+                            <Divider />
+                            <div className='mb-2 font-semibold'>근거 하이라이트</div>
+                            <List
+                                size='small'
+                                dataSource={analysisResult.evidence_links}
+                                renderItem={(link) => (
+                                    <List.Item>
+                                        <Space direction='vertical' size={0} style={{ width: '100%' }}>
+                                            <div>
+                                                <Tag color='green'>답변</Tag>
+                                                <Text>{link.answer_span}</Text>
+                                            </div>
+                                            {link.resume_ref && (
+                                                <div>
+                                                    <Tag color='blue'>이력서</Tag>
+                                                    <Text>{link.resume_ref}</Text>
+                                                </div>
+                                            )}
+                                            <div className='text-xs text-gray-500'>
+                                                유사도: {fmt(link.similarity ?? '-', 3)}
+                                                {link.explanation ? ` · ${link.explanation}` : ''}
+                                            </div>
+                                        </Space>
+                                    </List.Item>
+                                )}
+                            />
+                        </>
+                    )}
+                </Card>
+            )}
+
+            {/* 문항별 텍스트 상세 */}
+            {Array.isArray(perQuestionTextAnalyses) && perQuestionTextAnalyses.length > 0 && (
+                <Card className='!border-0 !shadow-lg mb-8' title='문항별 텍스트 상세'>
+                    <List
+                        itemLayout='vertical'
+                        dataSource={perQuestionTextAnalyses}
+                        renderItem={(item, idx) => {
+                            const qText = qaList?.[idx]?.question || `질문 ${idx + 1}`;
+                            const content = item.content;
+                            const context = item.context;
+                            const contradiction = !!context?.consistency?.contradiction;
+                            return (
+                                <List.Item key={item.questionId}>
+                                    <Card size='small' className='!border !border-gray-100'>
+                                        <div className='mb-2 flex items-center justify-between'>
+                                            <div className='font-semibold text-gray-800'>
+                                                {qText}
+                                            </div>
+                                            <Space>
+                                                {typeof content?.content_score === 'number' && (
+                                                    <Tag color={getScoreColor(content.content_score)}>
+                                                        내용 {content.content_score}
+                                                    </Tag>
+                                                )}
+                                                {typeof context?.context_score === 'number' && (
+                                                    <Tag color={getScoreColor(context.context_score)}>
+                                                        맥락 {context.context_score}
+                                                    </Tag>
+                                                )}
+                                                {contradiction && (
+                                                    <Tag color='red' icon={<WarningOutlined />}>모순 감지</Tag>
+                                                )}
+                                            </Space>
+                                        </div>
+                                        <Row gutter={[16, 16]}>
+                                            <Col xs={24} md={12}>
+                                                <div className='mb-2 font-semibold'>근거</div>
+                                                <List
+                                                    size='small'
+                                                    dataSource={content?.reasoning || []}
+                                                    locale={{ emptyText: '근거 없음' }}
+                                                    renderItem={(r) => (
+                                                        <List.Item>
+                                                            <Space>
+                                                                <CheckCircleOutlined className='text-green-500' />
+                                                                <span>{r}</span>
+                                                            </Space>
+                                                        </List.Item>
+                                                    )}
+                                                />
+                                                {!!content?.star && (
+                                                    <div className='mt-2 text-xs text-gray-600'>
+                                                        <div>Situation: {content.star.situation || '-'}</div>
+                                                        <div>Task: {content.star.task || '-'}</div>
+                                                        <div>Action: {content.star.action || '-'}</div>
+                                                        <div>Result: {content.star.result || '-'}</div>
+                                                    </div>
+                                                )}
+                                            </Col>
+                                            <Col xs={24} md={12}>
+                                                <div className='mb-2 font-semibold'>개선 팁</div>
+                                                <List
+                                                    size='small'
+                                                    dataSource={content?.improvements || []}
+                                                    locale={{ emptyText: '개선 팁 없음' }}
+                                                    renderItem={(im) => (
+                                                        <List.Item>
+                                                            <Space>
+                                                                <RiseOutlined className='text-blue-500' />
+                                                                <span>{im}</span>
+                                                            </Space>
+                                                        </List.Item>
+                                                    )}
+                                                />
+                                                <Divider className='my-3' />
+                                                <div className='mb-2 font-semibold'>근거 링크</div>
+                                                <List
+                                                    size='small'
+                                                    dataSource={context?.links || []}
+                                                    locale={{ emptyText: '링크 없음' }}
+                                                    renderItem={(lnk) => (
+                                                        <List.Item>
+                                                            <Space direction='vertical' size={0} style={{ width: '100%' }}>
+                                                                <div>
+                                                                    <Tag color='green'>답변</Tag>
+                                                                    <Text>{lnk.answer_span}</Text>
+                                                                </div>
+                                                                {lnk.resume_ref && (
+                                                                    <div>
+                                                                        <Tag color='blue'>이력서</Tag>
+                                                                        <Text>{lnk.resume_ref}</Text>
+                                                                    </div>
+                                                                )}
+                                                                <div className='text-xs text-gray-500'>
+                                                                    유사도: {fmt(lnk.similarity ?? '-', 3)}
+                                                                    {lnk.explanation ? ` · ${lnk.explanation}` : ''}
+                                                                </div>
+                                                            </Space>
+                                                        </List.Item>
+                                                    )}
+                                                />
+                                            </Col>
+                                        </Row>
+                                    </Card>
+                                </List.Item>
+                            );
+                        }}
+                    />
+                </Card>
+            )}
 
             {/* 음성/영상 분석 요약 카드 */}
             {(audioData?.overall || visualData?.overall) && (

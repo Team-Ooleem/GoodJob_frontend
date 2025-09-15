@@ -157,7 +157,7 @@ export default function AiInterviewSettingCalibrationCombined() {
         };
     }, [phase]);
 
-    // 초기 세션 생성 + 장치 존재 체크
+    // 초기 세션 생성(항상 신규) + 장치 존재 체크
     useEffect(() => {
         (async () => {
             try {
@@ -168,14 +168,28 @@ export default function AiInterviewSettingCalibrationCombined() {
                 setWebcamOk(false);
                 setMicOk(false);
             }
-            // 세션 ID 준비: 없다면 생성 후 서버에 세션 업서트(최소 보장)
+            // 세션 ID: 설정 페이지 진입 시마다 항상 신규 발급
             try {
-                let sid = localStorage.getItem('aiInterviewSessionId');
-                if (!sid) {
-                    sid = `sess_${Math.random().toString(36).slice(2, 10)}_${Date.now()}`;
-                    localStorage.setItem('aiInterviewSessionId', sid);
-                }
+                const prevSid = localStorage.getItem('aiInterviewSessionId');
+                // 이전 세션 산출물(지표/리포트 캐시)은 혼선 방지를 위해 정리
+                try {
+                    const keysToClear = [
+                        'interviewAudioOverallServer',
+                        'interviewAudioPerQuestionServer',
+                        'interviewAudioOverall',
+                        'interviewAudioPerQuestion',
+                        'interviewVisualOverall',
+                        'interviewVisualPerQuestion',
+                        'interviewAnalysis',
+                        'interviewQA',
+                    ];
+                    keysToClear.forEach((k) => localStorage.removeItem(k));
+                } catch {}
+
+                const sid = `sess_${Math.random().toString(36).slice(2, 10)}_${Date.now()}`;
+                localStorage.setItem('aiInterviewSessionId', sid);
                 setSessionId(sid);
+
                 // 인터뷰 세션 보장: finalize를 호출하면 interview_sessions에 INSERT IGNORE 됨
                 try {
                     await api.post(`/metrics/${sid}/finalize`, {}, { timeout: 10000 });

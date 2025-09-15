@@ -78,7 +78,7 @@ export class RealMediaPipeAnalyzer {
     private animationFrameId: number | null = null;
     private lastLogTime = 0;
     private logInterval = 10000; // 10초마다 분석 결과 로그 출력
-    private analysisInterval = 2000; // 2초마다 분석 실행
+    private analysisInterval = 1000; // 1초마다 분석 실행
     private lastAnalysisTime = 0;
 
     // MediaPipe Tasks Vision
@@ -91,7 +91,7 @@ export class RealMediaPipeAnalyzer {
     private lastDetectionTime = 0;
     private lastAnalysisLogTime = 0;
     private hasLoggedInitialData = false;
-    
+
     // 캘리브레이션 구성(로컬 저장 기반)
     private calib: {
         baselineConfidence?: number | null;
@@ -158,7 +158,8 @@ export class RealMediaPipeAnalyzer {
             }
             const data = JSON.parse(raw) as any;
             const v = data?.visual as VisualAggregatePayload | undefined;
-            const baselineConfidence = typeof v?.confidence_mean === 'number' ? v.confidence_mean : null;
+            const baselineConfidence =
+                typeof v?.confidence_mean === 'number' ? v.confidence_mean : null;
             const baselineSmile = typeof v?.smile_mean === 'number' ? v.smile_mean : null;
 
             const baseConf = baselineConfidence ?? 0.6;
@@ -305,7 +306,12 @@ export class RealMediaPipeAnalyzer {
 
         // ▼ 실시간 피드백: 답변(문항) 진행 중일 때만 표시/발생
         if (this.currentQuestionId) {
-            this.generateInterviewFeedback(interviewMetrics, leftEyeCenter, rightEyeCenter, noseTip);
+            this.generateInterviewFeedback(
+                interviewMetrics,
+                leftEyeCenter,
+                rightEyeCenter,
+                noseTip,
+            );
         }
 
         // ▼ 추가: 5초 간격 분석시 **버퍼에 샘플 기록** (문항 진행중일 때만)
@@ -383,8 +389,10 @@ export class RealMediaPipeAnalyzer {
         const eyeLookOutRight =
             blendshapes.find((c: any) => c.categoryName === 'eyeLookOutRight')?.score || 0;
         const mouthOpen = blendshapes.find((c: any) => c.categoryName === 'jawOpen')?.score || 0;
-        const eyeWideLeft = blendshapes.find((c: any) => c.categoryName === 'eyeWideLeft')?.score || 0;
-        const eyeWideRight = blendshapes.find((c: any) => c.categoryName === 'eyeWideRight')?.score || 0;
+        const eyeWideLeft =
+            blendshapes.find((c: any) => c.categoryName === 'eyeWideLeft')?.score || 0;
+        const eyeWideRight =
+            blendshapes.find((c: any) => c.categoryName === 'eyeWideRight')?.score || 0;
 
         metrics.smile = (smileLeft + smileRight) / 2;
         // 자신감: 과도한 놀람/긴장(eyeWide, browInnerUp↑)은 감점, 적당한 미소와 시선 고정은 가점
@@ -449,7 +457,10 @@ export class RealMediaPipeAnalyzer {
 
         const now = Date.now();
         const emit = (type: DetectionResult['type'], payload: DetectionResult) => {
-            if (this.lastFeedbackType === type && now - this.lastFeedbackTime < this.feedbackCooldownMs) {
+            if (
+                this.lastFeedbackType === type &&
+                now - this.lastFeedbackTime < this.feedbackCooldownMs
+            ) {
                 return; // 동일 유형 메시지 스팸 방지
             }
             this.lastFeedbackType = type;
