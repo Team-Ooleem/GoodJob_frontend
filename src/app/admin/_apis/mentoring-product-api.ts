@@ -242,7 +242,13 @@ export async function createMentoringProduct(
         throw new Error(`멘토링 상품 생성 실패 (${res.status}) ${msg}`);
     }
 
-    return res.json();
+    // 백엔드 응답을 success 래퍼로 감싸서 반환
+    const json = await res.json();
+    return {
+        success: true,
+        product_idx: json.product_idx ?? 0, // 백엔드가 반환하면 사용
+        message: '멘토링 상품이 성공적으로 생성되었습니다.',
+    };
 }
 
 /** 직무 카테고리 목록 조회 */
