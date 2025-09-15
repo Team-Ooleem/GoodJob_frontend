@@ -31,8 +31,8 @@ export function CameraBox({
 
     // 마이크 음소거 상태 결정
     const micMuted = isLocal ? !isMicEnabled : (isMuted ?? false);
-    // Use shadcn/ui design tokens
-    const speakingStyle = isSpeaking ? 'ring-2 ring-primary' : '';
+    // Use shadcn/ui design tokens - 마이크가 꺼져있으면 speaking 효과 비활성화
+    const speakingStyle = isSpeaking && !micMuted ? 'ring-2 ring-primary' : '';
     const bgClass = 'bg-muted';
 
     const initial = useMemo(() => {

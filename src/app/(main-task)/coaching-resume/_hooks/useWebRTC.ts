@@ -291,7 +291,6 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
         setSendRecordingStatus(sendRecordingStatus);
     }, [sendRecordingStatus]);
 
-
     // 🆕 WebRTC 상태와 Canvas Store 상태 동기화
     useEffect(() => {
         const canvasStore = useCanvasStore.getState();
@@ -449,7 +448,9 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
         setIsMuted(!nextEnabled);
         sendMuteStatus(!nextEnabled);
 
-        console.log(`🎤 마이크 ${nextEnabled ? '켜짐' : '꺼짐'}, 상태 전송: isMuted=${!nextEnabled}`);
+        console.log(
+            `🎤 마이크 ${nextEnabled ? '켜짐' : '꺼짐'}, 상태 전송: isMuted=${!nextEnabled}`,
+        );
     }, [localStream, sendMuteStatus]);
 
     const toggleCamera = useCallback(() => {
