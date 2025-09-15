@@ -12,14 +12,6 @@ export default function PlatformPage() {
     // 모든 페이지의 상품들을 하나의 배열로 합치기
     const allProducts = data?.pages?.flatMap((page) => page?.products || []) ?? [];
 
-    console.log('🏠 페이지 데이터:', {
-        allProducts: allProducts?.length,
-        hasNextPage,
-        isFetchingNextPage,
-        isLoading,
-        error,
-    });
-
     if (isLoading) {
         return (
             <div className='min-h-screen bg-gradient-to-br from-background dark:from-slate-900 dark:to-slate-800 flex items-center justify-center'>
