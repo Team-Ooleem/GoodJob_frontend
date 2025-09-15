@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { useMemo, useEffect, useRef } from 'react';
+import { Badge } from '@/components/ui/badge';
 import { useCanvasStore } from '../_stores';
 
 interface ICameraBox {
@@ -55,6 +56,16 @@ export function CameraBox({
         }
     }, [stream]);
 
+    // 마이크 상태에 따라 오디오 트랙 음소거 제어
+    useEffect(() => {
+        if (isLocal && stream) {
+            const audioTracks = stream.getAudioTracks();
+            audioTracks.forEach((track) => {
+                track.enabled = isMicEnabled;
+            });
+        }
+    }, [isLocal, stream, isMicEnabled]);
+
     return (
         <div
             className={`${sizeClass} overflow-hidden ${bgClass} rounded-xl relative ${speakingStyle}`}
@@ -80,10 +91,11 @@ export function CameraBox({
                 />
             )}
 
-            {/* null 자리에 여기에 video 넣으면 됩니다! */}
-
-            <p className='text-foreground absolute left-2 bottom-1.5 font-medium text-sm flex items-center gap-1'>
-                <span>{name ?? (isLocal ? 'You' : '이름없음')}</span>
+            {/* 이름 뱃지 + 마이크 상태 */}
+            <div className='absolute left-2 bottom-1.5 font-medium text-sm flex items-center gap-1'>
+                <Badge variant='secondary' className='px-2 py-0.5'>
+                    {name ?? (isLocal ? 'You' : '이름없음')}
+                </Badge>
                 {isLocal && !isMicEnabled && (
                     <span className='inline-flex items-center justify-center w-4 h-4 rounded-full bg-destructive'>
                         <Image
@@ -95,7 +107,7 @@ export function CameraBox({
                         />
                     </span>
                 )}
-            </p>
+            </div>
         </div>
     );
 }
