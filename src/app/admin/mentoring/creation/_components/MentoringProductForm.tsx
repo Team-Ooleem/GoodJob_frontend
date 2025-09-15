@@ -86,10 +86,10 @@ export default function MentoringProductForm({
     };
 
     const onFormSubmit = (data: MentoringProductFormData) => {
-        // mentor_idx를 기본값으로 설정 (예: 1 또는 관리자 ID)
+        // mentor_idx는 상위 컴포넌트에서 설정됨
         const submitData: CreateMentoringProductRequest = {
             ...data,
-            mentor_idx: 1, // 기본 멘토 ID 또는 관리자 ID
+            mentor_idx: 0, // 상위 컴포넌트에서 실제 값으로 덮어씌워짐
         };
         onSubmit(submitData);
     };
