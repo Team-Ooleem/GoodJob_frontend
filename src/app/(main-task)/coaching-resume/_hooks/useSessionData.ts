@@ -8,7 +8,8 @@ import {
     SessionUserResponse,
     ChatSession,
     BackendSessionMessage, // 🆕 추가
-} from '@/apis/Recording-api';
+} from '@/apis/recoding-api';
+
 import { API_BASE_URL } from '@/constants/config';
 
 export const useSessionData = (canvasIdx: string) => {

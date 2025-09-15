@@ -2,13 +2,13 @@
 
 import { Flex } from 'antd';
 import Image from 'next/image';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 // local stores
 import { useCanvasStore } from '../_stores';
 
 // local hooks
-import { startRecording, stopRecording } from '../_hooks';
+import { useWebRTC } from '../_hooks/useWebRTC';
 
 // local components
 import { ReplayButton } from './ReplayButton';
@@ -25,9 +25,10 @@ export function FabricToolbar() {
     const isCamEnabled = useCanvasStore((store) => store.isCamEnabled);
     const toggleMic = useCanvasStore((store) => store.toggleMic);
     const toggleCam = useCanvasStore((store) => store.toggleCam);
+
+    // 🆕 Canvas Store의 isRecording 상태와 toggleRecording 함수 사용
     const isRecording = useCanvasStore((store) => store.isRecording);
     const toggleRecording = useCanvasStore((store) => store.toggleRecording);
-    const setRecording = useCanvasStore((store) => store.setRecording);
     const isRecordingListOpen = useCanvasStore((store) => store.isRecordingListOpen);
     const toggleRecordingList = useCanvasStore((store) => store.toggleRecordingList);
     const [hoverMic, setHoverMic] = useState(false);
@@ -151,15 +152,7 @@ export function FabricToolbar() {
                 {/* 녹음 */}
                 <button
                     className='p-2 rounded hover:bg-gray-100'
-                    onClick={() => {
-                        if (isRecording) {
-                            stopRecording();
-                        } else {
-                            startRecording();
-                        }
-
-                        toggleRecording();
-                    }}
+                    onClick={toggleRecording} // 🆕 Canvas Store의 toggleRecording 직접 사용
                     title={isRecording ? '녹음 중지' : '녹음 시작'}
                 >
                     <Image
