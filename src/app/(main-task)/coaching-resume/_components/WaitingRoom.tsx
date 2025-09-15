@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import {
     Select,
     SelectContent,
@@ -11,7 +12,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { Mic, MicOff, Video, VideoOff, ChevronDown } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, ChevronDown, User } from 'lucide-react';
 import { useSessionStore } from '../_stores';
 
 type MediaDevice = {
@@ -202,17 +203,60 @@ export function WaitingRoom() {
                 </div>
             </div>
 
-            {/* Right: Info + CTA */}
+            {/* Right: Participants + CTA */}
             <div className='flex-1 flex justify-center items-center flex-col'>
                 <div className='w-full space-y-6'>
-                    <div className='space-y-1'>
-                        <h2 className='text-2xl font-semibold'>참여할 준비가 되셨나요?</h2>
-                        <p className='text-sm text-muted-foreground'>다른 참석자는 없습니다.</p>
-                    </div>
+                    <div className='w-1/2 space-y-4'>
+                        <h2 className='text-2xl font-semibold'>참석자 목록</h2>
 
-                    <Button size='lg' className='w-1/2' onClick={startSession}>
-                        지금 참여하기
-                    </Button>
+                        {/* Mentor Card */}
+                        <div className='flex gap-2'>
+                            <Card className='flex-1 p-0'>
+                                <CardContent className='flex items-center space-x-4 p-4'>
+                                    <div className='w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center'>
+                                        <User className='h-6 w-6 text-primary' />
+                                    </div>
+                                    <div className='flex-1 space-y-1'>
+                                        <p className='font-medium'>김코치</p>
+                                        <p className='text-sm text-muted-foreground'>멘토</p>
+                                    </div>
+                                </CardContent>
+                                <CardFooter className='bg-green-50 dark:bg-green-950 p-3'>
+                                    <Badge
+                                        variant='secondary'
+                                        className='bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+                                    >
+                                        준비됨
+                                    </Badge>
+                                </CardFooter>
+                            </Card>
+
+                            {/* Mentee Card */}
+                            <Card className='flex-1  p-0'>
+                                <CardContent className='flex items-center space-x-4 p-4'>
+                                    <div className='w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center'>
+                                        <User className='h-6 w-6 text-primary' />
+                                    </div>
+                                    <div className='flex-1 space-y-1'>
+                                        <p className='font-medium'>이멘티</p>
+                                        <p className='text-sm text-muted-foreground'>멘티</p>
+                                    </div>
+                                </CardContent>
+                                <CardFooter className='bg-amber-50 dark:bg-amber-950 p-3'>
+                                    <Badge
+                                        variant='outline'
+                                        className='border-amber-200 text-amber-800 dark:border-amber-800 dark:text-amber-300'
+                                    >
+                                        대기중
+                                    </Badge>
+                                </CardFooter>
+                            </Card>
+                        </div>
+
+                        <Button size='lg' className='w-full' onClick={startSession}>
+                            지금 참여하기
+                        </Button>
+                    </div>
                 </div>
             </div>
         </div>
