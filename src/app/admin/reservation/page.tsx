@@ -11,7 +11,6 @@ import {
     type ApplicationsResponse,
 } from '../_apis/mentoring-application-api';
 import { useAuth } from '@/hooks/use-auth';
-import { mockReservationData, mockPageInfo } from '../_lib/mock-reservation-data';
 
 const DEFAULT_LIMIT = 10;
 // TODO: 실제 로그인 사용자(멘토/관리자)의 user_idx로 치환
@@ -107,16 +106,21 @@ export default function AdminPage() {
 
             setLoading(true);
             try {
-                // 더미 데이터 사용 (개발/디자인 확인용)
-                // const res = await fetchApplications(user.idx, p, DEFAULT_LIMIT);
-                // setData(res.applications);
-                // setPageInfo(res.page_info);
-
-                // 더미 데이터로 대체
-                setData(mockReservationData);
-                setPageInfo(mockPageInfo);
+                // 실제 API 호출
+                const res = await fetchApplications(user.idx, p, DEFAULT_LIMIT);
+                setData(res.applications);
+                setPageInfo(res.page_info);
             } catch (e) {
-                console.error(e);
+                console.error('예약 목록 조회 실패:', e);
+                // 에러 발생 시 빈 데이터로 설정
+                setData([]);
+                setPageInfo({
+                    page: 1,
+                    limit: DEFAULT_LIMIT,
+                    total: 0,
+                    total_pages: 0,
+                    has_next: false,
+                });
             } finally {
                 setLoading(false);
             }
