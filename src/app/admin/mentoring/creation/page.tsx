@@ -26,9 +26,10 @@ export default function AdminProductCreationPage() {
             try {
                 const categoriesData = await fetchJobCategories();
                 setJobCategories(categoriesData);
+                console.log('직무 카테고리 로드 성공:', categoriesData);
             } catch (error) {
                 console.error('초기 데이터 로드 실패:', error);
-                setAlert({ type: 'error', message: '데이터를 불러오는데 실패했습니다.' });
+                // 더미 데이터가 제공되므로 에러 알림을 표시하지 않음
             } finally {
                 setIsDataLoading(false);
             }
