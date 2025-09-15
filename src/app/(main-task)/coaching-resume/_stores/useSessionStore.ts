@@ -11,7 +11,7 @@ interface SessionState {
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
-    mentorReady: false,
+    mentorReady: true,
     menteeReady: false,
     sessionStarted: false,
 

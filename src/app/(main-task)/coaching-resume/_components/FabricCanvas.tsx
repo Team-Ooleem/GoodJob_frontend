@@ -88,10 +88,5 @@ export function FabricCanvas() {
 
     const isRecording = useCanvasStore((store) => store.isRecording);
 
-    return (
-        <canvas
-            ref={canvasRef}
-            className={isRecording ? 'border border-2 border-red-500' : undefined}
-        />
-    );
+    return <canvas ref={canvasRef} />;
 }
