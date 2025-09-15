@@ -97,6 +97,30 @@ interface VisualAnalysisData {
     perQuestion?: Record<string, any>;
 }
 
+// NEW: 문항별 텍스트 분석 타입(백엔드 스키마 축약)
+interface ContentAnalysisRow {
+    content_score: number;
+    reasoning?: string[];
+    improvements?: string[];
+    star?: { situation?: string; task?: string; action?: string; result?: string };
+}
+interface ContextLink {
+    answer_span: string;
+    resume_ref?: string;
+    similarity?: number;
+    explanation?: string;
+}
+interface ContextAnalysisRow {
+    context_score: number;
+    links?: ContextLink[];
+    consistency?: { contradiction: boolean; notes?: string };
+}
+interface PerQuestionTextAnalysis {
+    questionId: string;
+    content?: ContentAnalysisRow;
+    context?: ContextAnalysisRow;
+}
+
 const { Title, Text } = Typography;
 
 export default function ReportsPage() {
@@ -114,6 +138,7 @@ export default function ReportsPage() {
     const [selectedAudioData, setSelectedAudioData] = useState<AudioAnalysisData | null>(null);
     const [selectedVisualData, setSelectedVisualData] = useState<VisualAnalysisData | null>(null);
     const [selectedVisualQuestionScores, setSelectedVisualQuestionScores] = useState<Record<string, { score: number; calibrationApplied?: boolean }> | null>(null);
+    const [selectedPerQuestionTextAnalyses, setSelectedPerQuestionTextAnalyses] = useState<PerQuestionTextAnalysis[] | null>(null);
 
     const router = useRouter();
 
@@ -155,11 +180,13 @@ export default function ReportsPage() {
                     const audioOverall = audioRes.data.overall;
 
                     // 문항별 음성 지표도 로드
-                    let audioPerQuestion = [];
+                    let audioPerQuestion = [] as any[];
                     try {
                         const audioPerQRes = await api.get(`/audio-metrics/${sessionId}`);
                         if (audioPerQRes.data?.ok && audioPerQRes.data?.rows) {
-                            audioPerQuestion = audioPerQRes.data.rows;
+                            audioPerQuestion = (audioPerQRes.data.rows as any[])
+                                .filter((r) => Number.isFinite(Number((r as any)?.question_id)) && Number((r as any)?.question_id) > 0)
+                                .map((r) => ({ ...(r as any), questionNumber: Number((r as any).question_id) }));
                         }
                     } catch (e) {
                         console.warn('문항별 음성 지표 로드 실패:', e);
@@ -182,7 +209,15 @@ export default function ReportsPage() {
                 if (visualRes.data?.ok && visualRes.data?.aggregate) {
                     visualData = {
                         overall: visualRes.data.aggregate.overall,
-                        perQuestion: visualRes.data.aggregate.perQuestion,
+                        perQuestion: (() => {
+                            const src = visualRes.data.aggregate.perQuestion || {};
+                            const out: Record<string, any> = {};
+                            for (const [k, v] of Object.entries(src)) {
+                                const n = Number(k);
+                                if (Number.isFinite(n) && n > 0) out[String(n)] = v;
+                            }
+                            return out;
+                        })(),
                     };
                     console.log('영상 지표 로드 성공:', visualData);
                 }
@@ -205,6 +240,7 @@ export default function ReportsPage() {
             setSelectedReport(null);
             setSelectedAudioData(null);
             setSelectedVisualData(null);
+            setSelectedPerQuestionTextAnalyses(null);
             setModalVisible(true);
 
             // 리포트 데이터 로드
@@ -256,6 +292,14 @@ export default function ReportsPage() {
                         }
                     }
                 } catch {}
+                // 문항별 텍스트 분석 묶음 조회
+                try {
+                    const faRes = await api.post(`/ai/${sessionId}/finalize-analyses`, {});
+                    const list = faRes?.data?.analyses as Array<PerQuestionTextAnalysis>;
+                    if (Array.isArray(list)) setSelectedPerQuestionTextAnalyses(list);
+                } catch (e) {
+                    console.warn('문항별 텍스트 분석 조회 실패(모달):', e);
+                }
             } else {
                 throw new Error('리포트 로드 실패');
             }
@@ -414,6 +458,7 @@ export default function ReportsPage() {
                         analysisResult={selectedReport}
                         audioData={selectedAudioData || undefined}
                         visualData={selectedVisualData || undefined}
+                        perQuestionTextAnalyses={selectedPerQuestionTextAnalyses || undefined}
                         sessionMeta={{
                             sessionId: selectedSessionId || 'unknown',
                         }}

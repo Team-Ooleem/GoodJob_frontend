@@ -86,6 +86,30 @@ interface VisualAnalysisData {
 
 type DataSource = 'server' | 'localStorage' | 'unavailable';
 
+// NEW: 문항별 텍스트 분석 타입(백엔드 스키마 축약)
+interface ContentAnalysisRow {
+    content_score: number;
+    reasoning?: string[];
+    improvements?: string[];
+    star?: { situation?: string; task?: string; action?: string; result?: string };
+}
+interface ContextLink {
+    answer_span: string;
+    resume_ref?: string;
+    similarity?: number;
+    explanation?: string;
+}
+interface ContextAnalysisRow {
+    context_score: number;
+    links?: ContextLink[];
+    consistency?: { contradiction: boolean; notes?: string };
+}
+interface PerQuestionTextAnalysis {
+    questionId: string;
+    content?: ContentAnalysisRow;
+    context?: ContextAnalysisRow;
+}
+
 export default function AiInterviewResultPage() {
     const [analysisResult, setAnalysisResult] = useState<InterviewAnalysisResult | null>(null);
     const [qaList, setQaList] = useState<QAPair[]>([]);
@@ -103,6 +127,8 @@ export default function AiInterviewResultPage() {
     const [visualNormalizedPerQuestion, setVisualNormalizedPerQuestion] = useState<Record<string, any> | null>(null);
     const [audioNormalizedRatiosPerQuestion, setAudioNormalizedRatiosPerQuestion] = useState<Record<string, Record<string, number>> | null>(null);
     const [visualServerQuestionScores, setVisualServerQuestionScores] = useState<Record<string, { score: number; calibrationApplied?: boolean }> | null>(null);
+    // NEW: 문항별 텍스트 분석
+    const [perQuestionTextAnalyses, setPerQuestionTextAnalyses] = useState<PerQuestionTextAnalysis[] | null>(null);
 
     useEffect(() => {
         loadInterviewResult();
@@ -118,6 +144,7 @@ export default function AiInterviewResultPage() {
                 throw new Error('면접 세션을 찾을 수 없습니다.');
             }
             setSessionId(storedSessionId);
+            let reportLoadedFromServer = false;
 
             // 2. QA 데이터 로드 (표시용)
             try {
@@ -147,14 +174,15 @@ export default function AiInterviewResultPage() {
                                 // 평균 특성값(있으면 표시용)
                                 ...(s.averages || {}),
                             };
-                            const perQ = Array.isArray(s.questionScores)
+                            const perQRaw = Array.isArray(s.questionScores)
                                 ? (s.questionScores as Array<any>).map((q: any, idx: number) => ({
-                                      questionNumber: (q.index as number) ?? idx + 1,
+                                      questionNumber: Number(q?.questionId) || idx + 1,
                                       question: qaList[idx]?.question || `질문 ${idx + 1}`,
                                       normalized_score: typeof q.score === 'number' ? q.score : undefined,
                                       calibrationApplied: !!q.calibrationApplied,
                                   }))
                                 : [];
+                            const perQ = normalizeAudioPerQuestion(perQRaw, qaList.length || undefined);
                             setAudioData({ overall: audioOverall, perQuestion: perQ });
                         }
                     } catch {}
@@ -181,7 +209,22 @@ export default function AiInterviewResultPage() {
                         }
                     } catch {}
                     setDataSource('server');
+                    reportLoadedFromServer = true;
                     console.log('✅ 서버에서 리포트 로드 성공');
+
+                    // 서버 리포트를 권위 소스로 사용하는 경우에도, per-question 비주얼 지표는 서버 finalize에서 가져와 표시
+                    try {
+                        const visualRes2 = await api.post(`/metrics/${storedSessionId}/finalize`, {});
+                        if (visualRes2.data?.ok && visualRes2.data?.aggregate) {
+                            const rawPack2 = {
+                                overall: visualRes2.data.aggregate.overall,
+                                perQuestion: visualRes2.data.aggregate.perQuestion,
+                            } as VisualAnalysisData;
+                            setVisualData(enrichVisualScores(sanitizeVisualPack(rawPack2)));
+                        }
+                    } catch (e) {
+                        console.warn('비주얼 지표 최종 집계 로드 실패(서버 리포트 경로):', e);
+                    }
                 } else {
                     throw new Error('서버 리포트 데이터가 유효하지 않습니다.');
                 }
@@ -251,13 +294,16 @@ export default function AiInterviewResultPage() {
                             overall: visualRes.data.aggregate.overall,
                             perQuestion: visualRes.data.aggregate.perQuestion,
                         } as VisualAnalysisData;
-                        setVisualData(enrichVisualScores(rawPack));
+                        setVisualData(enrichVisualScores(sanitizeVisualPack(rawPack)));
                         console.log('✅ 서버에서 영상 지표 로드 성공');
                     }
                 } catch (e) {
                     console.warn('서버 영상 지표 로드 실패:', e);
                 }
             } else {
+                // 결과 페이지(쿼리 파라미터 없음): 서버 리포트를 권위 소스로 사용
+                // 서버 리포트 실패 시에만 localStorage 폴백
+                if (!reportLoadedFromServer) {
                 // localStorage에서 로드 (기존 로직)
                 try {
                     // 서버 음성 지표 시도
@@ -271,7 +317,7 @@ export default function AiInterviewResultPage() {
                         let audioPerQuestion = [] as any[];
 
                         if (serverAudioPerQuestion) {
-                            audioPerQuestion = JSON.parse(serverAudioPerQuestion);
+                            audioPerQuestion = sanitizeAudioRows(JSON.parse(serverAudioPerQuestion));
                         }
 
                         const nextPack = { overall: audioOverall, perQuestion: audioPerQuestion };
@@ -331,11 +377,12 @@ export default function AiInterviewResultPage() {
                             overall: JSON.parse(visualOverall),
                             perQuestion: visualPerQuestion ? JSON.parse(visualPerQuestion) : {},
                         } as VisualAnalysisData;
-                        setVisualData(enrichVisualScores(rawPack));
+                        setVisualData(enrichVisualScores(sanitizeVisualPack(rawPack)));
                         console.log('✅ localStorage 영상 지표 로드 성공');
                     }
                 } catch (e) {
                     console.warn('localStorage 영상 지표 로드 실패:', e);
+                }
                 }
             }
             // === 캘리브레이션 및 정규화 비교 로드 ===
@@ -470,6 +517,20 @@ export default function AiInterviewResultPage() {
                     setCalibration({ visualBaseline: localCalib.visual });
                 }
             }
+            // 6. 문항별 텍스트 분석 최종 묶음 조회(finalize-analyses)
+            try {
+                const faRes = await api.post(`/ai/${storedSessionId}/finalize-analyses`, {});
+                const list = faRes?.data?.analyses as Array<{
+                    questionId: string;
+                    content?: ContentAnalysisRow;
+                    context?: ContextAnalysisRow;
+                }>;
+                if (Array.isArray(list)) {
+                    setPerQuestionTextAnalyses(list);
+                }
+            } catch (e) {
+                console.warn('문항별 텍스트 분석 조회 실패(표시 생략):', e);
+            }
         } catch (err: any) {
             console.error('리포트 로드 완전 실패:', err);
             setError(err.message || '면접 결과를 불러오는 중 오류가 발생했습니다.');
@@ -490,19 +551,28 @@ export default function AiInterviewResultPage() {
             ...(next.overall || {}),
             ...(prev.overall || {}),
         } as any;
-        // perQuestion: questionNumber 기준 병합
+        // perQuestion: questionNumber/question_id를 숫자로 정규화하여 병합
         const prevArr = Array.isArray(prev.perQuestion) ? prev.perQuestion : [];
         const nextArr = Array.isArray(next.perQuestion) ? next.perQuestion : [];
         const map = new Map<number, any>();
-        for (const it of nextArr) {
-            if (!it) continue;
-            map.set(Number(it.questionNumber) || map.size + 1, { ...it });
-        }
-        for (const it of prevArr) {
-            if (!it) continue;
-            const key = Number(it.questionNumber) || map.size + 1;
-            map.set(key, { ...(map.get(key) || {}), ...it });
-        }
+        const toKey = (it: any, idx: number) => {
+            const raw = (it?.questionNumber ?? it?.question_id ?? (idx + 1)) as any;
+            const n = Number(raw);
+            return Number.isFinite(n) && n > 0 ? n : idx + 1;
+        };
+        nextArr.forEach((it, idx) => {
+            if (!it) return;
+            const key = toKey(it, idx);
+            map.set(key, { ...it, questionNumber: key });
+        });
+        prevArr.forEach((it, idx) => {
+            if (!it) return;
+            const key = toKey(it, idx);
+            // prev는 보조 소스: 존재하는 키에만 병합하고, 새로운 키는 추가하지 않음
+            if (map.has(key)) {
+                map.set(key, { ...(map.get(key) || {}), ...it, questionNumber: key });
+            }
+        });
         const mergedPerQ = Array.from(map.entries())
             .sort((a, b) => a[0] - b[0])
             .map(([_, v]) => v);
@@ -525,7 +595,34 @@ export default function AiInterviewResultPage() {
             mergedOverall.confidence_score = (next.overall as any).confidence_score;
         if ((next.overall as any)?.behavior_score != null)
             mergedOverall.behavior_score = (next.overall as any).behavior_score;
-        return { overall: mergedOverall, perQuestion: next.perQuestion ?? prev.perQuestion };
+        // perQuestion: 객체 키를 숫자 문자열로 정규화 후 병합
+        const norm = (obj?: Record<string, any> | null) => {
+            const src = obj || {};
+            const out: Record<string, any> = {};
+            for (const [k, v] of Object.entries(src)) {
+                const n = Number(k);
+                const key = Number.isFinite(n) && n > 0 ? String(n) : String(k);
+                out[key] = v;
+            }
+            return out;
+        };
+        const a = norm(next.perQuestion as any);
+        const b = norm(prev.perQuestion as any);
+        // 숫자 키만 유지하고, next(권위 소스)에 없는 키는 버림
+        const perQ: Record<string, any> = { ...a };
+        for (const k of Object.keys(b)) if (perQ[k]) perQ[k] = { ...b[k], ...perQ[k] };
+        return { overall: mergedOverall, perQuestion: perQ };
+    };
+
+    // 시각 지표 perQuestion 정규화(숫자 키만 유지)
+    const sanitizeVisualPack = (pack: VisualAnalysisData | null): VisualAnalysisData | null => {
+        if (!pack?.perQuestion) return pack;
+        const out: Record<string, any> = {};
+        for (const [k, v] of Object.entries(pack.perQuestion as Record<string, any>)) {
+            const n = Number(k);
+            if (Number.isFinite(n) && n > 0) out[String(n)] = v;
+        }
+        return { ...pack, perQuestion: out } as VisualAnalysisData;
     };
 
     // 최신 visual/audio 상태를 안전하게 캡처하기 위한 헬퍼들
@@ -583,6 +680,34 @@ export default function AiInterviewResultPage() {
             }
         }
         return out;
+    };
+
+    // 오디오 perQuestion 정규화/중복 제거: 숫자 키만 유지하고 qaLength 초과 항목은 제거
+    const normalizeAudioPerQuestion = (
+        arr: any[] | null | undefined,
+        qaLength?: number,
+    ): any[] => {
+        const list = Array.isArray(arr) ? arr : [];
+        const map = new Map<number, any>();
+        for (let i = 0; i < list.length; i++) {
+            const it = list[i];
+            const n = Number(it?.questionNumber ?? it?.question_id ?? i + 1);
+            if (!Number.isFinite(n) || n <= 0) continue; // 숫자가 아닌 키(q1 등) 제거
+            if (!map.has(n)) map.set(n, { ...it, questionNumber: n, question: it?.question || `질문 ${n}` });
+        }
+        let out = Array.from(map.entries())
+            .sort((a, b) => a[0] - b[0])
+            .map(([_, v]) => v);
+        if (qaLength && qaLength > 0) out = out.slice(0, qaLength);
+        return out;
+    };
+
+    // 서버에서 받은 audio_metrics rows 정리(숫자 question_id만 유지)
+    const sanitizeAudioRows = (rows: any[]): any[] => {
+        if (!Array.isArray(rows)) return [];
+        return rows
+            .filter((r) => Number.isFinite(Number(r?.question_id)) && Number(r?.question_id) > 0)
+            .map((r, idx) => ({ ...r, questionNumber: Number(r.question_id) || idx + 1 }));
     };
 
     const fmt = (n: any, digits = 3) => {
@@ -751,6 +876,7 @@ export default function AiInterviewResultPage() {
                     qaList={qaList}
                     audioData={audioData || undefined}
                     visualData={visualData || undefined}
+                    perQuestionTextAnalyses={perQuestionTextAnalyses || undefined}
                     sessionMeta={{
                         sessionId: sessionId || 'unknown',
                         createdAt: new Date().toISOString(), // 실제로는 서버에서 제공

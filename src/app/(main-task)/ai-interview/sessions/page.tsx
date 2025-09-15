@@ -189,7 +189,8 @@ const useQuestionManager = () => {
     const hasCurrentQuestion = !!currentQuestion;
     const questionText = currentQuestion?.text || '';
     const questionId = currentQuestion?.id || `q${currentIndex + 1}`;
-    const aggregateId = `q${currentIndex + 1}`;
+    // 서버 저장/집계용 고정 문항 ID(1,2,3...)
+    const persistId = String(currentIndex + 1);
 
     const addQuestion = (question: QuestionDto) => {
         setQuestions((prev) => [...prev, question]);
@@ -210,7 +211,7 @@ const useQuestionManager = () => {
         hasCurrentQuestion,
         questionText,
         questionId,
-        aggregateId,
+        persistId,
         isLoading,
         setIsLoading,
         addQuestion,
@@ -403,7 +404,7 @@ export default function AiInterviewSessionsPage() {
     const [qaList, setQaList] = useState<Array<{ question: string; answer: string }>>([]);
     const [isCompleting, setIsCompleting] = useState(false);
 
-    const MAX_QUESTIONS = 1;
+    const MAX_QUESTIONS = 3;
 
     const timerRef = useRef<NodeJS.Timeout | null>(null);
     const recognitionRef = useRef<any>(null);
@@ -411,11 +412,13 @@ export default function AiInterviewSessionsPage() {
     const webcamRef = useRef<WebcamHandle>(null);
     const recorderRef = useRef<WavRecorder | null>(null);
     const lastAudioBlobRef = useRef<Blob | null>(null);
+    // 결과 페이지로의 정상 이동 시 이탈 경고를 건너뛰기 위한 플래그
+    const bypassLeaveGuardRef = useRef(false);
 
     const sessionIdRef = useRef<string>(
         typeof window !== 'undefined'
             ? localStorage.getItem('aiInterviewSessionId') ||
-              `sess_${Math.random().toString(36).slice(2, 10)}_${Date.now()}`
+                  `sess_${Math.random().toString(36).slice(2, 10)}_${Date.now()}`
             : `sess_${Math.random().toString(36).slice(2, 10)}_${Date.now()}`,
     );
     const SESSION_ID = sessionIdRef.current as string;
@@ -502,7 +505,8 @@ export default function AiInterviewSessionsPage() {
         return data.result.transcript || '';
     }
 
-    // 질문 초기화
+    // 질문 초기화 (개발모드 StrictMode 중복 실행 방지 가드)
+    const initAskedRef = useRef(false);
     useEffect(() => {
         const initializeFirstQuestion = async () => {
             try {
@@ -537,7 +541,10 @@ export default function AiInterviewSessionsPage() {
             }
         };
 
-        initializeFirstQuestion();
+        if (!initAskedRef.current) {
+            initAskedRef.current = true;
+            initializeFirstQuestion();
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -564,6 +571,41 @@ export default function AiInterviewSessionsPage() {
         speakQuestionAsync();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [questionManager.currentIndex, questionManager.hasCurrentQuestion]);
+
+    // 세션 이탈 방어: 진행 중 이탈(새로고침/닫기/뒤로가기) 시 경고 및 최소 정리
+    useEffect(() => {
+        const inProgress = () =>
+            !bypassLeaveGuardRef.current && (isRecording || !!currentSession || sessions.length > 0);
+
+        const beforeUnload = (e: BeforeUnloadEvent) => {
+            if (inProgress()) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        };
+
+        // 뒤로가기 방어: 현재 히스토리에 더미 상태를 넣고 pop 시 확인
+        const pushDummy = () => {
+            try { history.pushState(null, '', location.href); } catch {}
+        };
+        const onPopState = (e: PopStateEvent) => {
+            if (!inProgress()) return;
+            const ok = confirm('면접이 진행 중입니다. 이탈하면 진행 내용이 사라질 수 있어요. 이동하시겠습니까?');
+            if (!ok) {
+                // 이동 취소: 다시 현재 페이지로 상태 복구
+                pushDummy();
+            }
+        };
+
+        window.addEventListener('beforeunload', beforeUnload);
+        pushDummy();
+        window.addEventListener('popstate', onPopState);
+        return () => {
+            window.removeEventListener('beforeunload', beforeUnload);
+            window.removeEventListener('popstate', onPopState);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isRecording, currentSession, sessions.length]);
 
     // 타이머 관리
     const startTimer = () => {
@@ -646,7 +688,7 @@ export default function AiInterviewSessionsPage() {
             if (agg) {
                 try {
                     await api.post(
-                        `metrics/${SESSION_ID}/${questionManager.aggregateId}/aggregate`,
+                        `metrics/${SESSION_ID}/${questionManager.persistId}/aggregate`,
                         agg,
                         {
                             timeout: 10000,
@@ -683,7 +725,7 @@ export default function AiInterviewSessionsPage() {
                         form.append('file', blob, `q${questionManager.currentIndex + 1}.wav`);
 
                         const analysisRes = await api.post(
-                            `/audio-metrics/${SESSION_ID}/${questionManager.aggregateId}/analyze`,
+                            `/audio-metrics/${SESSION_ID}/${questionManager.persistId}/analyze`,
                             form,
                             { timeout: 120000 },
                         );
@@ -732,11 +774,30 @@ export default function AiInterviewSessionsPage() {
                 ]);
                 setCurrentSession(null);
 
+                // 새 백엔드: 문항별 내용/맥락 분석 트리거 (비차단)
+                try {
+                    const selectedResumeId =
+                        sessionStorage.getItem('selectedResumeId') || undefined;
+                    const prevClaims = qaList
+                        .slice(Math.max(0, qaList.length - 3))
+                        .map((q) => (q?.answer || '').slice(0, 200))
+                        .filter(Boolean);
+                    const body: any = { answer: finalAnswer };
+                    if (selectedResumeId) body.resumeFileId = selectedResumeId;
+                    if (prevClaims.length) body.prevClaims = prevClaims;
+                    await api.post(`ai/${SESSION_ID}/${questionManager.persistId}/analyze`, body, {
+                        timeout: 45000,
+                    });
+                } catch (e) {
+                    console.warn('문항 내용/맥락 분석 업로드 실패(진행 계속):', e);
+                }
+
                 // 다음 질문 처리
                 if (!questionManager.isLastQuestion(MAX_QUESTIONS)) {
                     try {
                         const originalQuestion: QuestionDto = {
-                            id: questionManager.questionId,
+                            // LLM parentId 일관성 유지: 저장용 persistId 사용
+                            id: questionManager.persistId,
                             text: questionManager.questionText,
                         };
 
@@ -915,8 +976,9 @@ export default function AiInterviewSessionsPage() {
                 localStorage.setItem('interviewQA', JSON.stringify(latestQAList));
             } catch {}
             setTimeout(() => {
+                bypassLeaveGuardRef.current = true;
                 window.location.href = '/ai-interview/result';
-            }, 800);
+            }, 20000);
         }
     };
 
