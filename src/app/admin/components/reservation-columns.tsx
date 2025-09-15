@@ -14,18 +14,39 @@ declare global {
 }
 
 const statusBadge = (s: Application['application_status']) => {
-    const map: Record<
-        Application['application_status'],
-        { label: string; variant?: 'default' | 'secondary' | 'destructive' | 'outline' }
-    > = {
-        pending: { label: '대기', variant: 'secondary' },
-        approved: { label: '승인', variant: 'default' },
-        rejected: { label: '거절', variant: 'destructive' },
-        completed: { label: '완료', variant: 'outline' },
-        cancelled: { label: '취소', variant: 'destructive' },
+    const map: Record<Application['application_status'], { label: string; className: string }> = {
+        pending: {
+            label: '대기',
+            className:
+                'bg-gradient-to-r from-yellow-400 to-yellow-500 text-white font-medium px-3 py-1 rounded-full text-xs shadow-sm',
+        },
+        approved: {
+            label: '승인',
+            className:
+                'bg-gray-100 text-gray-700 font-medium px-3 py-1 rounded-full text-xs border border-gray-200',
+        },
+        rejected: {
+            label: '거절',
+            className:
+                'bg-gray-100 text-gray-700 font-medium px-3 py-1 rounded-full text-xs border border-gray-200',
+        },
+        completed: {
+            label: '완료',
+            className:
+                'bg-gray-100 text-gray-700 font-medium px-3 py-1 rounded-full text-xs border border-gray-200',
+        },
+        cancelled: {
+            label: '취소',
+            className:
+                'bg-gray-100 text-gray-700 font-medium px-3 py-1 rounded-full text-xs border border-gray-200',
+        },
     };
-    const { label, variant } = map[s] ?? { label: s, variant: 'outline' };
-    return <Badge variant={variant}>{label}</Badge>;
+    const { label, className } = map[s] ?? {
+        label: s,
+        className:
+            'bg-gray-100 text-gray-700 font-medium px-3 py-1 rounded-full text-xs border border-gray-200',
+    };
+    return <span className={className}>{label}</span>;
 };
 
 export const applicationColumns = (onChanged?: () => void): ColumnDef<Application>[] => [
@@ -107,15 +128,19 @@ export const applicationColumns = (onChanged?: () => void): ColumnDef<Applicatio
 
             if (currentStatus === 'pending') {
                 return (
-                    <div className='flex gap-2'>
+                    <div className='flex gap-3'>
                         <Button
                             size='sm'
                             onClick={handleApprove}
-                            className='bg-green-600 hover:bg-green-700'
+                            className='bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold px-3 py-1.5 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 border-0 text-xs'
                         >
                             승인
                         </Button>
-                        <Button size='sm' variant='destructive' onClick={handleReject}>
+                        <Button
+                            size='sm'
+                            onClick={handleReject}
+                            className='bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold px-3 py-1.5 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 border-0 text-xs'
+                        >
                             거절
                         </Button>
                     </div>

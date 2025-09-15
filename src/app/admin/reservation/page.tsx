@@ -106,11 +106,21 @@ export default function AdminPage() {
 
             setLoading(true);
             try {
+                // 실제 API 호출
                 const res = await fetchApplications(user.idx, p, DEFAULT_LIMIT);
                 setData(res.applications);
                 setPageInfo(res.page_info);
             } catch (e) {
-                console.error(e);
+                console.error('예약 목록 조회 실패:', e);
+                // 에러 발생 시 빈 데이터로 설정
+                setData([]);
+                setPageInfo({
+                    page: 1,
+                    limit: DEFAULT_LIMIT,
+                    total: 0,
+                    total_pages: 0,
+                    has_next: false,
+                });
             } finally {
                 setLoading(false);
             }
