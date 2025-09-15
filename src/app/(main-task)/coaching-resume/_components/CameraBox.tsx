@@ -9,6 +9,7 @@ interface ICameraBox {
     name?: string;
     isLocal: boolean;
     isSpeaking: boolean;
+    isMuted?: boolean;
     profileImg?: string;
     stream?: MediaStream | null;
     size?: 'sm' | 'md' | 'lg';
@@ -18,6 +19,7 @@ export function CameraBox({
     name = '이름없음',
     isLocal,
     isSpeaking,
+    isMuted,
     profileImg,
     stream,
     size,
@@ -26,6 +28,9 @@ export function CameraBox({
 
     const isCamEnabled = useCanvasStore((s) => s.isCamEnabled);
     const isMicEnabled = useCanvasStore((s) => s.isMicEnabled);
+
+    // 마이크 음소거 상태 결정
+    const micMuted = isLocal ? !isMicEnabled : (isMuted ?? false);
     // Use shadcn/ui design tokens
     const speakingStyle = isSpeaking ? 'ring-2 ring-primary' : '';
     const bgClass = 'bg-muted';
@@ -96,7 +101,7 @@ export function CameraBox({
                 <Badge variant='secondary' className='px-2 py-0.5'>
                     {name ?? (isLocal ? 'You' : '이름없음')}
                 </Badge>
-                {isLocal && !isMicEnabled && (
+                {micMuted && (
                     <span className='inline-flex items-center justify-center w-4 h-4 rounded-full bg-destructive'>
                         <Image
                             src='/assets/mic-off.svg'

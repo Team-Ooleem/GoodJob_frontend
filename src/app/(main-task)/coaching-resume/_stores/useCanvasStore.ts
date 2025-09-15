@@ -61,6 +61,12 @@ type CanvasStoreState = {
     sendRecordingStatus?: (isRecording: boolean) => void;
     setSendRecordingStatus: (fn: (isRecording: boolean) => void) => void;
 
+    // WebRTC functions
+    webRTCToggleMic?: () => void;
+    webRTCToggleCamera?: () => void;
+    setWebRTCToggleMic: (fn: () => void) => void;
+    setWebRTCToggleCamera: (fn: () => void) => void;
+
     // objects
     deleteActiveObject: () => void;
     clearAllObjects: () => void;
@@ -97,6 +103,8 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     socket: null,
 
     setSendRecordingStatus: (fn) => set({ sendRecordingStatus: fn }),
+    setWebRTCToggleMic: (fn) => set({ webRTCToggleMic: fn }),
+    setWebRTCToggleCamera: (fn) => set({ webRTCToggleCamera: fn }),
 
     setSocket: (socket) => set({ socket }),
 
@@ -132,15 +140,30 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
         }),
 
     // media toggles
-    toggleMic: () => set((state) => ({ isMicEnabled: !state.isMicEnabled })),
-    toggleCam: () => set((state) => ({ isCamEnabled: !state.isCamEnabled })),
+    toggleMic: () => {
+        const currentState = get();
+        if (currentState.webRTCToggleMic) {
+            currentState.webRTCToggleMic();
+        } else {
+            // fallback: just toggle the state
+            set((state) => ({ isMicEnabled: !state.isMicEnabled }));
+        }
+    },
+    toggleCam: () => {
+        const currentState = get();
+        if (currentState.webRTCToggleCamera) {
+            currentState.webRTCToggleCamera();
+        } else {
+            // fallback: just toggle the state
+            set((state) => ({ isCamEnabled: !state.isCamEnabled }));
+        }
+    },
     setMicEnabled: (enabled: boolean) => set({ isMicEnabled: enabled }),
     setCamEnabled: (enabled: boolean) => set({ isCamEnabled: enabled }),
 
     // �� toggleRecording: 실제 녹음 로직 + 상태 토글
     toggleRecording: () => {
         const currentState = get();
-        const socket = currentState.socket;
         if (currentState.isRecording) {
             // 🆕 상태 변경을 stopRecording 함수 내부에서 처리하도록 수정
             stopRecording();
