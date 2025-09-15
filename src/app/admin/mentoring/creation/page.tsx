@@ -11,11 +11,13 @@ import {
     CreateMentoringProductRequest,
     JobCategory,
 } from '@/app/admin/_apis/mentoring-product-api';
+import { fetchMyMentorIdx } from '@/app/admin/_apis/mentoring-application-api';
 
 export default function AdminProductCreationPage() {
     const router = useRouter();
     const { user, isAuthenticated, isLoading: authLoading } = useAuth();
     const [jobCategories, setJobCategories] = useState<JobCategory[]>([]);
+    const [mentorIdx, setMentorIdx] = useState<number | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isDataLoading, setIsDataLoading] = useState(true);
     const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -24,19 +26,39 @@ export default function AdminProductCreationPage() {
     useEffect(() => {
         const loadInitialData = async () => {
             try {
-                const categoriesData = await fetchJobCategories();
+                // 멘토 idx와 직무 카테고리를 병렬로 로드
+                const [categoriesData, mentorData] = await Promise.all([
+                    fetchJobCategories(),
+                    fetchMyMentorIdx(),
+                ]);
+
                 setJobCategories(categoriesData);
                 console.log('직무 카테고리 로드 성공:', categoriesData);
+
+                if (mentorData.is_mentor && mentorData.mentor_idx) {
+                    setMentorIdx(mentorData.mentor_idx);
+                    console.log('멘토 idx 로드 성공:', mentorData.mentor_idx);
+                } else {
+                    setAlert({
+                        type: 'error',
+                        message: '멘토 권한이 없습니다. 멘토 등록 후 상품을 등록할 수 있습니다.',
+                    });
+                }
             } catch (error) {
                 console.error('초기 데이터 로드 실패:', error);
-                // 더미 데이터가 제공되므로 에러 알림을 표시하지 않음
+                setAlert({
+                    type: 'error',
+                    message: '데이터를 불러오는 중 오류가 발생했습니다.',
+                });
             } finally {
                 setIsDataLoading(false);
             }
         };
 
-        loadInitialData();
-    }, []);
+        if (isAuthenticated) {
+            loadInitialData();
+        }
+    }, [isAuthenticated]);
 
     const handleSubmit = async (data: CreateMentoringProductRequest) => {
         // 인증 확인
@@ -45,13 +67,22 @@ export default function AdminProductCreationPage() {
             return;
         }
 
+        // 멘토 권한 확인
+        if (!mentorIdx) {
+            setAlert({
+                type: 'error',
+                message: '멘토 권한이 없습니다. 멘토 등록 후 상품을 등록할 수 있습니다.',
+            });
+            return;
+        }
+
         setIsLoading(true);
         setAlert(null);
         try {
-            // 현재 사용자의 mentor_idx 사용 (user.idx 또는 user.id 사용)
+            // 실제 멘토 idx 사용
             const submitData: CreateMentoringProductRequest = {
                 ...data,
-                mentor_idx: user.idx || parseInt(user.id) || 1, // fallback to 1 if not available
+                mentor_idx: mentorIdx,
             };
 
             const response = await createMentoringProduct(submitData);
@@ -97,6 +128,24 @@ export default function AdminProductCreationPage() {
                         className='mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600'
                     >
                         로그인 페이지로 이동
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    // 멘토 권한이 없는 경우
+    if (!mentorIdx) {
+        return (
+            <div className='flex items-center justify-center min-h-[400px]'>
+                <div className='text-center'>
+                    <p className='text-red-500 text-lg'>멘토 권한이 없습니다.</p>
+                    <p className='text-gray-600 mt-2'>멘토 등록 후 상품을 등록할 수 있습니다.</p>
+                    <button
+                        onClick={() => router.push('/admin/mentoring')}
+                        className='mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600'
+                    >
+                        멘토링 관리로 이동
                     </button>
                 </div>
             </div>

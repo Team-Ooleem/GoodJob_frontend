@@ -1,4 +1,5 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!;
+import { API_BASE_URL } from '@/constants/config';
+const BASE_URL = API_BASE_URL;
 
 export type MentoringProduct = {
     product_idx: number;
@@ -230,7 +231,22 @@ export async function fetchMentoringProducts(
 export async function createMentoringProduct(
     data: CreateMentoringProductRequest,
 ): Promise<CreateMentoringProductResponse> {
-    const res = await fetch(`${BASE_URL}/mentoring-products`, {
+    // 여러 가능한 엔드포인트 시도
+    const possibleUrls = [
+        `${BASE_URL}/mentoring-products`,
+        `${BASE_URL}/mentoring/products`,
+        `${BASE_URL}/admin/mentoring-products`,
+        `${BASE_URL}/mentoring-products/create`,
+    ];
+    const url = possibleUrls[0]; // 첫 번째 시도
+    console.log('🚀 API 호출:', {
+        url,
+        method: 'POST',
+        data,
+        BASE_URL,
+    });
+
+    const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
