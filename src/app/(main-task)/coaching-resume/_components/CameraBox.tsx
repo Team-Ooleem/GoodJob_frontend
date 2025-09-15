@@ -25,8 +25,9 @@ export function CameraBox({
 
     const isCamEnabled = useCanvasStore((s) => s.isCamEnabled);
     const isMicEnabled = useCanvasStore((s) => s.isMicEnabled);
-    const speakingStyle = isSpeaking ? 'ring-2 ring-blue-500' : '';
-    const bgClass = 'bg-[#0b1b2b]'; // 어두운 파란색 배경
+    // Use shadcn/ui design tokens
+    const speakingStyle = isSpeaking ? 'ring-2 ring-primary' : '';
+    const bgClass = 'bg-muted';
 
     const initial = useMemo(() => {
         const base = (name || (isLocal ? 'You' : '')).trim();
@@ -55,14 +56,16 @@ export function CameraBox({
     }, [stream]);
 
     return (
-        <div className={`${sizeClass} overflow-hidden ${bgClass} rounded-xl relative ${speakingStyle}`}>
+        <div
+            className={`${sizeClass} overflow-hidden ${bgClass} rounded-xl relative ${speakingStyle}`}
+        >
             {showProfileFallback ? (
                 <div className='w-full h-full flex items-center justify-center'>
-                    <div className='w-14 h-14 rounded-full overflow-hidden border-2 border-blue-500 flex items-center justify-center bg-slate-600'>
+                    <div className='w-14 h-14 rounded-full overflow-hidden border-2 border-primary flex items-center justify-center bg-muted-foreground/40'>
                         {profileImg ? (
                             <Image src={profileImg} alt='profile' width={64} height={64} />
                         ) : (
-                            <span className='text-white text-xl font-semibold'>{initial}</span>
+                            <span className='text-foreground text-xl font-semibold'>{initial}</span>
                         )}
                     </div>
                 </div>
@@ -79,10 +82,10 @@ export function CameraBox({
 
             {/* null 자리에 여기에 video 넣으면 됩니다! */}
 
-            <p className='text-white absolute left-2 bottom-1.5 font-medium text-sm flex items-center gap-1'>
+            <p className='text-foreground absolute left-2 bottom-1.5 font-medium text-sm flex items-center gap-1'>
                 <span>{name ?? (isLocal ? 'You' : '이름없음')}</span>
                 {isLocal && !isMicEnabled && (
-                    <span className='inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-500'>
+                    <span className='inline-flex items-center justify-center w-4 h-4 rounded-full bg-destructive'>
                         <Image
                             src='/assets/mic-off.svg'
                             alt='mic-off'
