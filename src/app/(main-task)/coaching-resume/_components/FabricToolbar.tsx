@@ -45,7 +45,7 @@ export function FabricToolbar() {
                     <div className='flex items-center gap-1 px-1'>
                         {/* 마이크 */}
                         <Tooltip>
-                            <TooltipTrigger asChild>
+                            <TooltipTrigger>
                                 <Button
                                     variant='ghost'
                                     size='sm'
@@ -75,7 +75,7 @@ export function FabricToolbar() {
 
                         {/* 카메라 */}
                         <Tooltip>
-                            <TooltipTrigger asChild>
+                            <TooltipTrigger>
                                 <Button
                                     variant='ghost'
                                     size='sm'
@@ -108,7 +108,7 @@ export function FabricToolbar() {
                     <div className='flex items-center gap-1 px-2'>
                         {/* 선택 도구 */}
                         <Tooltip>
-                            <TooltipTrigger asChild>
+                            <TooltipTrigger>
                                 <Button
                                     variant='ghost'
                                     size='sm'
@@ -136,7 +136,7 @@ export function FabricToolbar() {
 
                         {/* 펜 */}
                         <Tooltip>
-                            <TooltipTrigger asChild>
+                            <TooltipTrigger>
                                 <Button
                                     variant='ghost'
                                     size='sm'
@@ -167,7 +167,7 @@ export function FabricToolbar() {
 
                         {/* 형광펜 */}
                         <Tooltip>
-                            <TooltipTrigger asChild>
+                            <TooltipTrigger>
                                 <Button
                                     variant='ghost'
                                     size='sm'
@@ -194,7 +194,7 @@ export function FabricToolbar() {
 
                         {/* 스티커 노트 */}
                         <Tooltip>
-                            <TooltipTrigger asChild>
+                            <TooltipTrigger>
                                 <Button
                                     variant='ghost'
                                     size='sm'
@@ -222,7 +222,7 @@ export function FabricToolbar() {
 
                         {/* 지우개 */}
                         <Tooltip>
-                            <TooltipTrigger asChild>
+                            <TooltipTrigger>
                                 <Button
                                     variant='ghost'
                                     size='sm'
@@ -250,7 +250,7 @@ export function FabricToolbar() {
                     {/* group: plus */}
                     <div className='flex items-center px-1'>
                         <Tooltip>
-                            <TooltipTrigger asChild>
+                            <TooltipTrigger>
                                 <Button
                                     variant='ghost'
                                     size='sm'
