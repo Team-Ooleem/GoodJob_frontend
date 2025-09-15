@@ -12,6 +12,12 @@ interface CoachingResumeResultCardProps {
 }
 
 export default function CoachingResumeResultCard({ result }: CoachingResumeResultCardProps) {
+    // 현재 시간과 세션 예정 시간 비교
+    const sessionDate = new Date(result.date);
+    const now = new Date();
+    const isUpcoming = sessionDate > now;
+    const isCompleted = result.status === 'completed';
+
     const getScoreColor = (score: number) => {
         if (score >= 90) return 'bg-green-500';
         if (score >= 80) return 'bg-blue-500';
@@ -31,9 +37,16 @@ export default function CoachingResumeResultCard({ result }: CoachingResumeResul
             <Card className='hover:shadow-md transition-shadow overflow-hidden'>
                 {/* Thumbnail */}
                 <div className='w-full h-32 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center relative'>
-                    <FileText className='h-16 w-16 text-white' />
+                    {isCompleted ? (
+                        <FileText className='h-16 w-16 text-white' />
+                    ) : (
+                        <div className='text-center text-white'>
+                            <div className='text-2xl font-bold mb-1'>준비 중</div>
+                            <div className='text-sm opacity-80'>곧 시작됩니다</div>
+                        </div>
+                    )}
                     <div className='absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded'>
-                        완료
+                        {isCompleted ? '완료' : isUpcoming ? '예정' : '진행중'}
                     </div>
                 </div>
                 <CardHeader className='pb-2 pt-3 px-3'>
