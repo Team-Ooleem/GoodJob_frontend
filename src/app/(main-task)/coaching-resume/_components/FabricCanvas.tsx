@@ -19,6 +19,8 @@ import {
     useCollaborativeCursor,
 } from '../_hooks';
 
+import { ParticipantCamera } from './ParticipantCamera';
+
 // local stores
 import { useCanvasStore } from '../_stores';
 
@@ -88,5 +90,10 @@ export function FabricCanvas() {
 
     const isRecording = useCanvasStore((store) => store.isRecording);
 
-    return <canvas ref={canvasRef} />;
+    return (
+        <div className='relative'>
+            <ParticipantCamera />
+            <canvas ref={canvasRef} />
+        </div>
+    );
 }

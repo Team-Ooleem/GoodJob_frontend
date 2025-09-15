@@ -13,7 +13,7 @@ export function ParticipantCamera() {
     }, [joinRoom]);
 
     return (
-        <div className='flex justify-center items-center gap-3 absolute top-5 left-1/2 -translate-x-1/2 z-10'>
+        <div className='flex flex-col justify-center items-center gap-3 absolute top-5 right-5 z-10'>
             <CameraBox
                 isLocal={false}
                 isSpeaking={isRemoteSpeaking}

@@ -4,7 +4,6 @@ import { useSessionStore } from '../_stores';
 import {
     FabricToolbar,
     FabricCanvas,
-    ParticipantCamera,
     RecordingListPopup,
     SocketProvider,
     WaitingRoom,
@@ -27,7 +26,6 @@ export default function CoachingResumePage() {
         <>
             <SocketProvider />
             <CanvasHeader title='김아무개의 세션' onExit={() => console.log('나가기')} />
-            <ParticipantCamera />
             <FabricToolbar />
             <FabricCanvas />
             <RecordingListPopup />
