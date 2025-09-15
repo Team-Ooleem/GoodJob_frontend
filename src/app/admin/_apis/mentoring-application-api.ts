@@ -1,4 +1,5 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_BASE!;
+import { API_BASE_URL } from '@/constants/config';
+const BASE_URL = API_BASE_URL;
 
 export type Application = {
     application_id: number;
@@ -14,6 +15,7 @@ export type PageInfo = {
     page: number;
     limit: number;
     total: number;
+    total_pages: number;
     has_next: boolean;
 };
 
@@ -22,42 +24,46 @@ export type ApplicationsResponse = {
     page_info: PageInfo;
 };
 
-// /** 예약 목록 조회 (실서버) */
-// export async function fetchApplications(
-//     userIdx: number,
-//     page = 1,
-//     limit = 10,
-// ): Promise<ApplicationsResponse> {
-//     const url = `${BASE_URL}/mentoring-applications/${userIdx}?page=${page}&limit=${limit}`;
-//     const res = await fetch(url, { credentials: 'include' });
+/** 예약 목록 조회 (실서버) */
+export async function fetchApplications(
+    userIdx: number,
+    page = 1,
+    limit = 10,
+): Promise<ApplicationsResponse> {
+    const url = `${BASE_URL}/mentoring-applications/${userIdx}?page=${page}&limit=${limit}`;
+    const res = await fetch(url, { credentials: 'include' });
 
-//     if (!res.ok) {
-//         const msg = await safeText(res);
-//         throw new Error(`예약 목록 조회 실패 (${res.status}) ${msg}`);
-//     }
-//     const data = await res.json();
-//     // 서버 응답이 바로 ApplicationsResponse 형태라고 가정
-//     return data as ApplicationsResponse;
-// }
+    if (!res.ok) {
+        const msg = await safeText(res);
+        throw new Error(`예약 목록 조회 실패 (${res.status}) ${msg}`);
+    }
+    const data = await res.json();
 
-// /** 예약 상태 변경 (승인/거절) */
-// export async function updateApplication(
-//     applicationId: number,
-//     payload: { application_status: 'approved' | 'rejected'; rejection_reason?: string },
-// ) {
-//     const res = await fetch(`${BASE_URL}/mentoring-applications/${applicationId}`, {
-//         method: 'PATCH',
-//         headers: { 'Content-Type': 'application/json' },
-//         credentials: 'include',
-//         body: JSON.stringify(payload),
-//     });
+    // total_pages 계산 추가
+    const totalPages = Math.ceil(data.page_info.total / data.page_info.limit);
+    data.page_info.total_pages = totalPages;
 
-//     if (!res.ok) {
-//         const msg = await safeText(res);
-//         throw new Error(`예약 상태 변경 실패 (${res.status}) ${msg}`);
-//     }
-//     return res.json();
-// }
+    return data as ApplicationsResponse;
+}
+
+/** 예약 상태 변경 (승인/거절) */
+export async function updateApplication(
+    applicationId: number,
+    payload: { application_status: 'approved' | 'rejected'; rejection_reason?: string },
+) {
+    const res = await fetch(`${BASE_URL}/mentoring-applications/${applicationId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+        const msg = await safeText(res);
+        throw new Error(`예약 상태 변경 실패 (${res.status}) ${msg}`);
+    }
+    return res.json();
+}
 
 // 더미 데이터
 const mockApplications: Application[] = [
@@ -199,40 +205,40 @@ const mockApplications: Application[] = [
     },
 ];
 
-/** 예약 목록 조회 (더미 데이터 사용) */
-export async function fetchApplications(
-    userIdx: number,
-    page = 1,
-    limit = 10,
-): Promise<ApplicationsResponse> {
-    try {
-        const startIndex = (page - 1) * limit;
-        const endIndex = startIndex + limit;
-        const paginatedApplications = mockApplications.slice(startIndex, endIndex);
+// /** 예약 목록 조회 (더미 데이터 사용) */
+// export async function fetchApplications(
+//     userIdx: number,
+//     page = 1,
+//     limit = 10,
+// ): Promise<ApplicationsResponse> {
+//     try {
+//         const startIndex = (page - 1) * limit;
+//         const endIndex = startIndex + limit;
+//         const paginatedApplications = mockApplications.slice(startIndex, endIndex);
 
-        return {
-            applications: paginatedApplications,
-            page_info: {
-                page,
-                limit,
-                total: mockApplications.length,
-                has_next: endIndex < mockApplications.length,
-            },
-        };
-    } catch (error) {
-        console.error('예약 목록 조회 실패:', error);
-        throw new Error('예약 목록을 불러오는데 실패했습니다.');
-    }
-}
+//         return {
+//             applications: paginatedApplications,
+//             page_info: {
+//                 page,
+//                 limit,
+//                 total: mockApplications.length,
+//                 has_next: endIndex < mockApplications.length,
+//             },
+//         };
+//     } catch (error) {
+//         console.error('예약 목록 조회 실패:', error);
+//         throw new Error('예약 목록을 불러오는데 실패했습니다.');
+//     }
+// }
 
-/** 예약 상태 변경 (더미 구현) */
-export async function updateApplication(
-    applicationId: number,
-    payload: { application_status: 'approved' | 'rejected'; rejection_reason?: string },
-) {
-    console.log(`예약 상태 변경: ${applicationId}`, payload);
-    return { success: true };
-}
+// /** 예약 상태 변경 (더미 구현) */
+// export async function updateApplication(
+//     applicationId: number,
+//     payload: { application_status: 'approved' | 'rejected'; rejection_reason?: string },
+// ) {
+//     console.log(`예약 상태 변경: ${applicationId}`, payload);
+//     return { success: true };
+// }
 
 /** 편의 함수: 승인/거절 래퍼 */
 export const approveApplication = (id: number) =>

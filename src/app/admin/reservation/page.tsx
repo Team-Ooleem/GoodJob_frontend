@@ -10,10 +10,11 @@ import {
     type Application,
     type ApplicationsResponse,
 } from '../_apis/mentoring-application-api';
+import { useAuth } from '@/hooks/use-auth';
 
 const DEFAULT_LIMIT = 10;
 // TODO: 실제 로그인 사용자(멘토/관리자)의 user_idx로 치환
-const ADMIN_USER_IDX = 1;
+// const ADMIN_USER_IDX = 1;
 
 // 거절 사유 입력 모달 컴포넌트
 const RejectionModal = ({
@@ -81,11 +82,13 @@ const RejectionModal = ({
 };
 
 export default function AdminPage() {
+    const { user, isAuthenticated, isLoading: authLoading } = useAuth();
     const [data, setData] = React.useState<Application[]>([]);
     const [pageInfo, setPageInfo] = React.useState<ApplicationsResponse['page_info']>({
         page: 1,
         limit: DEFAULT_LIMIT,
         total: 0,
+        total_pages: 0,
         has_next: false,
     });
     const [loading, setLoading] = React.useState(true);
@@ -97,18 +100,23 @@ export default function AdminPage() {
         application: null,
     });
 
-    const load = React.useCallback(async (p: number) => {
-        setLoading(true);
-        try {
-            const res = await fetchApplications(ADMIN_USER_IDX, p, DEFAULT_LIMIT);
-            setData(res.applications);
-            setPageInfo(res.page_info);
-        } catch (e) {
-            console.error(e);
-        } finally {
-            setLoading(false);
-        }
-    }, []);
+    const load = React.useCallback(
+        async (p: number) => {
+            if (!user?.idx) return;
+
+            setLoading(true);
+            try {
+                const res = await fetchApplications(user.idx, p, DEFAULT_LIMIT);
+                setData(res.applications);
+                setPageInfo(res.page_info);
+            } catch (e) {
+                console.error(e);
+            } finally {
+                setLoading(false);
+            }
+        },
+        [user?.idx],
+    );
 
     const handleRejectionClick = React.useCallback((application: Application) => {
         setRejectionModal({
@@ -150,8 +158,10 @@ export default function AdminPage() {
     }, []);
 
     React.useEffect(() => {
-        load(1);
-    }, [load]);
+        if (isAuthenticated && user?.idx) {
+            load(1);
+        }
+    }, [isAuthenticated, user?.idx, load]);
 
     // window 객체에 모달 열기 함수 등록
     React.useEffect(() => {
@@ -176,7 +186,17 @@ export default function AdminPage() {
 
                 {/* 데이터 테이블 섹션 */}
                 <div className='rounded-lg border'>
-                    {loading ? (
+                    {authLoading ? (
+                        <div className='flex items-center justify-center h-32'>
+                            <div className='text-sm text-muted-foreground'>인증 확인 중…</div>
+                        </div>
+                    ) : !isAuthenticated ? (
+                        <div className='flex items-center justify-center h-32'>
+                            <div className='text-sm text-muted-foreground'>
+                                로그인이 필요합니다.
+                            </div>
+                        </div>
+                    ) : loading ? (
                         <div className='flex items-center justify-center h-32'>
                             <div className='text-sm text-muted-foreground'>불러오는 중…</div>
                         </div>
