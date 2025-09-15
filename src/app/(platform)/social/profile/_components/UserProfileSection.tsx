@@ -17,6 +17,7 @@ interface UserProfileSectionProps {
 export function UserProfileSection({ userId, currentUserId }: UserProfileSectionProps) {
     // 사용자 프로필 데이터 조회
     const { data: userProfile, isLoading, error } = useUserProfile(userId);
+    console.log(userProfile);
 
     // 팔로우 관련 뮤테이션
     const { toggleFollow } = useFollowMutations(currentUserId);
@@ -162,7 +163,9 @@ export function UserProfileSection({ userId, currentUserId }: UserProfileSection
                             <p className='flex items-center justify-center text-xl font-bold'>
                                 <Star className='h-4 w-4 text-yellow-500 fill-yellow-500' />
                                 {userProfile?.mentorProfile?.avgMentoringRating
-                                    ? userProfile.mentorProfile.avgMentoringRating.toFixed(1)
+                                    ? Number(userProfile.mentorProfile.avgMentoringRating).toFixed(
+                                          1,
+                                      )
                                     : '0.0'}
                             </p>
                         </li>
