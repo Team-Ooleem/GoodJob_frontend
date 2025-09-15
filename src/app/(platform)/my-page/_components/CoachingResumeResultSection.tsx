@@ -5,18 +5,22 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { ChevronRight, FileText, Star, Building2, Calendar, Edit3 } from 'lucide-react';
 import CoachingResumeResultCard from './CoachingResumeResultCard';
-import { CoachingResumeResult } from '../_lib/mock-data';
+import { MentoringApplication } from '../_lib/mock-data';
 
 interface CoachingResumeResultSectionProps {
-    results: CoachingResumeResult[];
+    results: MentoringApplication[];
     showAll?: boolean;
     onShowAll?: () => void;
+    isLoading?: boolean;
+    error?: Error | null;
 }
 
 export default function CoachingResumeResultSection({
     results,
     showAll = false,
     onShowAll,
+    isLoading = false,
+    error = null,
 }: CoachingResumeResultSectionProps) {
     const displayResults = showAll ? results : results.slice(0, 3);
     const hasMore = results.length > 3;
@@ -37,7 +41,18 @@ export default function CoachingResumeResultSection({
                 </div>
             </div>
 
-            {results.length === 0 ? (
+            {isLoading ? (
+                <div className='text-center py-12 bg-muted/30 rounded-lg'>
+                    <Edit3 className='h-12 w-12 text-muted-foreground mx-auto mb-4' />
+                    <p className='text-muted-foreground'>로딩 중...</p>
+                </div>
+            ) : error ? (
+                <div className='text-center py-12 bg-muted/30 rounded-lg'>
+                    <Edit3 className='h-12 w-12 text-muted-foreground mx-auto mb-4' />
+                    <p className='text-red-500 mb-4'>데이터를 불러오는 중 오류가 발생했습니다</p>
+                    <Button onClick={() => window.location.reload()}>다시 시도</Button>
+                </div>
+            ) : results.length === 0 ? (
                 <div className='text-center py-12 bg-muted/30 rounded-lg'>
                     <Edit3 className='h-12 w-12 text-muted-foreground mx-auto mb-4' />
                     <p className='text-muted-foreground mb-4'>아직 이력서 코칭 결과가 없습니다</p>
@@ -48,8 +63,11 @@ export default function CoachingResumeResultSection({
             ) : (
                 <>
                     <div className='grid gap-4 md:grid-cols-2 lg:grid-cols-3'>
-                        {displayResults.map((result) => (
-                            <CoachingResumeResultCard key={result.id} result={result} />
+                        {displayResults.map((application) => (
+                            <CoachingResumeResultCard
+                                key={application.application_id}
+                                application={application}
+                            />
                         ))}
                     </div>
 
