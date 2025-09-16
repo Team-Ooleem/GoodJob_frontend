@@ -86,6 +86,7 @@ export const useInterviewSession = ({
     const [currentProcessingStep, setCurrentProcessingStep] = useState<ProcessingStep | null>(null);
     const [countdown, setCountdown] = useState(10);
     const [isCountdownActive, setIsCountdownActive] = useState(false);
+    const [showCompletionPopup, setShowCompletionPopup] = useState(false);
 
     const timerRef = useRef<NodeJS.Timeout | null>(null);
     const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -350,11 +351,11 @@ export const useInterviewSession = ({
                         }, 1000);
                     }
                 } else {
-                    setCurrentProcessingStep('finalizing');
-                    message.success('모든 답변이 완료되었습니다!');
-                    setTimeout(() => {
-                        handleInterviewCompletion([...sessions, completedSession!]);
-                    }, 1000);
+                    // 마지막 질문 완료 시 바로 완료 팝업 표시
+                    setShowProcessingPopup(false);
+                    setCurrentProcessingStep(null);
+                    setShowCompletionPopup(true);
+                    handleInterviewCompletion([...sessions, completedSession!]);
                 }
             }
 
@@ -453,34 +454,32 @@ export const useInterviewSession = ({
         console.log(`\n✅ 총 ${latestQAList.length}개의 질문에 답변했습니다.`);
         console.log('=====================================');
 
-        // 백엔드 리포트 분석 호출
-        message.loading('면접 결과를 분석 중입니다...', 0);
+        // 백엔드 리포트 분석 호출 (완료 팝업에서 진행 중 표시)
         try {
             const analysisData = await InterviewAPI.analyzeInterviewResult(sessionId, latestQAList);
             if (analysisData) {
                 localStorage.setItem('interviewAnalysis', JSON.stringify(analysisData));
             }
 
-            // 분석 완료 후 즉시 결과 페이지로 이동
-            message.success('면접 분석이 완료되었습니다! 결과 페이지로 이동합니다.');
+            // 분석 완료 후 완료 팝업 닫고 결과 페이지로 이동
             setTimeout(() => {
+                setShowCompletionPopup(false);
                 bypassLeaveGuardRef.current = true;
                 window.location.href = '/ai-interview/result';
-            }, 2000); // 2초 후 이동 (사용자가 메시지를 확인할 시간)
+            }, 2000); // 2초 후 이동
         } catch (error) {
             console.error('리포트 분석 호출 실패:', error);
             // 분석 실패해도 결과 페이지로 이동 (기존 데이터로 표시)
-            message.warning('분석 중 오류가 발생했지만 결과를 확인할 수 있습니다.');
             setTimeout(() => {
+                setShowCompletionPopup(false);
                 bypassLeaveGuardRef.current = true;
                 window.location.href = '/ai-interview/result';
             }, 2000);
-        } finally {
-            message.destroy();
-            try {
-                localStorage.setItem('interviewQA', JSON.stringify(latestQAList));
-            } catch {}
         }
+
+        try {
+            localStorage.setItem('interviewQA', JSON.stringify(latestQAList));
+        } catch {}
     };
 
     // 웹캠 감지 데이터 처리
@@ -559,6 +558,7 @@ export const useInterviewSession = ({
         currentProcessingStep,
         countdown,
         isCountdownActive,
+        showCompletionPopup,
         handleStartAnswer,
         handleCompleteAnswer,
         handleDetection,

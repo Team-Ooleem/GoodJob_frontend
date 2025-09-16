@@ -2,41 +2,31 @@
 'use client';
 
 import { useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Separator } from '@/components/ui/separator';
 import {
-    Card,
-    Typography,
-    Progress,
-    Row,
-    Col,
-    Statistic,
-    List,
-    Tag,
-    Space,
-    Divider,
-    Button,
-    Alert,
-} from 'antd';
-import {
-    CheckCircleOutlined,
-    MessageOutlined,
-    BulbOutlined,
-    EyeOutlined,
-    TrophyOutlined,
-    StarOutlined,
-    RiseOutlined,
-    WarningOutlined,
-    DownloadOutlined,
-    LinkOutlined,
-    SoundOutlined,
-    SmileOutlined,
-    AudioOutlined,
-    ClockCircleOutlined,
-    ThunderboltOutlined,
-} from '@ant-design/icons';
+    CheckCircle,
+    MessageCircle,
+    Lightbulb,
+    Eye,
+    Trophy,
+    Star,
+    TrendingUp,
+    AlertTriangle,
+    Download,
+    Link,
+    Volume2,
+    Smile,
+    Mic,
+    Clock,
+    Zap,
+} from 'lucide-react';
 
 import type { InterviewAnalysisResult } from '@/types/report';
-
-const { Title, Paragraph, Text } = Typography;
 
 interface QAPair {
     question: string;
@@ -202,10 +192,10 @@ export default function InterviewReport({
     };
 
     const getScoreIcon = (score: number) => {
-        if (score >= 90) return <TrophyOutlined className='text-yellow-500' />;
-        if (score >= 80) return <StarOutlined className='text-blue-500' />;
-        if (score >= 70) return <CheckCircleOutlined className='text-orange-500' />;
-        return <WarningOutlined className='text-red-500' />;
+        if (score >= 90) return <Trophy className='text-yellow-500' />;
+        if (score >= 80) return <Star className='text-blue-500' />;
+        if (score >= 70) return <CheckCircle className='text-orange-500' />;
+        return <AlertTriangle className='text-red-500' />;
     };
 
     const pct = (n?: number | null, total?: number | null) => {
@@ -247,10 +237,12 @@ export default function InterviewReport({
             {/* 헤더 */}
             {displayOptions.showHeader && (
                 <div className='text-center mb-8'>
-                    <Title level={displayOptions.compact ? 3 : 1} className='!text-gray-800 mb-4'>
-                        <TrophyOutlined className='mr-3 text-yellow-500' />
+                    <h1
+                        className={`${displayOptions.compact ? 'text-3xl' : 'text-5xl'} font-bold text-gray-800 mb-4 flex items-center justify-center gap-3`}
+                    >
+                        <Trophy className='text-yellow-500' />
                         AI 모의면접 결과 리포트
-                    </Title>
+                    </h1>
                     {sessionMeta && (
                         <div className='text-sm text-gray-500 mb-4'>
                             <div>세션 ID: {sessionMeta.sessionId}</div>
@@ -263,23 +255,27 @@ export default function InterviewReport({
                         </div>
                     )}
                     {displayOptions.showActions && (
-                        <div className='mt-4 print:hidden'>
-                            <Space>
-                                <Button icon={<DownloadOutlined />} onClick={handlePrint}>
-                                    PDF로 저장/인쇄
-                                </Button>
-                                <Button icon={<LinkOutlined />} onClick={handleShare}>
-                                    링크 복사
-                                </Button>
-                            </Space>
+                        <div className='mt-4 print:hidden flex gap-3 justify-center'>
+                            <Button onClick={handlePrint} className='flex items-center gap-2'>
+                                <Download className='w-4 h-4' />
+                                PDF로 저장/인쇄
+                            </Button>
+                            <Button
+                                variant='outline'
+                                onClick={handleShare}
+                                className='flex items-center gap-2'
+                            >
+                                <Link className='w-4 h-4' />
+                                링크 복사
+                            </Button>
                         </div>
                     )}
                 </div>
             )}
 
             {/* 전체 점수 카드 */}
-            <Card className='!border-0 !shadow-lg mb-8'>
-                <div className='text-center'>
+            <Card className='border-0 shadow-lg mb-8'>
+                <CardContent className='text-center pt-6'>
                     <div className='flex items-center justify-center mb-4'>
                         {getScoreIcon(analysisResult.overall_score)}
                         <div
@@ -289,435 +285,515 @@ export default function InterviewReport({
                             {analysisResult.overall_score}점
                         </div>
                     </div>
-                    <Title level={displayOptions.compact ? 4 : 2} className='!text-gray-800 mb-2'>
+                    <h2
+                        className={`${displayOptions.compact ? 'text-xl' : 'text-2xl'} font-bold text-gray-800 mb-2`}
+                    >
                         {getScoreLevel(analysisResult.overall_score)}
-                    </Title>
-                    <Progress
-                        percent={analysisResult.overall_score}
-                        strokeColor={getScoreColor(analysisResult.overall_score)}
-                        className='max-w-md mx-auto'
-                    />
-                </div>
+                    </h2>
+                    <div className='max-w-md mx-auto'>
+                        <Progress value={analysisResult.overall_score} className='h-3' />
+                    </div>
+                </CardContent>
             </Card>
 
             {/* 세부 점수 (내용/맥락/표현 = 30/30/40) */}
-            <Row gutter={[24, 24]} className='mb-8'>
-                <Col xs={24} sm={12} md={8}>
-                    <Card className='!border-0 !shadow-lg text-center'>
-                        <Statistic
-                            title='내용'
-                            value={analysisResult.detailed_scores?.content30 ?? 0}
-                            suffix='/ 30'
-                            prefix={<CheckCircleOutlined className='text-green-500' />}
-                            valueStyle={{
-                                color: getScoreColor(
-                                    pctOf(analysisResult.detailed_scores?.content30, 30),
-                                ),
-                            }}
-                        />
-                    </Card>
-                </Col>
-                <Col xs={24} sm={12} md={8}>
-                    <Card className='!border-0 !shadow-lg text-center'>
-                        <Statistic
-                            title='맥락'
-                            value={analysisResult.detailed_scores?.context30 ?? 0}
-                            suffix='/ 30'
-                            prefix={<MessageOutlined className='text-blue-500' />}
-                            valueStyle={{
-                                color: getScoreColor(
-                                    pctOf(analysisResult.detailed_scores?.context30, 30),
-                                ),
-                            }}
-                        />
-                    </Card>
-                </Col>
-                <Col xs={24} sm={12} md={8}>
-                    <Card className='!border-0 !shadow-lg text-center'>
-                        <Statistic
-                            title='표현'
-                            value={analysisResult.detailed_scores?.expression40 ?? 0}
-                            suffix='/ 40'
-                            prefix={<TrophyOutlined className='text-yellow-500' />}
-                            valueStyle={{
-                                color: getScoreColor(
-                                    pctOf(analysisResult.detailed_scores?.expression40, 40),
-                                ),
-                            }}
-                        />
-                    </Card>
-                </Col>
-            </Row>
+            <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-8'>
+                <Card className='border-0 shadow-lg text-center'>
+                    <CardContent className='pt-6'>
+                        <div className='text-sm text-muted-foreground mb-2'>내용</div>
+                        <div className='flex items-center justify-center gap-2'>
+                            <CheckCircle className='text-green-500 w-5 h-5' />
+                            <div
+                                className='text-3xl font-bold'
+                                style={{
+                                    color: getScoreColor(
+                                        pctOf(analysisResult.detailed_scores?.content30, 30),
+                                    ),
+                                }}
+                            >
+                                {analysisResult.detailed_scores?.content30 ?? 0}
+                            </div>
+                            <span className='text-lg text-muted-foreground'>/ 30</span>
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card className='border-0 shadow-lg text-center'>
+                    <CardContent className='pt-6'>
+                        <div className='text-sm text-muted-foreground mb-2'>맥락</div>
+                        <div className='flex items-center justify-center gap-2'>
+                            <MessageCircle className='text-blue-500 w-5 h-5' />
+                            <div
+                                className='text-3xl font-bold'
+                                style={{
+                                    color: getScoreColor(
+                                        pctOf(analysisResult.detailed_scores?.context30, 30),
+                                    ),
+                                }}
+                            >
+                                {analysisResult.detailed_scores?.context30 ?? 0}
+                            </div>
+                            <span className='text-lg text-muted-foreground'>/ 30</span>
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card className='border-0 shadow-lg text-center'>
+                    <CardContent className='pt-6'>
+                        <div className='text-sm text-muted-foreground mb-2'>표현</div>
+                        <div className='flex items-center justify-center gap-2'>
+                            <Trophy className='text-yellow-500 w-5 h-5' />
+                            <div
+                                className='text-3xl font-bold'
+                                style={{
+                                    color: getScoreColor(
+                                        pctOf(analysisResult.detailed_scores?.expression40, 40),
+                                    ),
+                                }}
+                            >
+                                {analysisResult.detailed_scores?.expression40 ?? 0}
+                            </div>
+                            <span className='text-lg text-muted-foreground'>/ 40</span>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
 
             {/* 표현 지수 (confidence/clarity/engagement/composure/professionalism/consistency) */}
             {analysisResult.expression_indices && (
-                <Card className='!border-0 !shadow-lg mb-8' title='표현 지수'>
-                    <Row gutter={[16, 16]}>
-                        <Col xs={24} md={8}>
-                            <Card size='small' className='text-center'>
-                                <div className='text-gray-600 mb-1'>자신감</div>
-                                <div
-                                    className='text-3xl font-bold'
-                                    style={{
-                                        color: getScoreColor(
-                                            analysisResult.expression_indices.confidence,
-                                        ),
-                                    }}
-                                >
-                                    {analysisResult.expression_indices.confidence}
-                                </div>
+                <Card className='border-0 shadow-lg mb-8'>
+                    <CardHeader>
+                        <CardTitle>표현 지수</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
+                            <Card className='text-center'>
+                                <CardContent className='pt-4'>
+                                    <div className='text-gray-600 mb-1'>자신감</div>
+                                    <div
+                                        className='text-3xl font-bold'
+                                        style={{
+                                            color: getScoreColor(
+                                                analysisResult.expression_indices.confidence,
+                                            ),
+                                        }}
+                                    >
+                                        {analysisResult.expression_indices.confidence}
+                                    </div>
+                                </CardContent>
                             </Card>
-                        </Col>
-                        <Col xs={24} md={8}>
-                            <Card size='small' className='text-center'>
-                                <div className='text-gray-600 mb-1'>명료성</div>
-                                <div
-                                    className='text-3xl font-bold'
-                                    style={{
-                                        color: getScoreColor(
-                                            analysisResult.expression_indices.clarity,
-                                        ),
-                                    }}
-                                >
-                                    {analysisResult.expression_indices.clarity}
-                                </div>
+                            <Card className='text-center'>
+                                <CardContent className='pt-4'>
+                                    <div className='text-gray-600 mb-1'>명료성</div>
+                                    <div
+                                        className='text-3xl font-bold'
+                                        style={{
+                                            color: getScoreColor(
+                                                analysisResult.expression_indices.clarity,
+                                            ),
+                                        }}
+                                    >
+                                        {analysisResult.expression_indices.clarity}
+                                    </div>
+                                </CardContent>
                             </Card>
-                        </Col>
-                        <Col xs={24} md={8}>
-                            <Card size='small' className='text-center'>
-                                <div className='text-gray-600 mb-1'>몰입도</div>
-                                <div
-                                    className='text-3xl font-bold'
-                                    style={{
-                                        color: getScoreColor(
-                                            analysisResult.expression_indices.engagement,
-                                        ),
-                                    }}
-                                >
-                                    {analysisResult.expression_indices.engagement}
-                                </div>
+                            <Card className='text-center'>
+                                <CardContent className='pt-4'>
+                                    <div className='text-gray-600 mb-1'>몰입도</div>
+                                    <div
+                                        className='text-3xl font-bold'
+                                        style={{
+                                            color: getScoreColor(
+                                                analysisResult.expression_indices.engagement,
+                                            ),
+                                        }}
+                                    >
+                                        {analysisResult.expression_indices.engagement}
+                                    </div>
+                                </CardContent>
                             </Card>
-                        </Col>
-                        <Col xs={24} md={8}>
-                            <Card size='small' className='text-center'>
-                                <div className='text-gray-600 mb-1'>침착성</div>
-                                <div
-                                    className='text-3xl font-bold'
-                                    style={{
-                                        color: getScoreColor(
-                                            analysisResult.expression_indices.composure,
-                                        ),
-                                    }}
-                                >
-                                    {analysisResult.expression_indices.composure}
-                                </div>
+                            <Card className='text-center'>
+                                <CardContent className='pt-4'>
+                                    <div className='text-gray-600 mb-1'>침착성</div>
+                                    <div
+                                        className='text-3xl font-bold'
+                                        style={{
+                                            color: getScoreColor(
+                                                analysisResult.expression_indices.composure,
+                                            ),
+                                        }}
+                                    >
+                                        {analysisResult.expression_indices.composure}
+                                    </div>
+                                </CardContent>
                             </Card>
-                        </Col>
-                        <Col xs={24} md={8}>
-                            <Card size='small' className='text-center'>
-                                <div className='text-gray-600 mb-1'>전문성</div>
-                                <div
-                                    className='text-3xl font-bold'
-                                    style={{
-                                        color: getScoreColor(
-                                            analysisResult.expression_indices.professionalism,
-                                        ),
-                                    }}
-                                >
-                                    {analysisResult.expression_indices.professionalism}
-                                </div>
+                            <Card className='text-center'>
+                                <CardContent className='pt-4'>
+                                    <div className='text-gray-600 mb-1'>전문성</div>
+                                    <div
+                                        className='text-3xl font-bold'
+                                        style={{
+                                            color: getScoreColor(
+                                                analysisResult.expression_indices.professionalism,
+                                            ),
+                                        }}
+                                    >
+                                        {analysisResult.expression_indices.professionalism}
+                                    </div>
+                                </CardContent>
                             </Card>
-                        </Col>
-                        <Col xs={24} md={8}>
-                            <Card size='small' className='text-center'>
-                                <div className='text-gray-600 mb-1'>일관성</div>
-                                <div
-                                    className='text-3xl font-bold'
-                                    style={{
-                                        color: getScoreColor(
-                                            analysisResult.expression_indices.consistency,
-                                        ),
-                                    }}
-                                >
-                                    {analysisResult.expression_indices.consistency}
-                                </div>
+                            <Card className='text-center'>
+                                <CardContent className='pt-4'>
+                                    <div className='text-gray-600 mb-1'>일관성</div>
+                                    <div
+                                        className='text-3xl font-bold'
+                                        style={{
+                                            color: getScoreColor(
+                                                analysisResult.expression_indices.consistency,
+                                            ),
+                                        }}
+                                    >
+                                        {analysisResult.expression_indices.consistency}
+                                    </div>
+                                </CardContent>
                             </Card>
-                        </Col>
-                    </Row>
-                    {typeof analysisResult.expression_indices.reliabilityWeight === 'number' && (
-                        <div className='mt-3 text-right text-xs text-gray-500'>
-                            신뢰도 가중치: {analysisResult.expression_indices.reliabilityWeight}
                         </div>
-                    )}
+                        {typeof analysisResult.expression_indices.reliabilityWeight ===
+                            'number' && (
+                            <div className='mt-3 text-right text-xs text-gray-500'>
+                                신뢰도 가중치: {analysisResult.expression_indices.reliabilityWeight}
+                            </div>
+                        )}
+                    </CardContent>
                 </Card>
             )}
 
             {/* 텍스트 분석 요약 (내용/맥락) */}
             {analysisResult.text_analysis_summary && (
-                <Card className='!border-0 !shadow-lg mb-8' title='텍스트 분석 요약(내용·맥락)'>
-                    <Row gutter={[16, 16]}>
-                        <Col xs={24} md={8}>
-                            <Card size='small'>
-                                <div className='text-center mb-2'>LLM 종합</div>
-                                <div
-                                    className='text-4xl font-bold'
-                                    style={{
-                                        color: getScoreColor(
-                                            (analysisResult.text_analysis_summary.overall_llm10 ||
-                                                0) * 10,
-                                        ),
-                                    }}
-                                >
-                                    {analysisResult.text_analysis_summary.overall_llm10 || 0}
-                                    <span className='text-base ml-1'>/ 10</span>
+                <Card className='border-0 shadow-lg mb-8'>
+                    <CardHeader>
+                        <CardTitle>텍스트 분석 요약(내용·맥락)</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className='grid grid-cols-1 md:grid-cols-3 gap-4 mb-6'>
+                            <Card>
+                                <CardContent className='pt-4 text-center'>
+                                    <div className='mb-2'>LLM 종합</div>
+                                    <div
+                                        className='text-4xl font-bold'
+                                        style={{
+                                            color: getScoreColor(
+                                                (analysisResult.text_analysis_summary
+                                                    .overall_llm10 || 0) * 10,
+                                            ),
+                                        }}
+                                    >
+                                        {analysisResult.text_analysis_summary.overall_llm10 || 0}
+                                        <span className='text-base ml-1'>/ 10</span>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardContent className='pt-4'>
+                                    <div className='mb-2'>내용 적합도</div>
+                                    <Progress
+                                        value={
+                                            analysisResult.text_analysis_summary.content_avg100 || 0
+                                        }
+                                        className='h-3'
+                                    />
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardContent className='pt-4'>
+                                    <div className='mb-2'>맥락 일치도</div>
+                                    <Progress
+                                        value={
+                                            analysisResult.text_analysis_summary.context_avg100 || 0
+                                        }
+                                        className='h-3'
+                                    />
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                        <Separator className='my-6' />
+
+                        <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
+                            <div>
+                                <div className='mb-3 font-semibold'>상위 근거</div>
+                                <div className='space-y-2'>
+                                    {analysisResult.text_analysis_summary.top_reasons?.length ? (
+                                        analysisResult.text_analysis_summary.top_reasons.map(
+                                            (item, index) => (
+                                                <div
+                                                    key={index}
+                                                    className='flex items-center gap-2'
+                                                >
+                                                    <CheckCircle className='text-green-500 w-4 h-4 flex-shrink-0' />
+                                                    <span className='text-sm'>{item}</span>
+                                                </div>
+                                            ),
+                                        )
+                                    ) : (
+                                        <div className='text-sm text-muted-foreground'>
+                                            근거 정보 없음
+                                        </div>
+                                    )}
                                 </div>
-                            </Card>
-                        </Col>
-                        <Col xs={24} md={8}>
-                            <Card size='small'>
-                                <div className='mb-2'>내용 적합도</div>
-                                <Progress
-                                    percent={
-                                        analysisResult.text_analysis_summary.content_avg100 || 0
-                                    }
-                                    strokeColor={getScoreColor(
-                                        analysisResult.text_analysis_summary.content_avg100 || 0,
+                            </div>
+                            <div>
+                                <div className='mb-3 font-semibold'>개선 팁</div>
+                                <div className='space-y-2'>
+                                    {analysisResult.text_analysis_summary.top_improvements
+                                        ?.length ? (
+                                        analysisResult.text_analysis_summary.top_improvements.map(
+                                            (item, index) => (
+                                                <div
+                                                    key={index}
+                                                    className='flex items-center gap-2'
+                                                >
+                                                    <TrendingUp className='text-blue-500 w-4 h-4 flex-shrink-0' />
+                                                    <span className='text-sm'>{item}</span>
+                                                </div>
+                                            ),
+                                        )
+                                    ) : (
+                                        <div className='text-sm text-muted-foreground'>
+                                            개선 팁 없음
+                                        </div>
                                     )}
-                                />
-                            </Card>
-                        </Col>
-                        <Col xs={24} md={8}>
-                            <Card size='small'>
-                                <div className='mb-2'>맥락 일치도</div>
-                                <Progress
-                                    percent={
-                                        analysisResult.text_analysis_summary.context_avg100 || 0
-                                    }
-                                    strokeColor={getScoreColor(
-                                        analysisResult.text_analysis_summary.context_avg100 || 0,
-                                    )}
-                                />
-                            </Card>
-                        </Col>
-                    </Row>
-                    <Divider />
-                    <Row gutter={[16, 16]}>
-                        <Col xs={24} md={12}>
-                            <div className='mb-2 font-semibold'>상위 근거</div>
-                            <List
-                                size='small'
-                                dataSource={analysisResult.text_analysis_summary.top_reasons || []}
-                                locale={{ emptyText: '근거 정보 없음' }}
-                                renderItem={(item) => (
-                                    <List.Item>
-                                        <Space>
-                                            <CheckCircleOutlined className='text-green-500' />
-                                            <span>{item}</span>
-                                        </Space>
-                                    </List.Item>
-                                )}
-                            />
-                        </Col>
-                        <Col xs={24} md={12}>
-                            <div className='mb-2 font-semibold'>개선 팁</div>
-                            <List
-                                size='small'
-                                dataSource={
-                                    analysisResult.text_analysis_summary.top_improvements || []
-                                }
-                                locale={{ emptyText: '개선 팁 없음' }}
-                                renderItem={(item) => (
-                                    <List.Item>
-                                        <Space>
-                                            <RiseOutlined className='text-blue-500' />
-                                            <span>{item}</span>
-                                        </Space>
-                                    </List.Item>
-                                )}
-                            />
-                        </Col>
-                    </Row>
-                    {!!analysisResult.evidence_links?.length && (
-                        <>
-                            <Divider />
-                            <div className='mb-2 font-semibold'>근거 하이라이트</div>
-                            <List
-                                size='small'
-                                dataSource={analysisResult.evidence_links}
-                                renderItem={(link) => (
-                                    <List.Item>
-                                        <Space
-                                            direction='vertical'
-                                            size={0}
-                                            style={{ width: '100%' }}
-                                        >
-                                            <div>
-                                                <Tag color='green'>답변</Tag>
-                                                <Text>{link.answer_span}</Text>
+                                </div>
+                            </div>
+                        </div>
+
+                        {!!analysisResult.evidence_links?.length && (
+                            <>
+                                <Separator className='my-6' />
+                                <div className='mb-3 font-semibold'>근거 하이라이트</div>
+                                <div className='space-y-3'>
+                                    {analysisResult.evidence_links.map((link, index) => (
+                                        <div key={index} className='space-y-2'>
+                                            <div className='flex items-center gap-2'>
+                                                <Badge variant='secondary'>답변</Badge>
+                                                <span className='text-sm'>{link.answer_span}</span>
                                             </div>
                                             {link.resume_ref && (
-                                                <div>
-                                                    <Tag color='blue'>이력서</Tag>
-                                                    <Text>{link.resume_ref}</Text>
+                                                <div className='flex items-center gap-2'>
+                                                    <Badge variant='outline'>이력서</Badge>
+                                                    <span className='text-sm'>
+                                                        {link.resume_ref}
+                                                    </span>
                                                 </div>
                                             )}
                                             <div className='text-xs text-gray-500'>
                                                 유사도: {fmt(link.similarity ?? '-', 3)}
                                                 {link.explanation ? ` · ${link.explanation}` : ''}
                                             </div>
-                                        </Space>
-                                    </List.Item>
-                                )}
-                            />
-                        </>
-                    )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </>
+                        )}
+                    </CardContent>
                 </Card>
             )}
 
             {/* 문항별 텍스트 상세 */}
             {Array.isArray(perQuestionTextAnalyses) && perQuestionTextAnalyses.length > 0 && (
-                <Card className='!border-0 !shadow-lg mb-8' title='문항별 텍스트 상세'>
-                    <List
-                        itemLayout='vertical'
-                        dataSource={perQuestionTextAnalyses}
-                        renderItem={(item, idx) => {
-                            const qText = qaList?.[idx]?.question || `질문 ${idx + 1}`;
-                            const content = item.content;
-                            const context = item.context;
-                            const contradiction = !!context?.consistency?.contradiction;
-                            return (
-                                <List.Item key={item.questionId}>
-                                    <Card size='small' className='!border !border-gray-100'>
-                                        <div className='mb-2 flex items-center justify-between'>
-                                            <div className='font-semibold text-gray-800'>
-                                                {qText}
+                <Card className='border-0 shadow-lg mb-8'>
+                    <CardHeader>
+                        <CardTitle>문항별 텍스트 상세</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className='space-y-6'>
+                            {perQuestionTextAnalyses.map((item, idx) => {
+                                const qText = qaList?.[idx]?.question || `질문 ${idx + 1}`;
+                                const content = item.content;
+                                const context = item.context;
+                                const contradiction = !!context?.consistency?.contradiction;
+                                return (
+                                    <Card key={item.questionId} className='border border-gray-100'>
+                                        <CardContent className='pt-4'>
+                                            <div className='mb-4 flex items-center justify-between'>
+                                                <div className='font-semibold text-gray-800'>
+                                                    {qText}
+                                                </div>
+                                                <div className='flex gap-2'>
+                                                    {typeof content?.content_score === 'number' && (
+                                                        <Badge
+                                                            variant='secondary'
+                                                            className='text-xs'
+                                                            style={{
+                                                                backgroundColor: getScoreColor(
+                                                                    content.content_score,
+                                                                ),
+                                                                color: 'white',
+                                                            }}
+                                                        >
+                                                            내용 {content.content_score}
+                                                        </Badge>
+                                                    )}
+                                                    {typeof context?.context_score === 'number' && (
+                                                        <Badge
+                                                            variant='secondary'
+                                                            className='text-xs'
+                                                            style={{
+                                                                backgroundColor: getScoreColor(
+                                                                    context.context_score,
+                                                                ),
+                                                                color: 'white',
+                                                            }}
+                                                        >
+                                                            맥락 {context.context_score}
+                                                        </Badge>
+                                                    )}
+                                                    {contradiction && (
+                                                        <Badge
+                                                            variant='destructive'
+                                                            className='text-xs flex items-center gap-1'
+                                                        >
+                                                            <AlertTriangle className='w-3 h-3' />
+                                                            모순 감지
+                                                        </Badge>
+                                                    )}
+                                                </div>
                                             </div>
-                                            <Space>
-                                                {typeof content?.content_score === 'number' && (
-                                                    <Tag
-                                                        color={getScoreColor(content.content_score)}
-                                                    >
-                                                        내용 {content.content_score}
-                                                    </Tag>
-                                                )}
-                                                {typeof context?.context_score === 'number' && (
-                                                    <Tag
-                                                        color={getScoreColor(context.context_score)}
-                                                    >
-                                                        맥락 {context.context_score}
-                                                    </Tag>
-                                                )}
-                                                {contradiction && (
-                                                    <Tag color='red' icon={<WarningOutlined />}>
-                                                        모순 감지
-                                                    </Tag>
-                                                )}
-                                            </Space>
-                                        </div>
-                                        <Row gutter={[16, 16]}>
-                                            <Col xs={24} md={12}>
-                                                <div className='mb-2 font-semibold'>근거</div>
-                                                <List
-                                                    size='small'
-                                                    dataSource={content?.reasoning || []}
-                                                    locale={{ emptyText: '근거 없음' }}
-                                                    renderItem={(r) => (
-                                                        <List.Item>
-                                                            <Space>
-                                                                <CheckCircleOutlined className='text-green-500' />
-                                                                <span>{r}</span>
-                                                            </Space>
-                                                        </List.Item>
-                                                    )}
-                                                />
-                                                {!!content?.star && (
-                                                    <div className='mt-2 text-xs text-gray-600'>
-                                                        <div>
-                                                            Situation:{' '}
-                                                            {content.star.situation || '-'}
-                                                        </div>
-                                                        <div>Task: {content.star.task || '-'}</div>
-                                                        <div>
-                                                            Action: {content.star.action || '-'}
-                                                        </div>
-                                                        <div>
-                                                            Result: {content.star.result || '-'}
-                                                        </div>
+                                            <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
+                                                <div>
+                                                    <div className='mb-3 font-semibold'>근거</div>
+                                                    <div className='space-y-2'>
+                                                        {content?.reasoning?.length ? (
+                                                            content.reasoning.map((r, index) => (
+                                                                <div
+                                                                    key={index}
+                                                                    className='flex items-center gap-2'
+                                                                >
+                                                                    <CheckCircle className='text-green-500 w-4 h-4 flex-shrink-0' />
+                                                                    <span className='text-sm'>
+                                                                        {r}
+                                                                    </span>
+                                                                </div>
+                                                            ))
+                                                        ) : (
+                                                            <div className='text-sm text-muted-foreground'>
+                                                                근거 없음
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                )}
-                                            </Col>
-                                            <Col xs={24} md={12}>
-                                                <div className='mb-2 font-semibold'>개선 팁</div>
-                                                <List
-                                                    size='small'
-                                                    dataSource={content?.improvements || []}
-                                                    locale={{ emptyText: '개선 팁 없음' }}
-                                                    renderItem={(im) => (
-                                                        <List.Item>
-                                                            <Space>
-                                                                <RiseOutlined className='text-blue-500' />
-                                                                <span>{im}</span>
-                                                            </Space>
-                                                        </List.Item>
+                                                    {!!content?.star && (
+                                                        <div className='mt-4 p-3 bg-gray-50 rounded-lg text-xs text-gray-600 space-y-1'>
+                                                            <div>
+                                                                <strong>Situation:</strong>{' '}
+                                                                {content.star.situation || '-'}
+                                                            </div>
+                                                            <div>
+                                                                <strong>Task:</strong>{' '}
+                                                                {content.star.task || '-'}
+                                                            </div>
+                                                            <div>
+                                                                <strong>Action:</strong>{' '}
+                                                                {content.star.action || '-'}
+                                                            </div>
+                                                            <div>
+                                                                <strong>Result:</strong>{' '}
+                                                                {content.star.result || '-'}
+                                                            </div>
+                                                        </div>
                                                     )}
-                                                />
-                                                <Divider className='my-3' />
-                                                <div className='mb-2 font-semibold'>근거 링크</div>
-                                                <List
-                                                    size='small'
-                                                    dataSource={context?.links || []}
-                                                    locale={{ emptyText: '링크 없음' }}
-                                                    renderItem={(lnk) => (
-                                                        <List.Item>
-                                                            <Space
-                                                                direction='vertical'
-                                                                size={0}
-                                                                style={{ width: '100%' }}
-                                                            >
-                                                                <div>
-                                                                    <Tag color='green'>답변</Tag>
-                                                                    <Text>{lnk.answer_span}</Text>
-                                                                </div>
-                                                                {lnk.resume_ref && (
-                                                                    <div>
-                                                                        <Tag color='blue'>
-                                                                            이력서
-                                                                        </Tag>
-                                                                        <Text>
-                                                                            {lnk.resume_ref}
-                                                                        </Text>
+                                                </div>
+                                                <div>
+                                                    <div className='mb-3 font-semibold'>
+                                                        개선 팁
+                                                    </div>
+                                                    <div className='space-y-2'>
+                                                        {content?.improvements?.length ? (
+                                                            content.improvements.map(
+                                                                (im, index) => (
+                                                                    <div
+                                                                        key={index}
+                                                                        className='flex items-center gap-2'
+                                                                    >
+                                                                        <TrendingUp className='text-blue-500 w-4 h-4 flex-shrink-0' />
+                                                                        <span className='text-sm'>
+                                                                            {im}
+                                                                        </span>
                                                                     </div>
-                                                                )}
-                                                                <div className='text-xs text-gray-500'>
-                                                                    유사도:{' '}
-                                                                    {fmt(lnk.similarity ?? '-', 3)}
-                                                                    {lnk.explanation
-                                                                        ? ` · ${lnk.explanation}`
-                                                                        : ''}
+                                                                ),
+                                                            )
+                                                        ) : (
+                                                            <div className='text-sm text-muted-foreground'>
+                                                                개선 팁 없음
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    <Separator className='my-4' />
+
+                                                    <div className='mb-3 font-semibold'>
+                                                        근거 링크
+                                                    </div>
+                                                    <div className='space-y-3'>
+                                                        {context?.links?.length ? (
+                                                            context.links.map((lnk, index) => (
+                                                                <div
+                                                                    key={index}
+                                                                    className='space-y-2'
+                                                                >
+                                                                    <div className='flex items-center gap-2'>
+                                                                        <Badge variant='secondary'>
+                                                                            답변
+                                                                        </Badge>
+                                                                        <span className='text-sm'>
+                                                                            {lnk.answer_span}
+                                                                        </span>
+                                                                    </div>
+                                                                    {lnk.resume_ref && (
+                                                                        <div className='flex items-center gap-2'>
+                                                                            <Badge variant='outline'>
+                                                                                이력서
+                                                                            </Badge>
+                                                                            <span className='text-sm'>
+                                                                                {lnk.resume_ref}
+                                                                            </span>
+                                                                        </div>
+                                                                    )}
+                                                                    <div className='text-xs text-gray-500'>
+                                                                        유사도:{' '}
+                                                                        {fmt(
+                                                                            lnk.similarity ?? '-',
+                                                                            3,
+                                                                        )}
+                                                                        {lnk.explanation
+                                                                            ? ` · ${lnk.explanation}`
+                                                                            : ''}
+                                                                    </div>
                                                                 </div>
-                                                            </Space>
-                                                        </List.Item>
-                                                    )}
-                                                />
-                                            </Col>
-                                        </Row>
+                                                            ))
+                                                        ) : (
+                                                            <div className='text-sm text-muted-foreground'>
+                                                                링크 없음
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </CardContent>
                                     </Card>
-                                </List.Item>
-                            );
-                        }}
-                    />
+                                );
+                            })}
+                        </div>
+                    </CardContent>
                 </Card>
             )}
 
             {/* 음성/영상 분석 요약 카드 */}
             {(audioData?.overall || visualData?.overall) && (
-                <Row gutter={[24, 24]} className='mb-8'>
+                <div className='grid grid-cols-1 md:grid-cols-2 gap-6 mb-8'>
                     {audioData?.overall && displayOptions.showAudioAnalysis && (
-                        <Col xs={24} md={12}>
-                            <Card className='!border-0 !shadow-lg' bodyStyle={{ padding: 24 }}>
+                        <Card className='border-0 shadow-lg'>
+                            <CardContent className='p-6'>
                                 <div className='flex items-start gap-4'>
                                     <div className='text-4xl text-blue-500'>
-                                        <SoundOutlined />
+                                        <Volume2 />
                                     </div>
                                     <div className='flex-1'>
                                         <div className='text-xl text-gray-800 mb-1'>
@@ -751,7 +827,7 @@ export default function InterviewReport({
                                         </div>
                                         <div className='mt-3'>
                                             <Button
-                                                size='small'
+                                                size='sm'
                                                 onClick={() =>
                                                     setShowAudioDetails(!showAudioDetails)
                                                 }
@@ -761,16 +837,16 @@ export default function InterviewReport({
                                         </div>
                                     </div>
                                 </div>
-                            </Card>
-                        </Col>
+                            </CardContent>
+                        </Card>
                     )}
 
                     {visualData?.overall && displayOptions.showVisualAnalysis && (
-                        <Col xs={24} md={12}>
-                            <Card className='!border-0 !shadow-lg' bodyStyle={{ padding: 24 }}>
+                        <Card className='border-0 shadow-lg'>
+                            <CardContent className='p-6'>
                                 <div className='flex items-start gap-4'>
                                     <div className='text-4xl text-blue-500'>
-                                        <SmileOutlined />
+                                        <Smile />
                                     </div>
                                     <div className='flex-1'>
                                         <div className='text-xl text-gray-800 mb-1'>
@@ -796,7 +872,7 @@ export default function InterviewReport({
                                         </div>
                                         <div className='mt-3'>
                                             <Button
-                                                size='small'
+                                                size='sm'
                                                 onClick={() =>
                                                     setShowVisualDetails(!showVisualDetails)
                                                 }
@@ -806,262 +882,336 @@ export default function InterviewReport({
                                         </div>
                                     </div>
                                 </div>
-                            </Card>
-                        </Col>
+                            </CardContent>
+                        </Card>
                     )}
-                </Row>
+                </div>
             )}
 
             {/* 질문별 비주얼 비교 (캘리브레이션) */}
             {displayOptions.showVisualAnalysis &&
                 calibrationCompare?.visual?.normalizedPerQuestion &&
                 visualData?.perQuestion && (
-                    <Card title='질문별 비주얼 비교' className='!border-0 !shadow-lg mb-8'>
-                        <List
-                            dataSource={Object.keys(visualData.perQuestion)}
-                            renderItem={(qid, idx) => {
-                                const raw = (visualData.perQuestion as any)[qid] || {};
-                                const norm =
-                                    calibrationCompare?.visual?.normalizedPerQuestion?.[qid];
-                                const svr = calibrationCompare?.visual?.serverQuestionScores?.[qid];
-                                return (
-                                    <List.Item>
-                                        <div className='w-full'>
-                                            <div className='flex justify-between items-start mb-2'>
-                                                <Text strong>
+                    <Card className='border-0 shadow-lg mb-8'>
+                        <CardHeader>
+                            <CardTitle>질문별 비주얼 비교</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className='space-y-6'>
+                                {Object.keys(visualData.perQuestion).map((qid, idx) => {
+                                    const raw = (visualData.perQuestion as any)[qid] || {};
+                                    const norm =
+                                        calibrationCompare?.visual?.normalizedPerQuestion?.[qid];
+                                    const svr =
+                                        calibrationCompare?.visual?.serverQuestionScores?.[qid];
+                                    return (
+                                        <div key={qid} className='w-full'>
+                                            <div className='flex justify-between items-start mb-3'>
+                                                <div className='font-semibold'>
                                                     Q{idx + 1} ({qid})
-                                                </Text>
+                                                </div>
                                                 {svr?.score != null && (
-                                                    <Tag color={getScoreColor(svr.score)}>
+                                                    <Badge
+                                                        variant='secondary'
+                                                        className='text-xs'
+                                                        style={{
+                                                            backgroundColor: getScoreColor(
+                                                                svr.score,
+                                                            ),
+                                                            color: 'white',
+                                                        }}
+                                                    >
                                                         정규화 {svr.score.toFixed(0)}
                                                         {svr.calibrationApplied ? ' ✓' : ''}
-                                                    </Tag>
+                                                    </Badge>
                                                 )}
                                             </div>
                                             <div className='grid grid-cols-1 md:grid-cols-3 gap-3'>
-                                                <Card size='small'>
-                                                    <div className='text-gray-500 text-sm mb-1'>
-                                                        Raw
-                                                    </div>
-                                                    <div className='text-sm'>
-                                                        confidence_mean: {fmt(raw?.confidence_mean)}
-                                                    </div>
-                                                    <div className='text-sm'>
-                                                        smile_mean: {fmt(raw?.smile_mean)}
-                                                    </div>
+                                                <Card>
+                                                    <CardContent className='pt-3'>
+                                                        <div className='text-gray-500 text-sm mb-2'>
+                                                            Raw
+                                                        </div>
+                                                        <div className='text-sm'>
+                                                            confidence_mean:{' '}
+                                                            {fmt(raw?.confidence_mean)}
+                                                        </div>
+                                                        <div className='text-sm'>
+                                                            smile_mean: {fmt(raw?.smile_mean)}
+                                                        </div>
+                                                    </CardContent>
                                                 </Card>
-                                                <Card size='small'>
-                                                    <div className='text-gray-500 text-sm mb-1'>
-                                                        Calibrated
-                                                    </div>
-                                                    <div className='text-sm'>
-                                                        confidence_mean:{' '}
-                                                        {fmt(norm?.confidence_mean)}
-                                                    </div>
-                                                    <div className='text-sm'>
-                                                        smile_mean: {fmt(norm?.smile_mean)}
-                                                    </div>
+                                                <Card>
+                                                    <CardContent className='pt-3'>
+                                                        <div className='text-gray-500 text-sm mb-2'>
+                                                            Calibrated
+                                                        </div>
+                                                        <div className='text-sm'>
+                                                            confidence_mean:{' '}
+                                                            {fmt(norm?.confidence_mean)}
+                                                        </div>
+                                                        <div className='text-sm'>
+                                                            smile_mean: {fmt(norm?.smile_mean)}
+                                                        </div>
+                                                    </CardContent>
                                                 </Card>
-                                                <Card size='small'>
-                                                    <div className='text-gray-500 text-sm mb-1'>
-                                                        Presence/Level
-                                                    </div>
-                                                    <div className='text-xs text-gray-600'>
-                                                        good/avg/need:{' '}
-                                                        {raw?.presence_dist
-                                                            ? `${raw.presence_dist.good}/${raw.presence_dist.average}/${raw.presence_dist.needs_improvement}`
-                                                            : '-'}
-                                                    </div>
-                                                    <div className='text-xs text-gray-600'>
-                                                        warn/crit:{' '}
-                                                        {raw?.level_dist
-                                                            ? `${raw.level_dist.warning}/${raw.level_dist.critical}`
-                                                            : '-'}
-                                                    </div>
+                                                <Card>
+                                                    <CardContent className='pt-3'>
+                                                        <div className='text-gray-500 text-sm mb-2'>
+                                                            Presence/Level
+                                                        </div>
+                                                        <div className='text-xs text-gray-600'>
+                                                            good/avg/need:{' '}
+                                                            {raw?.presence_dist
+                                                                ? `${raw.presence_dist.good}/${raw.presence_dist.average}/${raw.presence_dist.needs_improvement}`
+                                                                : '-'}
+                                                        </div>
+                                                        <div className='text-xs text-gray-600'>
+                                                            warn/crit:{' '}
+                                                            {raw?.level_dist
+                                                                ? `${raw.level_dist.warning}/${raw.level_dist.critical}`
+                                                                : '-'}
+                                                        </div>
+                                                    </CardContent>
                                                 </Card>
                                             </div>
                                         </div>
-                                    </List.Item>
-                                );
-                            }}
-                        />
+                                    );
+                                })}
+                            </div>
+                        </CardContent>
                     </Card>
                 )}
 
             {/* 상세 음성 지표 */}
             {audioData?.overall && showAudioDetails && displayOptions.showAudioAnalysis && (
-                <Card title='종합 음성 지표' className='!border-0 !shadow-lg mb-8'>
-                    <Row gutter={[16, 16]}>
-                        <Col xs={24} md={8}>
-                            <Card size='small'>
-                                <div className='text-center mb-4'>
-                                    <div className='text-base text-gray-600 mb-2'>톤 안정성</div>
-                                    <div
-                                        className='text-4xl font-bold'
-                                        style={{
-                                            color: getScoreColor(
-                                                audioData.overall.tone_score || 70,
-                                            ),
-                                        }}
-                                    >
-                                        {audioData.overall.tone_score || '-'}
+                <Card className='border-0 shadow-lg mb-8'>
+                    <CardHeader>
+                        <CardTitle>종합 음성 지표</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+                            <Card>
+                                <CardContent className='pt-4'>
+                                    <div className='text-center mb-4'>
+                                        <div className='text-base text-gray-600 mb-2'>
+                                            톤 안정성
+                                        </div>
+                                        <div
+                                            className='text-4xl font-bold'
+                                            style={{
+                                                color: getScoreColor(
+                                                    audioData.overall.tone_score || 70,
+                                                ),
+                                            }}
+                                        >
+                                            {audioData.overall.tone_score || '-'}
+                                        </div>
                                     </div>
-                                </div>
-                                <Statistic
-                                    title='평균 f0_mean (Hz)'
-                                    value={audioData.overall.f0_mean?.toFixed(1) || '-'}
-                                />
-                                <Statistic
-                                    title='평균 f0_std (Hz)'
-                                    value={audioData.overall.f0_std?.toFixed(2) || '-'}
-                                />
-                            </Card>
-                        </Col>
-                        <Col xs={24} md={8}>
-                            <Card size='small'>
-                                <div className='text-center mb-4'>
-                                    <div className='text-base text-gray-600 mb-2'>목소리 떨림</div>
-                                    <div
-                                        className='text-4xl font-bold'
-                                        style={{
-                                            color: getScoreColor(
-                                                audioData.overall.vibrato_score || 70,
-                                            ),
-                                        }}
-                                    >
-                                        {audioData.overall.vibrato_score || '-'}
+                                    <div className='space-y-2'>
+                                        <div className='flex justify-between text-sm'>
+                                            <span>평균 f0_mean (Hz)</span>
+                                            <span>
+                                                {audioData.overall.f0_mean?.toFixed(1) || '-'}
+                                            </span>
+                                        </div>
+                                        <div className='flex justify-between text-sm'>
+                                            <span>평균 f0_std (Hz)</span>
+                                            <span>
+                                                {audioData.overall.f0_std?.toFixed(2) || '-'}
+                                            </span>
+                                        </div>
                                     </div>
-                                </div>
-                                <Statistic
-                                    title='평균 jitter_like'
-                                    value={audioData.overall.jitter_like?.toFixed(3) || '-'}
-                                />
-                                <Statistic
-                                    title='평균 shimmer_like'
-                                    value={audioData.overall.shimmer_like?.toFixed(3) || '-'}
-                                />
+                                </CardContent>
                             </Card>
-                        </Col>
-                        <Col xs={24} md={8}>
-                            <Card size='small'>
-                                <div className='text-center mb-4'>
-                                    <div className='text-base text-gray-600 mb-2'>말 빠르기</div>
-                                    <div
-                                        className='text-4xl font-bold'
-                                        style={{
-                                            color: getScoreColor(
-                                                audioData.overall.pace_score || 70,
-                                            ),
-                                        }}
-                                    >
-                                        {audioData.overall.pace_score || '-'}
+                            <Card>
+                                <CardContent className='pt-4'>
+                                    <div className='text-center mb-4'>
+                                        <div className='text-base text-gray-600 mb-2'>
+                                            목소리 떨림
+                                        </div>
+                                        <div
+                                            className='text-4xl font-bold'
+                                            style={{
+                                                color: getScoreColor(
+                                                    audioData.overall.vibrato_score || 70,
+                                                ),
+                                            }}
+                                        >
+                                            {audioData.overall.vibrato_score || '-'}
+                                        </div>
                                     </div>
-                                </div>
-                                <Statistic
-                                    title='평균 침묵 비율'
-                                    value={
-                                        audioData.overall.silence_ratio
-                                            ? `${(audioData.overall.silence_ratio * 100).toFixed(1)}%`
-                                            : '-'
-                                    }
-                                />
-                                <Statistic
-                                    title='평균 rms_cv'
-                                    value={audioData.overall.rms_cv?.toFixed(3) || '-'}
-                                />
+                                    <div className='space-y-2'>
+                                        <div className='flex justify-between text-sm'>
+                                            <span>평균 jitter_like</span>
+                                            <span>
+                                                {audioData.overall.jitter_like?.toFixed(3) || '-'}
+                                            </span>
+                                        </div>
+                                        <div className='flex justify-between text-sm'>
+                                            <span>평균 shimmer_like</span>
+                                            <span>
+                                                {audioData.overall.shimmer_like?.toFixed(3) || '-'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </CardContent>
                             </Card>
-                        </Col>
-                    </Row>
+                            <Card>
+                                <CardContent className='pt-4'>
+                                    <div className='text-center mb-4'>
+                                        <div className='text-base text-gray-600 mb-2'>
+                                            말 빠르기
+                                        </div>
+                                        <div
+                                            className='text-4xl font-bold'
+                                            style={{
+                                                color: getScoreColor(
+                                                    audioData.overall.pace_score || 70,
+                                                ),
+                                            }}
+                                        >
+                                            {audioData.overall.pace_score || '-'}
+                                        </div>
+                                    </div>
+                                    <div className='space-y-2'>
+                                        <div className='flex justify-between text-sm'>
+                                            <span>평균 침묵 비율</span>
+                                            <span>
+                                                {audioData.overall.silence_ratio
+                                                    ? `${(audioData.overall.silence_ratio * 100).toFixed(1)}%`
+                                                    : '-'}
+                                            </span>
+                                        </div>
+                                        <div className='flex justify-between text-sm'>
+                                            <span>평균 rms_cv</span>
+                                            <span>
+                                                {audioData.overall.rms_cv?.toFixed(3) || '-'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </CardContent>
                 </Card>
             )}
 
             {/* 상세 영상 지표 */}
             {visualData?.overall && showVisualDetails && displayOptions.showVisualAnalysis && (
-                <Card title='종합 영상 지표' className='!border-0 !shadow-lg mb-8'>
-                    <Row gutter={[16, 16]}>
-                        <Col xs={24} md={8}>
-                            <Card size='small'>
-                                <div className='text-center mb-4'>
-                                    <div className='text-base text-gray-600 mb-2'>자신감 점수</div>
-                                    <div
-                                        className='text-4xl font-bold'
-                                        style={{
-                                            color: getScoreColor(
-                                                visualData.overall.confidence_score || 70,
-                                            ),
-                                        }}
-                                    >
-                                        {visualData.overall.confidence_score || '-'}
+                <Card className='border-0 shadow-lg mb-8'>
+                    <CardHeader>
+                        <CardTitle>종합 영상 지표</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+                            <Card>
+                                <CardContent className='pt-4'>
+                                    <div className='text-center mb-4'>
+                                        <div className='text-base text-gray-600 mb-2'>
+                                            자신감 점수
+                                        </div>
+                                        <div
+                                            className='text-4xl font-bold'
+                                            style={{
+                                                color: getScoreColor(
+                                                    visualData.overall.confidence_score || 70,
+                                                ),
+                                            }}
+                                        >
+                                            {visualData.overall.confidence_score || '-'}
+                                        </div>
                                     </div>
-                                </div>
-                                <Statistic
-                                    title='평균 자신감'
-                                    value={
-                                        visualData.overall.confidence_mean
-                                            ? (visualData.overall.confidence_mean * 100).toFixed(0)
-                                            : '-'
-                                    }
-                                />
-                                <Statistic title='샘플 수' value={visualData.overall.count || 0} />
+                                    <div className='space-y-2'>
+                                        <div className='flex justify-between text-sm'>
+                                            <span>평균 자신감</span>
+                                            <span>
+                                                {visualData.overall.confidence_mean
+                                                    ? (
+                                                          visualData.overall.confidence_mean * 100
+                                                      ).toFixed(0)
+                                                    : '-'}
+                                            </span>
+                                        </div>
+                                        <div className='flex justify-between text-sm'>
+                                            <span>샘플 수</span>
+                                            <span>{visualData.overall.count || 0}</span>
+                                        </div>
+                                    </div>
+                                </CardContent>
                             </Card>
-                        </Col>
-                        <Col xs={24} md={8}>
-                            <Card size='small'>
-                                <div className='text-center mb-4'>
-                                    <div className='text-base text-gray-600 mb-2'>행동 점수</div>
-                                    <div
-                                        className='text-4xl font-bold'
-                                        style={{
-                                            color: getScoreColor(
-                                                visualData.overall.behavior_score || 70,
-                                            ),
-                                        }}
-                                    >
-                                        {visualData.overall.behavior_score || '-'}
+                            <Card>
+                                <CardContent className='pt-4'>
+                                    <div className='text-center mb-4'>
+                                        <div className='text-base text-gray-600 mb-2'>
+                                            행동 점수
+                                        </div>
+                                        <div
+                                            className='text-4xl font-bold'
+                                            style={{
+                                                color: getScoreColor(
+                                                    visualData.overall.behavior_score || 70,
+                                                ),
+                                            }}
+                                        >
+                                            {visualData.overall.behavior_score || '-'}
+                                        </div>
                                     </div>
-                                </div>
-                                <Statistic
-                                    title='미소 평균'
-                                    value={
-                                        visualData.overall.smile_mean
-                                            ? (visualData.overall.smile_mean * 100).toFixed(0)
-                                            : '-'
-                                    }
-                                />
-                                <Statistic
-                                    title='presence good'
-                                    value={pct(
-                                        visualData.overall.presence_dist?.good,
-                                        visualData.overall.count,
-                                    )}
-                                />
+                                    <div className='space-y-2'>
+                                        <div className='flex justify-between text-sm'>
+                                            <span>미소 평균</span>
+                                            <span>
+                                                {visualData.overall.smile_mean
+                                                    ? (visualData.overall.smile_mean * 100).toFixed(
+                                                          0,
+                                                      )
+                                                    : '-'}
+                                            </span>
+                                        </div>
+                                        <div className='flex justify-between text-sm'>
+                                            <span>presence good</span>
+                                            <span>
+                                                {pct(
+                                                    visualData.overall.presence_dist?.good,
+                                                    visualData.overall.count,
+                                                )}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </CardContent>
                             </Card>
-                        </Col>
-                        <Col xs={24} md={8}>
-                            <Card size='small'>
-                                <div className='text-center mb-4'>
-                                    <div className='text-base text-gray-600 mb-2'>
-                                        주의/경고 비중
+                            <Card>
+                                <CardContent className='pt-4'>
+                                    <div className='text-center mb-4'>
+                                        <div className='text-base text-gray-600 mb-2'>
+                                            주의/경고 비중
+                                        </div>
+                                        <div className='text-4xl font-bold text-red-500'>
+                                            {pct(
+                                                (visualData.overall.level_dist?.warning || 0) +
+                                                    (visualData.overall.level_dist?.critical || 0),
+                                                visualData.overall.count,
+                                            )}
+                                        </div>
                                     </div>
-                                    <div className='text-4xl font-bold text-red-500'>
-                                        {pct(
-                                            (visualData.overall.level_dist?.warning || 0) +
-                                                (visualData.overall.level_dist?.critical || 0),
-                                            visualData.overall.count,
-                                        )}
+                                    <div className='space-y-2'>
+                                        <div className='flex justify-between text-sm'>
+                                            <span>경고 (warn)</span>
+                                            <span>
+                                                {visualData.overall.level_dist?.warning || 0}
+                                            </span>
+                                        </div>
+                                        <div className='flex justify-between text-sm'>
+                                            <span>치명 (critical)</span>
+                                            <span>
+                                                {visualData.overall.level_dist?.critical || 0}
+                                            </span>
+                                        </div>
                                     </div>
-                                </div>
-                                <Statistic
-                                    title='경고 (warn)'
-                                    value={visualData.overall.level_dist?.warning || 0}
-                                />
-                                <Statistic
-                                    title='치명 (critical)'
-                                    value={visualData.overall.level_dist?.critical || 0}
-                                />
+                                </CardContent>
                             </Card>
-                        </Col>
-                    </Row>
+                        </div>
+                    </CardContent>
                 </Card>
             )}
 
@@ -1069,54 +1219,90 @@ export default function InterviewReport({
             {audioData?.perQuestion &&
                 audioData.perQuestion.length > 0 &&
                 displayOptions.showAudioAnalysis && (
-                    <Card title='질문별 음성 분석' className='!border-0 !shadow-lg mb-8'>
-                        <List
-                            dataSource={audioData.perQuestion}
-                            renderItem={(item) => (
-                                <List.Item>
-                                    <div className='w-full'>
+                    <Card className='border-0 shadow-lg mb-8'>
+                        <CardHeader>
+                            <CardTitle>질문별 음성 분석</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className='space-y-6'>
+                                {audioData.perQuestion.map((item, index) => (
+                                    <div key={index} className='w-full'>
                                         <div className='flex justify-between items-start mb-3'>
-                                            <Text strong className='text-lg'>
+                                            <div className='font-semibold text-lg'>
                                                 Q{item.questionNumber}. {item.question}
-                                            </Text>
-                                            <Space>
+                                            </div>
+                                            <div className='flex gap-2 flex-wrap'>
                                                 {typeof item.tone_score === 'number' && (
-                                                    <Tag color={getScoreColor(item.tone_score)}>
-                                                        <SoundOutlined /> 톤 {item.tone_score}
-                                                    </Tag>
+                                                    <Badge
+                                                        variant='secondary'
+                                                        className='text-xs flex items-center gap-1'
+                                                        style={{
+                                                            backgroundColor: getScoreColor(
+                                                                item.tone_score,
+                                                            ),
+                                                            color: 'white',
+                                                        }}
+                                                    >
+                                                        <Volume2 className='w-3 h-3' /> 톤{' '}
+                                                        {item.tone_score}
+                                                    </Badge>
                                                 )}
                                                 {typeof item.vibrato_score === 'number' && (
-                                                    <Tag color={getScoreColor(item.vibrato_score)}>
-                                                        <AudioOutlined /> 떨림 {item.vibrato_score}
-                                                    </Tag>
+                                                    <Badge
+                                                        variant='secondary'
+                                                        className='text-xs flex items-center gap-1'
+                                                        style={{
+                                                            backgroundColor: getScoreColor(
+                                                                item.vibrato_score,
+                                                            ),
+                                                            color: 'white',
+                                                        }}
+                                                    >
+                                                        <Mic className='w-3 h-3' /> 떨림{' '}
+                                                        {item.vibrato_score}
+                                                    </Badge>
                                                 )}
                                                 {typeof item.pace_score === 'number' && (
-                                                    <Tag color={getScoreColor(item.pace_score)}>
-                                                        <ClockCircleOutlined /> 속도{' '}
+                                                    <Badge
+                                                        variant='secondary'
+                                                        className='text-xs flex items-center gap-1'
+                                                        style={{
+                                                            backgroundColor: getScoreColor(
+                                                                item.pace_score,
+                                                            ),
+                                                            color: 'white',
+                                                        }}
+                                                    >
+                                                        <Clock className='w-3 h-3' /> 속도{' '}
                                                         {item.pace_score}
-                                                    </Tag>
+                                                    </Badge>
                                                 )}
                                                 {typeof (item as any).normalized_score ===
                                                     'number' && (
-                                                    <Tag
-                                                        color={getScoreColor(
-                                                            (item as any)
-                                                                .normalized_score as number,
-                                                        )}
+                                                    <Badge
+                                                        variant='secondary'
+                                                        className='text-xs flex items-center gap-1'
+                                                        style={{
+                                                            backgroundColor: getScoreColor(
+                                                                (item as any)
+                                                                    .normalized_score as number,
+                                                            ),
+                                                            color: 'white',
+                                                        }}
                                                     >
-                                                        <ThunderboltOutlined /> 정규화{' '}
+                                                        <Zap className='w-3 h-3' /> 정규화{' '}
                                                         {(
                                                             (item as any).normalized_score as number
                                                         ).toFixed(2)}
-                                                    </Tag>
+                                                    </Badge>
                                                 )}
-                                            </Space>
+                                            </div>
                                         </div>
                                         {item.audioUrl && (
                                             <audio
                                                 controls
                                                 src={item.audioUrl}
-                                                className='w-full'
+                                                className='w-full mb-3'
                                             />
                                         )}
                                         {calibrationCompare?.audio?.ratiosPerQuestion &&
@@ -1130,208 +1316,240 @@ export default function InterviewReport({
                                                 return (
                                                     <div className='mt-2 text-xs text-gray-600'>
                                                         <span className='mr-2'>정규화 비율:</span>
-                                                        <Space size={8} wrap>
+                                                        <div className='flex gap-2 flex-wrap'>
                                                             {'f0_mean' in ratios && (
-                                                                <Tag>f0 {fmt(ratios.f0_mean)}</Tag>
+                                                                <Badge variant='outline'>
+                                                                    f0 {fmt(ratios.f0_mean)}
+                                                                </Badge>
                                                             )}
                                                             {'f0_std' in ratios && (
-                                                                <Tag>f0σ {fmt(ratios.f0_std)}</Tag>
+                                                                <Badge variant='outline'>
+                                                                    f0σ {fmt(ratios.f0_std)}
+                                                                </Badge>
                                                             )}
                                                             {'rms_cv' in ratios && (
-                                                                <Tag>
+                                                                <Badge variant='outline'>
                                                                     rms_cv {fmt(ratios.rms_cv)}
-                                                                </Tag>
+                                                                </Badge>
                                                             )}
                                                             {'jitter_like' in ratios && (
-                                                                <Tag>
+                                                                <Badge variant='outline'>
                                                                     jitter {fmt(ratios.jitter_like)}
-                                                                </Tag>
+                                                                </Badge>
                                                             )}
                                                             {'shimmer_like' in ratios && (
-                                                                <Tag>
+                                                                <Badge variant='outline'>
                                                                     shimmer{' '}
                                                                     {fmt(ratios.shimmer_like)}
-                                                                </Tag>
+                                                                </Badge>
                                                             )}
                                                             {'silence_ratio' in ratios && (
-                                                                <Tag>
+                                                                <Badge variant='outline'>
                                                                     silence{' '}
                                                                     {fmt(ratios.silence_ratio)}
-                                                                </Tag>
+                                                                </Badge>
                                                             )}
-                                                        </Space>
+                                                        </div>
                                                     </div>
                                                 );
                                             })()}
                                     </div>
-                                </List.Item>
-                            )}
-                        />
+                                ))}
+                            </div>
+                        </CardContent>
                     </Card>
                 )}
 
             {/* 종합 평가 */}
-            <Card title='종합 평가' className='!border-0 !shadow-lg mb-8'>
-                <Paragraph
-                    className={`${displayOptions.compact ? '!text-base' : '!text-lg'} !leading-relaxed`}
-                >
-                    {analysisResult.overall_evaluation}
-                </Paragraph>
+            <Card className='border-0 shadow-lg mb-8'>
+                <CardHeader>
+                    <CardTitle>종합 평가</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p
+                        className={`${displayOptions.compact ? 'text-base' : 'text-lg'} leading-relaxed text-gray-800`}
+                    >
+                        {analysisResult.overall_evaluation}
+                    </p>
+                </CardContent>
             </Card>
 
             {/* 강점과 개선사항 */}
-            <Row gutter={[24, 24]} className='mb-8'>
-                <Col xs={24} lg={12}>
-                    <Card title='강점' className='!border-0 !shadow-lg'>
-                        <List
-                            dataSource={analysisResult.strengths || []}
-                            renderItem={(item) => (
-                                <List.Item>
-                                    <CheckCircleOutlined className='text-green-500 mr-2' />
-                                    <Text>{item}</Text>
-                                </List.Item>
+            <div className='grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8'>
+                <Card className='border-0 shadow-lg'>
+                    <CardHeader>
+                        <CardTitle>강점</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className='space-y-3'>
+                            {analysisResult.strengths?.length ? (
+                                analysisResult.strengths.map((item, index) => (
+                                    <div key={index} className='flex items-start gap-2'>
+                                        <CheckCircle className='text-green-500 w-5 h-5 mt-0.5 flex-shrink-0' />
+                                        <span className='text-sm'>{item}</span>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className='text-sm text-muted-foreground'>강점 정보 없음</div>
                             )}
-                        />
-                    </Card>
-                </Col>
-                <Col xs={24} lg={12}>
-                    <Card title='개선사항' className='!border-0 !shadow-lg'>
-                        <List
-                            dataSource={analysisResult.improvements || []}
-                            renderItem={(item) => (
-                                <List.Item>
-                                    <RiseOutlined className='text-orange-500 mr-2' />
-                                    <Text>{item}</Text>
-                                </List.Item>
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card className='border-0 shadow-lg'>
+                    <CardHeader>
+                        <CardTitle>개선사항</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className='space-y-3'>
+                            {analysisResult.improvements?.length ? (
+                                analysisResult.improvements.map((item, index) => (
+                                    <div key={index} className='flex items-start gap-2'>
+                                        <TrendingUp className='text-orange-500 w-5 h-5 mt-0.5 flex-shrink-0' />
+                                        <span className='text-sm'>{item}</span>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className='text-sm text-muted-foreground'>
+                                    개선사항 정보 없음
+                                </div>
                             )}
-                        />
-                    </Card>
-                </Col>
-            </Row>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
 
             {/* 질문별 상세 피드백 */}
             {displayOptions.showDetailedFeedback && (
-                <Card
-                    title={
+                <Card className='border-0 shadow-lg mb-8'>
+                    <CardHeader>
                         <div className='flex justify-between items-center'>
-                            <span>질문별 상세 피드백</span>
+                            <CardTitle>질문별 상세 피드백</CardTitle>
                             {displayOptions.compact && (
                                 <Button
-                                    size='small'
+                                    size='sm'
                                     onClick={() => setShowFullFeedback(!showFullFeedback)}
                                 >
                                     {showFullFeedback ? '접기' : '펼치기'}
                                 </Button>
                             )}
                         </div>
-                    }
-                    className='!border-0 !shadow-lg mb-8'
-                >
+                    </CardHeader>
                     {(!displayOptions.compact || showFullFeedback) && (
-                        <div>
-                            {qaList.length > 0 ? (
-                                <List<QAPair>
-                                    dataSource={qaList}
-                                    renderItem={(qa, index) => {
-                                        const questionKey = `question_${index + 1}`;
-                                        const feedback =
-                                            analysisResult.detailed_feedback?.[questionKey];
+                        <CardContent>
+                            <div className='space-y-6'>
+                                {qaList.length > 0
+                                    ? qaList.map((qa, index) => {
+                                          const questionKey = `question_${index + 1}`;
+                                          const feedback =
+                                              analysisResult.detailed_feedback?.[questionKey];
 
-                                        return (
-                                            <List.Item>
-                                                <div className='w-full'>
-                                                    <div className='flex justify-between items-start mb-3'>
-                                                        <Text strong className='text-lg'>
-                                                            Q{index + 1}. {qa.question}
-                                                        </Text>
-                                                        {feedback && (
-                                                            <Tag
-                                                                color={getScoreColor(
-                                                                    feedback.score * 10,
-                                                                )}
-                                                                className='text-sm'
-                                                            >
-                                                                {feedback.score}/10점
-                                                            </Tag>
-                                                        )}
-                                                    </div>
-                                                    <div className='bg-gray-50 p-4 rounded-lg mb-3'>
-                                                        <Text type='secondary' className='text-sm'>
-                                                            <strong>답변:</strong> {qa.answer}
-                                                        </Text>
-                                                    </div>
-                                                    {feedback && (
-                                                        <div className='bg-blue-50 p-4 rounded-lg'>
-                                                            <Text className='text-sm'>
-                                                                <strong>AI 피드백:</strong>{' '}
-                                                                {feedback.feedback}
-                                                            </Text>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </List.Item>
-                                        );
-                                    }}
-                                />
-                            ) : (
-                                <List<string>
-                                    dataSource={Object.keys(analysisResult.detailed_feedback || {})}
-                                    renderItem={(questionKey, index) => {
-                                        const feedback =
-                                            analysisResult.detailed_feedback?.[questionKey];
-                                        const question = feedback?.question || `질문 ${index + 1}`;
+                                          return (
+                                              <div key={index} className='w-full'>
+                                                  <div className='flex justify-between items-start mb-3'>
+                                                      <div className='font-semibold text-lg'>
+                                                          Q{index + 1}. {qa.question}
+                                                      </div>
+                                                      {feedback && (
+                                                          <Badge
+                                                              variant='secondary'
+                                                              className='text-sm'
+                                                              style={{
+                                                                  backgroundColor: getScoreColor(
+                                                                      feedback.score * 10,
+                                                                  ),
+                                                                  color: 'white',
+                                                              }}
+                                                          >
+                                                              {feedback.score}/10점
+                                                          </Badge>
+                                                      )}
+                                                  </div>
+                                                  <div className='bg-gray-50 p-4 rounded-lg mb-3'>
+                                                      <p className='text-sm text-gray-600'>
+                                                          <strong>답변:</strong> {qa.answer}
+                                                      </p>
+                                                  </div>
+                                                  {feedback && (
+                                                      <div className='bg-blue-50 p-4 rounded-lg'>
+                                                          <p className='text-sm'>
+                                                              <strong>AI 피드백:</strong>{' '}
+                                                              {feedback.feedback}
+                                                          </p>
+                                                      </div>
+                                                  )}
+                                              </div>
+                                          );
+                                      })
+                                    : Object.keys(analysisResult.detailed_feedback || {}).map(
+                                          (questionKey, index) => {
+                                              const feedback =
+                                                  analysisResult.detailed_feedback?.[questionKey];
+                                              const question =
+                                                  feedback?.question || `질문 ${index + 1}`;
 
-                                        return (
-                                            <List.Item>
-                                                <div className='w-full'>
-                                                    <div className='flex justify-between items-start mb-3'>
-                                                        <Text strong className='text-lg'>
-                                                            Q{index + 1}. {question}
-                                                        </Text>
-                                                        {feedback && (
-                                                            <Tag
-                                                                color={getScoreColor(
-                                                                    feedback.score * 10,
-                                                                )}
-                                                                className='text-sm'
-                                                            >
-                                                                {feedback.score}/10점
-                                                            </Tag>
-                                                        )}
-                                                    </div>
-                                                    {feedback && (
-                                                        <div className='bg-blue-50 p-4 rounded-lg'>
-                                                            <Text className='text-sm'>
-                                                                <strong>AI 피드백:</strong>{' '}
-                                                                {feedback.feedback}
-                                                            </Text>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </List.Item>
-                                        );
-                                    }}
-                                />
-                            )}
-                        </div>
+                                              return (
+                                                  <div key={questionKey} className='w-full'>
+                                                      <div className='flex justify-between items-start mb-3'>
+                                                          <div className='font-semibold text-lg'>
+                                                              Q{index + 1}. {question}
+                                                          </div>
+                                                          {feedback && (
+                                                              <Badge
+                                                                  variant='secondary'
+                                                                  className='text-sm'
+                                                                  style={{
+                                                                      backgroundColor:
+                                                                          getScoreColor(
+                                                                              feedback.score * 10,
+                                                                          ),
+                                                                      color: 'white',
+                                                                  }}
+                                                              >
+                                                                  {feedback.score}/10점
+                                                              </Badge>
+                                                          )}
+                                                      </div>
+                                                      {feedback && (
+                                                          <div className='bg-blue-50 p-4 rounded-lg'>
+                                                              <p className='text-sm'>
+                                                                  <strong>AI 피드백:</strong>{' '}
+                                                                  {feedback.feedback}
+                                                              </p>
+                                                          </div>
+                                                      )}
+                                                  </div>
+                                              );
+                                          },
+                                      )}
+                            </div>
+                        </CardContent>
                     )}
                 </Card>
             )}
 
             {/* 1분 자기소개 대본 */}
-            <Card title='1분 자기소개 대본' className='!border-0 !shadow-lg mb-8'>
-                {analysisResult.self_intro_script ? (
-                    <div className='whitespace-pre-line text-gray-800 leading-relaxed'>
-                        {analysisResult.self_intro_script}
-                    </div>
-                ) : (
-                    <Alert
-                        type='info'
-                        message='대본 준비 중'
-                        description='이력서 요약을 바탕으로 대본을 생성하고 있습니다. 잠시 후 새로고침해보세요.'
-                        showIcon
-                    />
-                )}
+            <Card className='border-0 shadow-lg mb-8'>
+                <CardHeader>
+                    <CardTitle>1분 자기소개 대본</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    {analysisResult.self_intro_script ? (
+                        <div className='whitespace-pre-line text-gray-800 leading-relaxed'>
+                            {analysisResult.self_intro_script}
+                        </div>
+                    ) : (
+                        <Alert>
+                            <AlertTriangle className='h-4 w-4' />
+                            <AlertDescription>
+                                <div className='font-semibold mb-1'>대본 준비 중</div>
+                                <div>
+                                    이력서 요약을 바탕으로 대본을 생성하고 있습니다. 잠시 후
+                                    새로고침해보세요.
+                                </div>
+                            </AlertDescription>
+                        </Alert>
+                    )}
+                </CardContent>
             </Card>
 
             {/* 인쇄용 스타일 */}
@@ -1340,11 +1558,12 @@ export default function InterviewReport({
                     .print\\:hidden {
                         display: none !important;
                     }
-                    .ant-card {
-                        break-inside: avoid;
+                    .shadow-lg {
+                        box-shadow: none !important;
+                        border: 1px solid #e5e7eb !important;
                     }
                 }
-                .interview-report.compact .ant-card {
+                .interview-report.compact .shadow-lg {
                     margin-bottom: 16px;
                 }
             `}</style>

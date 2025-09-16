@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Webcam, WebcamHandle, Question, ProcessingPopup } from './_components';
+import { Webcam, WebcamHandle, Question, ProcessingPopup, CompletionPopup } from './_components';
 import { useQuestionManager } from './_hooks/useQuestionManager';
 import { useTTSManager } from './_hooks/useTTSManager';
 import { useInterviewSession } from './_hooks/useInterviewSession';
@@ -377,6 +377,14 @@ export default function AiInterviewSessionsPage() {
                 currentStep={interviewSession.currentProcessingStep}
                 onComplete={() => {
                     // 팝업 완료 시 추가 처리 (필요시)
+                }}
+            />
+
+            {/* 완료 팝업 */}
+            <CompletionPopup
+                isVisible={interviewSession.showCompletionPopup}
+                onClose={() => {
+                    // 완료 팝업 닫기 (필요시)
                 }}
             />
         </div>
