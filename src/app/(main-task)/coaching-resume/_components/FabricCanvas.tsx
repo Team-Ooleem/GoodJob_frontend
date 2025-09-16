@@ -88,7 +88,7 @@ export function FabricCanvas({ mentorName, menteeName }: Props) {
     useCollaborativeCanvas('resume-room');
 
     // 커서 위치 공유
-    useCollaborativeCursor('resume-room');
+    useCollaborativeCursor('resume-room', canvas);
 
     // pdf drag & drop
     usePdfDrop(canvasRef);
@@ -96,7 +96,7 @@ export function FabricCanvas({ mentorName, menteeName }: Props) {
     const isRecording = useCanvasStore((store) => store.isRecording);
 
     return (
-        <div className='relative'>
+        <div id='canvas-container' className='relative'>
             <ParticipantCamera mentorName={mentorName} menteeName={menteeName} />
             <canvas ref={canvasRef} />
         </div>
