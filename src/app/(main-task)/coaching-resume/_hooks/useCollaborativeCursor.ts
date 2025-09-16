@@ -100,8 +100,8 @@ export function useCollaborativeCursor(room: string, canvas: fabric.Canvas | nul
                 cursorEl.src = '/assets/cursor.png';
                 cursorEl.alt = 'remote-cursor';
                 cursorEl.style.position = 'absolute';
-                cursorEl.style.width = '24px';
-                cursorEl.style.height = '24px';
+                cursorEl.style.width = '34px';
+                cursorEl.style.height = '34px';
                 cursorEl.style.pointerEvents = 'none';
                 cursorEl.style.userSelect = 'none';
                 cursorEl.style.zIndex = '9999';

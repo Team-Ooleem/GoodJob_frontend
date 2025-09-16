@@ -75,7 +75,10 @@ export function useCollaborativeCanvas(room: string) {
         // 스냅샷 기반 undo/redo 헬퍼 함수들
         const saveSnapshot = () => {
             const snapshot = Array.from(yObjects.entries());
-            canvasSnapshotsRef.current = canvasSnapshotsRef.current.slice(0, currentSnapshotIndexRef.current + 1);
+            canvasSnapshotsRef.current = canvasSnapshotsRef.current.slice(
+                0,
+                currentSnapshotIndexRef.current + 1,
+            );
             canvasSnapshotsRef.current.push(snapshot);
             currentSnapshotIndexRef.current++;
 
@@ -291,7 +294,7 @@ export function useCollaborativeCanvas(room: string) {
 
             const { color, width, type } = brush as BrushConfig;
             const strokeColor = type === 'highlighter' ? 'rgba(255,255,0,0.3)' : color;
-            const strokeWidth = type === 'highlighter' ? width * 2 : width;
+            const strokeWidth = type === 'highlighter' ? width * 1.2 : width;
 
             const newPath = new fabric.Path(pathData, {
                 stroke: strokeColor,
