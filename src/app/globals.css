@@ -5,6 +5,32 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* TTS 오디오 시각화 애니메이션 */
+@keyframes heightPulse {
+    0%,
+    100% {
+        height: 0.5em;
+        opacity: 0.3;
+    }
+    50% {
+        height: 6em;
+        opacity: 1;
+    }
+}
+
+/* 웹캠 blur 효과 애니메이션 */
+@keyframes blurPulse {
+    0% {
+        opacity: 0.2;
+    }
+    50% {
+        opacity: 0.9;
+    }
+    100% {
+        opacity: 0.2;
+    }
+}
+
 * {
     font-family:
         'Pretendard Variable',
@@ -301,4 +327,25 @@ li {
     body {
         @apply bg-background text-foreground;
     }
+}
+
+/* 타이머 애니메이션 */
+@keyframes shake {
+    0%,
+    100% {
+        transform: translateX(0) translateY(0);
+    }
+    25% {
+        transform: translateX(-3px) translateY(-2px);
+    }
+    50% {
+        transform: translateX(3px) translateY(2px);
+    }
+    75% {
+        transform: translateX(-2px) translateY(1px);
+    }
+}
+
+.timer-shake {
+    animation: shake 0.3s ease-in-out infinite;
 }
