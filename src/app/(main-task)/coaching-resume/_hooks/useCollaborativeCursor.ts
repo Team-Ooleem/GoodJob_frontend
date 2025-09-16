@@ -49,32 +49,19 @@ function getClientUUID() {
     }
 }
 
-function getUserName(): string {
-    if (typeof window === 'undefined') return 'Anonymous';
-    try {
-        // localStorage에서 사용자 이름을 가져오거나 기본값 설정
-        const userName = window.localStorage.getItem('userName');
-        if (userName) return userName;
-
-        // 랜덤한 사용자 이름 생성
-        const names = ['Alex', 'Jordan', 'Casey', 'Riley', 'Avery', 'Quinn', 'Blake', 'Sage'];
-        const randomName =
-            names[Math.floor(Math.random() * names.length)] + Math.floor(Math.random() * 100);
-        window.localStorage.setItem('userName', randomName);
-        return randomName;
-    } catch {
-        return 'Anonymous';
-    }
-}
-
 export function useCollaborativeCursor(room: string, canvas: fabric.Canvas | null) {
     const socket = useCanvasStore((s) => s.socket);
     const cursorsRef = useRef<Map<string, HTMLDivElement>>(new Map());
+    // 세션 스토어에서 역할과 이름을 가져와 커서 라벨로 사용
+    const role = useSessionStore((s) => s.role);
+    const mentorName = useSessionStore((s) => s.mentorName);
+    const menteeName = useSessionStore((s) => s.menteeName);
+    // 상대방 이름을 라벨로 사용 (멘토면 멘티 이름, 멘티면 멘토 이름)
+    const opponentName = role === 'mentor' ? menteeName : mentorName;
 
     useEffect(() => {
         if (!socket || !canvas) return;
         const clientUUID = getClientUUID();
-        const userName = getUserName();
 
         const container = document.getElementById('canvas-container');
         if (!container) {
@@ -97,13 +84,12 @@ export function useCollaborativeCursor(room: string, canvas: fabric.Canvas | nul
                 clientUUID,
                 x: point.x,
                 y: point.y,
-                userName,
             });
         };
 
         const handleConnect = () => {
             console.log('✅ connected for cursor, joining room:', room);
-            socket.emit('joinCursor', { room, clientUUID, userName });
+            socket.emit('joinCursor', { room, clientUUID });
             canvas.on('mouse:move', handleMouseMove);
         };
 
@@ -113,12 +99,7 @@ export function useCollaborativeCursor(room: string, canvas: fabric.Canvas | nul
         };
 
         // --- 다른 사람 커서 업데이트 ---
-        const handleCursor = ({
-            clientUUID: remoteId,
-            x,
-            y,
-            userName: remoteUserName,
-        }: RemoteCursor) => {
+        const handleCursor = ({ clientUUID: remoteId, x, y }: RemoteCursor) => {
             if (remoteId === clientUUID) return;
 
             let cursorContainer = cursorsRef.current.get(remoteId);
@@ -141,7 +122,8 @@ export function useCollaborativeCursor(room: string, canvas: fabric.Canvas | nul
 
                 // 사용자 이름 라벨
                 const nameLabel = document.createElement('div');
-                nameLabel.textContent = remoteUserName || 'Anonymous';
+                nameLabel.setAttribute('data-cursor-label', '1');
+                nameLabel.textContent = opponentName || '';
                 nameLabel.style.position = 'absolute';
                 nameLabel.style.top = '36px';
                 nameLabel.style.left = '0px';
@@ -158,6 +140,12 @@ export function useCollaborativeCursor(room: string, canvas: fabric.Canvas | nul
                 container.appendChild(cursorContainer);
                 cursorsRef.current.set(remoteId, cursorContainer);
             }
+
+            // 이름 라벨은 세션 스토어 기준으로 항상 최신값으로 동기화
+            const labelEl = cursorContainer.querySelector(
+                'div[data-cursor-label="1"]',
+            ) as HTMLDivElement | null;
+            if (labelEl) labelEl.textContent = opponentName || '';
 
             // --- 월드 좌표 → 화면 좌표 변환 ---
             const t = canvas.viewportTransform ?? [1, 0, 0, 1, 0, 0];
@@ -208,5 +196,5 @@ export function useCollaborativeCursor(room: string, canvas: fabric.Canvas | nul
             socket.off('cursor', handleCursor);
             socket.off('user-left', handleUserLeft);
         };
-    }, [socket, room, canvas]);
+    }, [socket, room, canvas, opponentName]);
 }
