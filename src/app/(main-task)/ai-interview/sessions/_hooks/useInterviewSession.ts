@@ -4,8 +4,9 @@ import { useInterviewAnalysis } from '@/hooks/use-interview-analysis';
 import { blobToBase64 } from '@/utils/audio';
 import { WavRecorder } from '@/utils/audio/WavRecorder';
 import { InterviewAPI } from '../_apis/interview-api';
-import { QuestionDto } from '../../_hooks/useQuestionManager';
-import { useTTSManager } from '../../_hooks/useTTSManager';
+import { QuestionDto } from './useQuestionManager';
+import { useTTSManager } from './useTTSManager';
+import { ProcessingStep } from '../_components/ProcessingPopup';
 
 export interface AudioFeatures {
     f0_mean: number;
@@ -81,8 +82,13 @@ export const useInterviewSession = ({
     const [transcribedText, setTranscribedText] = useState('');
     const [qaList, setQaList] = useState<Array<{ question: string; answer: string }>>([]);
     const [isCompleting, setIsCompleting] = useState(false);
+    const [showProcessingPopup, setShowProcessingPopup] = useState(false);
+    const [currentProcessingStep, setCurrentProcessingStep] = useState<ProcessingStep | null>(null);
+    const [countdown, setCountdown] = useState(10);
+    const [isCountdownActive, setIsCountdownActive] = useState(false);
 
     const timerRef = useRef<NodeJS.Timeout | null>(null);
+    const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
     const completingRef = useRef(false);
     const recorderRef = useRef<WavRecorder | null>(null);
     const lastAudioBlobRef = useRef<Blob | null>(null);
@@ -112,6 +118,49 @@ export const useInterviewSession = ({
             clearInterval(timerRef.current);
             timerRef.current = null;
         }
+    };
+
+    // 카운트다운 타이머 관리
+    const startCountdown = () => {
+        if (countdownTimerRef.current) {
+            clearInterval(countdownTimerRef.current);
+        }
+
+        setIsCountdownActive(true);
+        setCountdown(10);
+
+        countdownTimerRef.current = setInterval(() => {
+            setCountdown((prev) => {
+                if (prev <= 1) {
+                    clearInterval(countdownTimerRef.current!);
+                    setIsCountdownActive(false);
+                    handleStartAnswer();
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+    };
+
+    const stopCountdown = () => {
+        if (countdownTimerRef.current) {
+            clearInterval(countdownTimerRef.current);
+            countdownTimerRef.current = null;
+        }
+        setIsCountdownActive(false);
+        setCountdown(10);
+    };
+
+    // TTS 완료 후 바로 답변 시작
+    const handleTTSComplete = () => {
+        // 10초 카운트다운 후 자동으로 답변 시작
+        startCountdown();
+    };
+
+    // 사용자가 시작 버튼을 눌렀을 때 (카운트다운 중단)
+    const handleUserStartAnswer = () => {
+        stopCountdown();
+        handleStartAnswer();
     };
 
     const handleTimeUp = () => {
@@ -152,7 +201,7 @@ export const useInterviewSession = ({
             message.error('마이크 접근 권한을 확인해주세요.');
         }
 
-        ttsManager.simulateAISpeaking(2000);
+        // ttsManager.simulateAISpeaking(2000); // 답변 시작 시 시뮬레이션 제거
     };
 
     // 답변 완료
@@ -165,8 +214,10 @@ export const useInterviewSession = ({
         try {
             stopTimer();
             setIsRecording(false);
+            setShowProcessingPopup(true);
 
             // 웹캠 집계
+            setCurrentProcessingStep('webcam-upload');
             const agg = webcamRef.current?.endQuestion();
             if (agg) {
                 try {
@@ -200,21 +251,19 @@ export const useInterviewSession = ({
                     }
 
                     // 백엔드 음성 분석
-                    message.loading('음성을 분석 중입니다...', 0);
+                    setCurrentProcessingStep('audio-analysis');
                     try {
                         await InterviewAPI.analyzeAudio(sessionId, questionManager.persistId, blob);
                     } catch (e) {
                         console.warn('백엔드를 통한 음성 분석 실패:', e);
-                    } finally {
-                        message.destroy();
                     }
 
                     // Google STT
-                    message.loading('구글 STT로 답변을 전사 중...', 0);
+                    setCurrentProcessingStep('stt-transcription');
                     try {
                         sttTranscript = await InterviewAPI.transcribeWithGoogleSTT(blob);
-                    } finally {
-                        message.destroy();
+                    } catch (e) {
+                        console.warn('Google STT 전사 실패:', e);
                     }
                 }
             } catch (e) {
@@ -245,6 +294,7 @@ export const useInterviewSession = ({
                 setCurrentSession(null);
 
                 // 새 백엔드: 문항별 내용/맥락 분석 트리거 (비차단)
+                setCurrentProcessingStep('content-analysis');
                 try {
                     await InterviewAPI.analyzeQuestionContent(
                         sessionId,
@@ -258,23 +308,27 @@ export const useInterviewSession = ({
 
                 // 다음 질문 처리
                 if (!questionManager.isLastQuestion(maxQuestions)) {
+                    setCurrentProcessingStep('next-question');
                     try {
                         const originalQuestion: QuestionDto = {
                             id: questionManager.persistId,
                             text: questionManager.questionText,
                         };
 
-                        message.loading('다음 질문을 생성 중...', 0);
                         const nextQuestion = await InterviewAPI.fetchFollowup(
                             originalQuestion,
                             finalAnswer,
                         );
                         questionManager.addQuestion(nextQuestion);
 
+                        // 다음 질문이 있으므로 finalizing 대신 next-question 유지
                         setTimeout(() => {
                             questionManager.moveToNext();
                             setTimeLeft(60);
-                            ttsManager.speakQuestion(nextQuestion.text, nextQuestion.id);
+                            ttsManager.speakQuestion(nextQuestion.text, nextQuestion.id, () => {
+                                // TTS 완료 후 시작 버튼 표시
+                                handleTTSComplete();
+                            });
                         }, 1000);
                     } catch (error) {
                         console.warn('꼬리질문 생성 실패:', error);
@@ -285,15 +339,18 @@ export const useInterviewSession = ({
                         };
                         questionManager.addQuestion(fallback);
 
+                        // fallback 질문이 있으므로 finalizing 대신 next-question 유지
                         setTimeout(() => {
                             questionManager.moveToNext();
                             setTimeLeft(60);
-                            ttsManager.speakQuestion(fallback.text, fallback.id);
+                            ttsManager.speakQuestion(fallback.text, fallback.id, () => {
+                                // TTS 완료 후 시작 버튼 표시
+                                handleTTSComplete();
+                            });
                         }, 1000);
-                    } finally {
-                        message.destroy();
                     }
                 } else {
+                    setCurrentProcessingStep('finalizing');
                     message.success('모든 답변이 완료되었습니다!');
                     setTimeout(() => {
                         handleInterviewCompletion([...sessions, completedSession!]);
@@ -304,6 +361,11 @@ export const useInterviewSession = ({
             setTranscribedText('');
         } finally {
             completingRef.current = false;
+            // 로딩 팝업 닫기 (약간의 지연 후)
+            setTimeout(() => {
+                setShowProcessingPopup(false);
+                setCurrentProcessingStep(null);
+            }, 1000);
         }
     };
 
@@ -398,17 +460,26 @@ export const useInterviewSession = ({
             if (analysisData) {
                 localStorage.setItem('interviewAnalysis', JSON.stringify(analysisData));
             }
+
+            // 분석 완료 후 즉시 결과 페이지로 이동
+            message.success('면접 분석이 완료되었습니다! 결과 페이지로 이동합니다.');
+            setTimeout(() => {
+                bypassLeaveGuardRef.current = true;
+                window.location.href = '/ai-interview/result';
+            }, 2000); // 2초 후 이동 (사용자가 메시지를 확인할 시간)
         } catch (error) {
             console.error('리포트 분석 호출 실패:', error);
+            // 분석 실패해도 결과 페이지로 이동 (기존 데이터로 표시)
+            message.warning('분석 중 오류가 발생했지만 결과를 확인할 수 있습니다.');
+            setTimeout(() => {
+                bypassLeaveGuardRef.current = true;
+                window.location.href = '/ai-interview/result';
+            }, 2000);
         } finally {
             message.destroy();
             try {
                 localStorage.setItem('interviewQA', JSON.stringify(latestQAList));
             } catch {}
-            setTimeout(() => {
-                bypassLeaveGuardRef.current = true;
-                window.location.href = '/ai-interview/result';
-            }, 20000);
         }
     };
 
@@ -484,9 +555,15 @@ export const useInterviewSession = ({
         transcribedText,
         qaList,
         isCompleting,
+        showProcessingPopup,
+        currentProcessingStep,
+        countdown,
+        isCountdownActive,
         handleStartAnswer,
         handleCompleteAnswer,
         handleDetection,
+        handleTTSComplete,
+        handleUserStartAnswer,
         bypassLeaveGuardRef,
     };
 };

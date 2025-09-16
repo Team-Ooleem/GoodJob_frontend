@@ -313,9 +313,10 @@ export default function AiInterviewSettingCalibrationCombined() {
 
     return (
         <div className='min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-3 relative overflow-hidden'>
-            {/* Voice Activity Glow Effect */}
+            {/* 화면 하단 초록색 마이크 애니메이션 */}
             <div className='absolute bottom-0 left-1/2 transform -translate-x-1/2 w-full'>
-                <div className='w-full h-48 bg-green-400/20 rounded-full blur-3xl animate-pulse translate-y-6'></div>
+                <div className='w-full h-16 bg-green-400/20 rounded-full blur-3xl animate-pulse translate-y-1'></div>
+                <div className='absolute bottom-0 left-1/2 transform -translate-x-1/2 w-[256px] h-[8px] bg-green-300 rounded-full'></div>
             </div>
 
             <Card className='w-full max-w-3xl shadow-xl border-0 rounded-xl overflow-hidden relative z-10'>

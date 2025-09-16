@@ -1,6 +1,5 @@
 import { useState, useRef } from 'react';
 import { api } from '@/apis/api';
-import { speakSync, type SpeakSyncResponse } from '@/apis/avatar-api';
 
 /**
  * TTS(Text-to-Speech) 관리를 위한 커스텀 훅
@@ -8,7 +7,6 @@ import { speakSync, type SpeakSyncResponse } from '@/apis/avatar-api';
  */
 export const useTTSManager = () => {
     const [isSpeaking, setIsSpeaking] = useState(false);
-    const [avatarVideoUrl, setAvatarVideoUrl] = useState<string | null>(null);
     const isSpeakingRef = useRef(false);
     const lastSpokenQuestionRef = useRef<string | null>(null);
     const speakingTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -98,36 +96,16 @@ export const useTTSManager = () => {
         }, duration);
     };
 
-    const speakQuestion = async (text: string, questionId: string) => {
+    const speakQuestion = async (text: string, questionId: string, onComplete?: () => void) => {
         if (isSpeakingRef.current || lastSpokenQuestionRef.current === questionId) {
             return;
         }
-
-        const useTalkingAvatar = process.env.NEXT_PUBLIC_TALKING_AVATAR === 'true';
-        const defaultAvatarId = process.env.NEXT_PUBLIC_DEFAULT_AVATAR_ID;
 
         isSpeakingRef.current = true;
         setIsSpeaking(true);
         lastSpokenQuestionRef.current = questionId;
 
         try {
-            if (useTalkingAvatar && defaultAvatarId) {
-                try {
-                    const res: SpeakSyncResponse = await speakSync({
-                        avatarId: defaultAvatarId,
-                        text: text,
-                        resolution: 256,
-                        stillMode: true,
-                    });
-                    if (res?.success) {
-                        setAvatarVideoUrl(res.videoUrl);
-                        return;
-                    }
-                } catch (e) {
-                    console.warn('아바타 TTS 실패, 음성 TTS로 폴백');
-                }
-            }
-
             const audioUrl = await synthesizeSpeech(text);
             const audio = new Audio(audioUrl);
 
@@ -135,12 +113,14 @@ export const useTTSManager = () => {
                 setIsSpeaking(false);
                 isSpeakingRef.current = false;
                 URL.revokeObjectURL(audioUrl);
+                onComplete?.(); // TTS 완료 콜백 호출
             };
 
             audio.onerror = () => {
                 setIsSpeaking(false);
                 isSpeakingRef.current = false;
                 URL.revokeObjectURL(audioUrl);
+                onComplete?.(); // 에러 시에도 콜백 호출
             };
 
             await audio.play();
@@ -149,13 +129,8 @@ export const useTTSManager = () => {
             setIsSpeaking(false);
             isSpeakingRef.current = false;
             simulateAISpeaking(3000);
+            onComplete?.(); // 실패 시에도 콜백 호출
         }
-    };
-
-    const onAvatarEnded = () => {
-        setAvatarVideoUrl(null);
-        setIsSpeaking(false);
-        isSpeakingRef.current = false;
     };
 
     const cleanup = () => {
@@ -166,9 +141,7 @@ export const useTTSManager = () => {
 
     return {
         isSpeaking,
-        avatarVideoUrl,
         speakQuestion,
-        onAvatarEnded,
         simulateAISpeaking,
         cleanup,
         isSpeakingRef,

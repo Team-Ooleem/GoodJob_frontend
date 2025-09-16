@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import { createPortal } from 'react-dom';
 import { RealMediaPipeAnalyzer, VisualAggregatePayload } from './RealMediaPipeAnalyzer';
 
 interface IWebcam {
@@ -25,6 +26,8 @@ export const Webcam = forwardRef<WebcamHandle, IWebcam>(function Webcam(
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isStreaming, setIsStreaming] = useState(false);
     const [detectionData, setDetectionData] = useState<any>(null);
+    const [showBlurEffect, setShowBlurEffect] = useState(false);
+    const [blurColor, setBlurColor] = useState<'warning' | 'bad' | null>(null);
     const mediaPipeAnalyzerRef = useRef<RealMediaPipeAnalyzer | null>(null);
     const isInitializedRef = useRef(false);
 
@@ -39,6 +42,18 @@ export const Webcam = forwardRef<WebcamHandle, IWebcam>(function Webcam(
         // 로그/표시
         setDetectionData(detection);
         onDetectionRef.current?.(detection);
+
+        // warning 또는 bad 레벨일 때 blur 효과 표시
+        if (detection.level === 'warning' || detection.level === 'bad') {
+            setBlurColor(detection.level);
+            setShowBlurEffect(true);
+
+            // 2초 후 blur 효과 숨김
+            setTimeout(() => {
+                setShowBlurEffect(false);
+                setTimeout(() => setBlurColor(null), 500); // 애니메이션 완료 후 색상 리셋
+            }, 2000);
+        }
 
         // 3초 후 오버레이 숨김
         window.setTimeout(() => setDetectionData(null), 3000);
@@ -163,7 +178,9 @@ export const Webcam = forwardRef<WebcamHandle, IWebcam>(function Webcam(
                                     ? 'bg-blue-500 text-white'
                                     : detectionData.level === 'good'
                                       ? 'bg-green-500 text-white'
-                                      : 'bg-yellow-500 text-black'
+                                      : detectionData.level === 'bad'
+                                        ? 'bg-red-500 text-white'
+                                        : 'bg-yellow-500 text-black'
                             }`}
                         >
                             <div className='flex items-center gap-2'>
@@ -243,6 +260,56 @@ export const Webcam = forwardRef<WebcamHandle, IWebcam>(function Webcam(
                     </div>
                 )}
             </div>
+
+            {/* Viewport 전체에 고정된 blur 효과 - Portal로 body에 직접 렌더링 */}
+            {showBlurEffect &&
+                blurColor &&
+                typeof window !== 'undefined' &&
+                createPortal(
+                    <div className='fixed inset-0 pointer-events-none z-[9999]'>
+                        {/* 상단 blur */}
+                        <div
+                            className={`fixed top-0 left-0 right-0 h-8 ${
+                                blurColor === 'warning' ? 'bg-yellow-400/50' : 'bg-red-400/50'
+                            }`}
+                            style={{
+                                animation: 'blurPulse 0.8s ease-in-out 1',
+                                filter: 'blur(20px)',
+                            }}
+                        />
+                        {/* 하단 blur */}
+                        <div
+                            className={`fixed bottom-0 left-0 right-0 h-8 ${
+                                blurColor === 'warning' ? 'bg-yellow-400/50' : 'bg-red-400/50'
+                            }`}
+                            style={{
+                                animation: 'blurPulse 0.8s ease-in-out 1',
+                                filter: 'blur(20px)',
+                            }}
+                        />
+                        {/* 좌측 blur */}
+                        <div
+                            className={`fixed top-0 bottom-0 left-0 w-8 ${
+                                blurColor === 'warning' ? 'bg-yellow-400/50' : 'bg-red-400/50'
+                            }`}
+                            style={{
+                                animation: 'blurPulse 0.8s ease-in-out 1',
+                                filter: 'blur(20px)',
+                            }}
+                        />
+                        {/* 우측 blur */}
+                        <div
+                            className={`fixed top-0 bottom-0 right-0 w-8 ${
+                                blurColor === 'warning' ? 'bg-yellow-400/50' : 'bg-red-400/50'
+                            }`}
+                            style={{
+                                animation: 'blurPulse 0.8s ease-in-out 1',
+                                filter: 'blur(20px)',
+                            }}
+                        />
+                    </div>,
+                    document.body,
+                )}
         </div>
     );
 });

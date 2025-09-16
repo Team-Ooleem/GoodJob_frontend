@@ -3,14 +3,14 @@
 interface DetectionResult {
     type: 'posture' | 'eye_contact' | 'smile' | 'gesture' | 'confidence' | 'attention' | 'stress';
     message: string;
-    level: 'good' | 'warning' | 'excellent';
+    level: 'good' | 'warning' | 'bad' | 'excellent';
     confidence: number;
     landmarks: any;
     metrics: any;
 }
 
 type Presence = 'good' | 'average' | 'needs_improvement';
-type LevelAgg = 'ok' | 'info' | 'warning' | 'critical';
+type LevelAgg = 'ok' | 'info' | 'warning' | 'bad' | 'critical';
 
 // 서버에 보낼 문항 집계 페이로드 (Nest의 VisualAggregateDto와 1:1)
 export type VisualAggregatePayload = {
@@ -33,6 +33,7 @@ export type VisualAggregatePayload = {
     level_ok: number;
     level_info: number;
     level_warning: number;
+    level_bad: number;
     level_critical: number;
 
     left_eye_x_mean: number | null;
@@ -330,11 +331,13 @@ export class RealMediaPipeAnalyzer {
                       ? 'needs_improvement'
                       : 'average';
 
-            // level 매핑: 스트레스가 높은 구간만 'warning'
+            // level 매핑: 매우 심각한 상황은 'bad', 높은 스트레스는 'warning'
             const level: LevelAgg =
-                interviewMetrics.stress > (this.calib?.stressWarnThreshold ?? 0.6)
-                    ? 'warning'
-                    : 'ok';
+                interviewMetrics.stress > 0.8 || interviewMetrics.confidence < 0.2
+                    ? 'bad'
+                    : interviewMetrics.stress > (this.calib?.stressWarnThreshold ?? 0.6)
+                      ? 'warning'
+                      : 'ok';
 
             const sample: VisualSampleLite = {
                 timestamp: new Date().toISOString(),
@@ -473,7 +476,24 @@ export class RealMediaPipeAnalyzer {
         const attWarnTh = this.calib?.attentionWarnThreshold ?? 0.45;
         const stressWarnTh = this.calib?.stressWarnThreshold ?? 0.6;
 
-        // 1) 스트레스 높음
+        // 1) 매우 심각한 상황 (bad)
+        if (metrics.stress > 0.8 || metrics.confidence < 0.2) {
+            emit('stress', {
+                type: 'stress',
+                message: '심각한 긴장 상태입니다. 깊게 숨을 쉬고 마음을 진정시켜보세요',
+                level: 'bad',
+                confidence: 1 - metrics.stress,
+                landmarks,
+                metrics: {
+                    stressLevel: metrics.stress,
+                    nervousness: metrics.nervousness,
+                    relaxationNeeded: true,
+                },
+            });
+            return;
+        }
+
+        // 2) 스트레스 높음 (warning)
         if (metrics.stress > stressWarnTh) {
             emit('stress', {
                 type: 'stress',
@@ -490,7 +510,7 @@ export class RealMediaPipeAnalyzer {
             return;
         }
 
-        // 2) 주의/아이컨택 낮음
+        // 3) 주의/아이컨택 낮음
         if (metrics.attention < attWarnTh || metrics.eyeContact < attWarnTh) {
             emit('attention', {
                 type: 'attention',
@@ -507,7 +527,7 @@ export class RealMediaPipeAnalyzer {
             return;
         }
 
-        // 3) 자신감 낮음
+        // 4) 자신감 낮음
         if (metrics.confidence < confWarnTh) {
             emit('confidence', {
                 type: 'confidence',
@@ -524,7 +544,7 @@ export class RealMediaPipeAnalyzer {
             return;
         }
 
-        // 4) 긍정 피드백
+        // 5) 긍정 피드백
         if (metrics.confidence > confGoodTh) {
             emit('confidence', {
                 type: 'confidence',
@@ -572,6 +592,116 @@ export class RealMediaPipeAnalyzer {
             });
             return;
         }
+
+        // 6) 참여도 낮음
+        if (metrics.engagement < 0.4) {
+            emit('attention', {
+                type: 'attention',
+                message: '더 적극적으로 참여해보세요',
+                level: 'warning',
+                confidence: metrics.engagement,
+                landmarks,
+                metrics: {
+                    engagementScore: metrics.engagement,
+                    participationLevel: 'low',
+                },
+            });
+            return;
+        }
+
+        // 7) 눈 깜빡임 과다
+        if (metrics.eyeContact < 0.3) {
+            emit('attention', {
+                type: 'attention',
+                message: '눈을 너무 자주 깜빡이지 마세요',
+                level: 'warning',
+                confidence: metrics.eyeContact,
+                landmarks,
+                metrics: {
+                    eyeContactScore: metrics.eyeContact,
+                    blinkFrequency: 'high',
+                },
+            });
+            return;
+        }
+
+        // 8) 과도한 미소
+        if (metrics.smile > 0.8) {
+            emit('smile', {
+                type: 'smile',
+                message: '자연스러운 표정을 유지해보세요',
+                level: 'warning',
+                confidence: 1 - metrics.smile,
+                landmarks,
+                metrics: {
+                    smileIntensity: metrics.smile,
+                    facialExpression: 'overdone',
+                },
+            });
+            return;
+        }
+
+        // 9) 표정 변화 부족
+        if (metrics.smile < 0.1 && metrics.confidence < 0.3) {
+            emit('confidence', {
+                type: 'confidence',
+                message: '표정을 좀 더 생동감 있게 해보세요',
+                level: 'warning',
+                confidence: (metrics.smile + metrics.confidence) / 2,
+                landmarks,
+                metrics: {
+                    facialExpression: 'static',
+                    liveliness: 'low',
+                },
+            });
+            return;
+        }
+
+        // 10) 시선이 너무 고정됨
+        if (metrics.attention > 0.9 && metrics.eyeContact > 0.9) {
+            emit('attention', {
+                type: 'attention',
+                message: '자연스럽게 시선을 움직여보세요',
+                level: 'good',
+                confidence: (metrics.attention + metrics.eyeContact) / 2,
+                landmarks,
+                metrics: {
+                    eyeContactScore: metrics.eyeContact,
+                    attentionScore: metrics.attention,
+                    naturalness: 'needs_variation',
+                },
+            });
+            return;
+        }
+
+        // 기본 피드백 - 모든 조건에 해당하지 않을 때
+        const randomMessages = [
+            '좋은 자세를 유지하고 있습니다',
+            '자연스러운 표정이 좋습니다',
+            '집중력이 좋습니다',
+            '면접에 잘 집중하고 있습니다',
+            '자신감 있는 모습이 보입니다',
+            '적절한 아이컨택을 유지하고 있습니다',
+            '긍정적인 에너지가 느껴집니다',
+            '안정적인 자세를 유지하고 있습니다',
+        ];
+
+        const randomMessage = randomMessages[Math.floor(Math.random() * randomMessages.length)];
+        const overallScore = (metrics.confidence + metrics.attention + metrics.engagement) / 3;
+
+        emit('confidence', {
+            type: 'confidence',
+            message: randomMessage,
+            level: overallScore > 0.7 ? 'good' : 'warning',
+            confidence: overallScore,
+            landmarks,
+            metrics: {
+                confidenceScore: metrics.confidence,
+                attentionScore: metrics.attention,
+                engagementScore: metrics.engagement,
+                overallPresence: overallScore > 0.7 ? 'good' : 'average',
+            },
+        });
     }
 
     private analyzeFrame() {
@@ -719,7 +849,7 @@ export class RealMediaPipeAnalyzer {
         const blinks = toNumArr((s) => s.detection.blinkProb);
 
         const presence = { good: 0, average: 0, needs_improvement: 0 };
-        const level = { ok: 0, info: 0, warning: 0, critical: 0 as 0 };
+        const level = { ok: 0, info: 0, warning: 0, bad: 0, critical: 0 as 0 };
 
         for (const s of samples) {
             const p = s.detection.overallPresence;
@@ -779,6 +909,7 @@ export class RealMediaPipeAnalyzer {
             level_ok: level.ok,
             level_info: level.info,
             level_warning: level.warning,
+            level_bad: level.bad,
             level_critical: level.critical,
 
             left_eye_x_mean: left.x,
