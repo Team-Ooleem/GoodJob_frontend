@@ -79,6 +79,10 @@ type CanvasStoreState = {
     addHistory: (poppedObject: fabric.Object) => void;
     undo: () => void;
     redo: () => void;
+
+    // 변경 발생 알림 콜백
+    onChange?: () => void;
+    setOnChange: (fn: () => void) => void;
 };
 
 type DrawingBrush = fabric.PencilBrush | fabric.SprayBrush;
@@ -354,28 +358,30 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
         })),
 
     undo: () => {
-        const canvas = get().canvasInstance;
-        if (canvas) {
-            if (canvas._objects.length > 0) {
-                const poppedObject = canvas._objects.pop() as fabric.Object;
-                get().addHistory(poppedObject);
-                canvas.renderAll();
-            }
+        const socket = get().socket;
+        const undoFn = (window as any).__collaborativeUndo;
+
+        if (socket && undoFn) {
+            // 로컬 실행
+            undoFn();
+            // 소켓을 통해 undo 작업을 브로드캐스트
+            socket.emit('canvas:undo', { room: (window as any).__currentRoom });
         }
     },
 
     redo: () => {
-        const canvas = get().canvasInstance;
-        const history = get().history;
-        if (canvas && history) {
-            if (history.length > 0) {
-                set({ isLocked: true });
-                canvas.add(history[history.length - 1]);
-                const newHistory = history.slice(0, -1);
-                set({ history: newHistory });
-            }
+        const socket = get().socket;
+        const redoFn = (window as any).__collaborativeRedo;
+
+        if (socket && redoFn) {
+            // 로컬 실행
+            redoFn();
+            // 소켓을 통해 redo 작업을 브로드캐스트
+            socket.emit('canvas:redo', { room: (window as any).__currentRoom });
         }
     },
+
+    setOnChange: (fn) => set({ onChange: fn }),
 }));
 
 function ensureFreeDrawingBrush(canvas: fabric.Canvas, brushConfig: BrushConfig) {

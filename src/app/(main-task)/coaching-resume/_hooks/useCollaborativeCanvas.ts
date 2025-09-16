@@ -15,9 +15,6 @@ type BrushConfig = {
 
 type FabricObject = fabric.Object & {
     id?: string;
-    __fromRemote?: boolean;
-    __lastModified?: number;
-    __brushType?: BrushKind;
 };
 
 const makeId = () => `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
@@ -28,10 +25,6 @@ const enlivenObjects = (arr: any[]): Promise<fabric.Object[]> =>
 const ensureId = (obj: FabricObject) => {
     if (!obj.id) obj.id = makeId();
     return obj.id;
-};
-
-const getObjectHash = (obj: FabricObject): string => {
-    return `${obj.left || 0}_${obj.top || 0}_${obj.angle || 0}_${obj.scaleX || 1}_${obj.scaleY || 1}`;
 };
 
 const toU8 = (payload: unknown): Uint8Array => {
@@ -52,14 +45,16 @@ export function useCollaborativeCanvas(room: string) {
     const brushConfig = useCanvasStore((s) => s.brush);
 
     const syncTimeoutRef = useRef<NodeJS.Timeout>();
-    const lastSyncHashRef = useRef<Map<string, string>>(new Map());
     const isApplyingRemoteRef = useRef(false);
+    const undoManagerRef = useRef<Y.UndoManager | null>(null);
+    const canvasSnapshotsRef = useRef<any[]>([]);
+    const currentSnapshotIndexRef = useRef(-1);
 
+    // FreeDrawing 상태 추적
     const isDrawingRef = useRef(false);
     const currentPathIdRef = useRef<string | null>(null);
     const currentBrushRef = useRef<BrushConfig>(brushConfig);
 
-    // 브러시 상태 추적
     useEffect(() => {
         currentBrushRef.current = brushConfig;
     }, [brushConfig]);
@@ -73,37 +68,157 @@ export function useCollaborativeCanvas(room: string) {
             socket.emit('joinCanvas', room);
         });
 
-        // --- Y.Doc 설정 ---
+        // --- Y.Doc ---
         const ydoc = new Y.Doc();
         const yObjects = ydoc.getMap<any>('objects');
 
+        // 스냅샷 기반 undo/redo 헬퍼 함수들
+        const saveSnapshot = () => {
+            const snapshot = Array.from(yObjects.entries());
+            canvasSnapshotsRef.current = canvasSnapshotsRef.current.slice(0, currentSnapshotIndexRef.current + 1);
+            canvasSnapshotsRef.current.push(snapshot);
+            currentSnapshotIndexRef.current++;
+
+            // 최대 50개 스냅샷만 유지
+            if (canvasSnapshotsRef.current.length > 50) {
+                canvasSnapshotsRef.current.shift();
+                currentSnapshotIndexRef.current--;
+            }
+        };
+
+        const performUndo = async () => {
+            if (currentSnapshotIndexRef.current > 0) {
+                currentSnapshotIndexRef.current--;
+                const snapshot = canvasSnapshotsRef.current[currentSnapshotIndexRef.current];
+                await restoreSnapshot(snapshot);
+            }
+        };
+
+        const performRedo = async () => {
+            if (currentSnapshotIndexRef.current < canvasSnapshotsRef.current.length - 1) {
+                currentSnapshotIndexRef.current++;
+                const snapshot = canvasSnapshotsRef.current[currentSnapshotIndexRef.current];
+                await restoreSnapshot(snapshot);
+            }
+        };
+
+        const restoreSnapshot = async (snapshot: any[]) => {
+            isApplyingRemoteRef.current = true;
+            try {
+                Y.transact(ydoc, () => {
+                    yObjects.clear();
+                    snapshot.forEach(([key, value]) => {
+                        yObjects.set(key, value);
+                    });
+                });
+                await syncFromY();
+            } finally {
+                setTimeout(() => {
+                    isApplyingRemoteRef.current = false;
+                }, 100);
+            }
+        };
+
+        // 초기 스냅샷 저장
+        saveSnapshot();
+
+        // 글로벌 참조 설정
+        (window as any).__collaborativeUndo = performUndo;
+        (window as any).__collaborativeRedo = performRedo;
+        (window as any).__currentRoom = room;
+
+        // 로컬 → 서버
         const onLocalYUpdate = (u8: Uint8Array, origin: any) => {
-            if (isApplyingRemoteRef.current || origin === 'remote') return;
+            if (origin === 'remote') return;
             socket.emit('sync', { room, update: Array.from(u8) });
         };
         ydoc.on('update', onLocalYUpdate);
 
+        // 원격 → 로컬
         const applyRemoteUpdate = async (u8: Uint8Array) => {
             isApplyingRemoteRef.current = true;
             try {
                 Y.applyUpdate(ydoc, u8, 'remote');
                 await syncFromY();
             } finally {
-                setTimeout(() => {
-                    isApplyingRemoteRef.current = false;
-                }, 50);
+                isApplyingRemoteRef.current = false;
             }
         };
 
         socket.on('init', (payload: unknown) => {
-            console.log('Received initial state');
+            applyRemoteUpdate(toU8(payload));
+        });
+        socket.on('update', (payload: unknown) => {
             applyRemoteUpdate(toU8(payload));
         });
 
-        socket.on('update', (payload: unknown) => {
-            console.log('Received update');
-            applyRemoteUpdate(toU8(payload));
-        });
+        // ----------------------------
+        // Y.js → Canvas 동기화
+        // ----------------------------
+        const syncFromY = async () => {
+            const existing = new Map<string, FabricObject>();
+            canvas.getObjects().forEach((obj) => {
+                const fo = obj as FabricObject;
+                if (fo.id) existing.set(fo.id, fo);
+            });
+
+            for (const [id, data] of yObjects.entries()) {
+                if (existing.has(id)) {
+                    // update
+                    existing.get(id)!.set(data);
+                    existing.get(id)!.setCoords();
+                    existing.delete(id);
+                } else {
+                    // create
+                    const [obj] = (await enlivenObjects([data])) as FabricObject[];
+                    obj.id = id;
+                    canvas.add(obj);
+                }
+            }
+
+            // remove leftover
+            existing.forEach((obj) => canvas.remove(obj));
+
+            canvas.requestRenderAll();
+        };
+
+        // ----------------------------
+        // Canvas → Y.js 동기화
+        // ----------------------------
+        const syncToY = () => {
+            if (isApplyingRemoteRef.current) return;
+            if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+
+            syncTimeoutRef.current = setTimeout(() => {
+                Y.transact(ydoc, () => {
+                    const ids = new Set<string>();
+                    canvas.getObjects().forEach((obj) => {
+                        if (obj instanceof fabric.ActiveSelection) return;
+                        const fo = obj as FabricObject;
+                        // 실시간 드로잉 path는 Y.js 동기화에서 제외
+                        if ((fo as any).__isRealTimePath) return;
+
+                        const id = ensureId(fo);
+                        ids.add(id);
+                        const data = fo.toObject();
+                        data.id = id;
+                        yObjects.set(id, data);
+                    });
+
+                    // 삭제 처리
+                    Array.from(yObjects.keys()).forEach((id) => {
+                        if (!ids.has(id)) yObjects.delete(id);
+                    });
+                });
+
+                // 스냅샷 저장 (변경이 있을 때만)
+                setTimeout(() => {
+                    if (!isApplyingRemoteRef.current) {
+                        saveSnapshot();
+                    }
+                }, 50);
+            }, 30);
+        };
 
         // ----------------------------
         // FreeDrawing 실시간 스트리밍
@@ -140,6 +255,7 @@ export function useCollaborativeCanvas(room: string) {
                 room,
                 id: currentPathIdRef.current,
             });
+            // 실시간 드로잉은 이미 처리되었으므로 syncToY 호출하지 않음
             currentPathIdRef.current = null;
         };
 
@@ -147,7 +263,7 @@ export function useCollaborativeCanvas(room: string) {
         canvas.on('mouse:move', handleMouseMove);
         canvas.on('mouse:up', handleMouseUp);
 
-        // --- 원격 수신 ---
+        // --- 원격 수신 (그려지는 중)
         socket.on('drawing:start', ({ id, brush }) => {
             const { color, width, type } = brush as BrushConfig;
             const path = new fabric.Path('', {
@@ -157,8 +273,7 @@ export function useCollaborativeCanvas(room: string) {
                 selectable: false,
             }) as FabricObject;
             path.id = id;
-            path.__fromRemote = true;
-            path.__brushType = type;
+            (path as any).__isRealTimePath = true; // 실시간 드로잉 마킹
             canvas.add(path);
         });
 
@@ -185,202 +300,91 @@ export function useCollaborativeCanvas(room: string) {
                 selectable: false,
             }) as FabricObject;
             newPath.id = id;
-            newPath.__fromRemote = true;
-            newPath.__brushType = type;
+            (newPath as any).__isRealTimePath = true; // 실시간 드로잉 마킹
 
             canvas.add(newPath);
             canvas.requestRenderAll();
         });
 
         socket.on('drawing:end', ({ id }) => {
-            const pathObj = canvas
-                .getObjects()
-                .find((o) => (o as FabricObject).id === id) as FabricObject;
-            if (pathObj) pathObj.__fromRemote = false;
-            canvas.requestRenderAll();
+            const obj = canvas.getObjects().find((o) => (o as FabricObject).id === id);
+            if (obj) {
+                ensureId(obj as FabricObject);
+                // 실시간 드로잉은 이미 Y.js에서 관리되므로 syncToY 호출하지 않음
+            }
+        });
+
+        // --- Undo/Redo 이벤트 ---
+        socket.on('canvas:undo', () => {
+            performUndo();
+        });
+
+        socket.on('canvas:redo', () => {
+            performRedo();
         });
 
         // ----------------------------
-        // Y.js → Canvas 동기화
+        // Fabric 이벤트 → 로컬 변경만 syncToY
         // ----------------------------
-        const syncFromY = async () => {
-            if (!isApplyingRemoteRef.current) return;
-            const canvasObjects = new Map<string, FabricObject>();
-            canvas.getObjects().forEach((obj) => {
-                const fo = obj as FabricObject;
-                if (fo.id) canvasObjects.set(fo.id, fo);
-            });
-
-            const updatedObjects: FabricObject[] = [];
-            for (const [id, data] of yObjects.entries()) {
-                if (data.type instanceof fabric.ActiveSelection) continue;
-
-                const existing = canvasObjects.get(id);
-                const newHash = `${data.left || 0}_${data.top || 0}_${data.angle || 0}_${data.scaleX || 1}_${data.scaleY || 1}`;
-                const lastHash = lastSyncHashRef.current.get(id);
-
-                if (existing) {
-                    if (lastHash !== newHash) {
-                        existing.__fromRemote = true;
-                        existing.__lastModified = Date.now();
-                        existing.set({
-                            left: data.left,
-                            top: data.top,
-                            angle: data.angle || 0,
-                            scaleX: data.scaleX || 1,
-                            scaleY: data.scaleY || 1,
-                        });
-                        existing.setCoords();
-                        updatedObjects.push(existing);
-                        lastSyncHashRef.current.set(id, newHash);
-                    }
-                    canvasObjects.delete(id);
-                } else {
-                    try {
-                        const [obj] = (await enlivenObjects([data])) as FabricObject[];
-                        obj.id = id;
-                        obj.__fromRemote = true;
-                        obj.__lastModified = Date.now();
-                        obj.set({
-                            hasControls: false,
-                            lockScalingX: true,
-                            lockScalingY: true,
-                            lockRotation: true,
-                            lockSkewingX: true,
-                            lockSkewingY: true,
-                        });
-                        canvas.add(obj);
-                        lastSyncHashRef.current.set(id, newHash);
-                        updatedObjects.push(obj);
-                    } catch (error) {
-                        console.error('Failed to enliven object:', error, data);
-                    }
-                }
-            }
-
-            canvasObjects.forEach((obj) => {
-                obj.__fromRemote = true;
-                canvas.remove(obj);
-                if (obj.id) lastSyncHashRef.current.delete(obj.id);
-            });
-
-            updatedObjects.forEach((obj) => {
-                setTimeout(() => (obj.__fromRemote = false), 100);
-            });
-            canvas.requestRenderAll();
-        };
-
-        // ----------------------------
-        // Canvas → Y.js 동기화
-        // ----------------------------
-        const syncToY = () => {
-            if (isApplyingRemoteRef.current) return;
-            if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
-
-            syncTimeoutRef.current = setTimeout(() => {
-                Y.transact(ydoc, () => {
-                    const currentIds = new Set<string>();
-                    canvas.getObjects().forEach((obj) => {
-                        if (obj instanceof fabric.ActiveSelection) return;
-                        const fo = obj as FabricObject;
-                        if (
-                            fo.__fromRemote &&
-                            fo.__lastModified &&
-                            Date.now() - fo.__lastModified < 200
-                        ) {
-                            return;
-                        }
-                        const id = ensureId(fo);
-                        currentIds.add(id);
-                        const data = fo.toObject();
-                        data.id = id;
-                        const currentHash = getObjectHash(fo);
-                        const lastHash = lastSyncHashRef.current.get(id);
-                        if (lastHash !== currentHash) {
-                            yObjects.set(id, data);
-                            lastSyncHashRef.current.set(id, currentHash);
-                        }
-                    });
-
-                    Array.from(yObjects.keys()).forEach((id) => {
-                        if (!currentIds.has(id)) {
-                            yObjects.delete(id);
-                            lastSyncHashRef.current.delete(id);
-                        }
-                    });
-                });
-            }, 50);
-        };
-
-        // Fabric 이벤트
         const onObjectAdded = (e: any) => {
             const obj = e.target as FabricObject;
-            if (obj.__fromRemote) return;
-            ensureId(obj);
-            obj.set({
-                hasControls: false,
-                lockScalingX: true,
-                lockScalingY: true,
-                lockRotation: true,
-                lockSkewingX: true,
-                lockSkewingY: true,
-            });
+            // 실시간 드로잉이나 원격 동기화에서 온 것이면 무시
+            if (obj.id && (isDrawingRef.current || isApplyingRemoteRef.current)) return;
             syncToY();
         };
 
-        const onObjectModified = (e: any) => {
-            const target = e.target as FabricObject | undefined;
-            if (!target || target.__fromRemote) return;
+        const onPathCreated = (e: any) => {
+            // 실시간 드로잉 중이면 syncToY 호출하지 않음 (이미 handleMouseUp에서 처리)
+            if (isDrawingRef.current) return;
             syncToY();
-            canvas.requestRenderAll();
-        };
-
-        const onObjectRemoved = (e: any) => {
-            const obj = e.target as FabricObject;
-            if (obj.__fromRemote) return;
-            if (obj.id) lastSyncHashRef.current.delete(obj.id);
-            syncToY();
-        };
-
-        const onPathCreated = () => {
-            // freeDrawing 종료 후 최종 Path → Yjs에 반영
-            syncToY();
-        };
-
-        const onObjectMoving = () => {
-            if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
-            syncTimeoutRef.current = setTimeout(syncToY, 16);
         };
 
         canvas.on('object:added', onObjectAdded);
-        canvas.on('object:modified', onObjectModified);
-        canvas.on('object:removed', onObjectRemoved);
+        canvas.on('object:modified', () => syncToY());
+        canvas.on('object:removed', () => syncToY());
         canvas.on('path:created', onPathCreated);
-        canvas.on('object:moving', onObjectMoving);
-        canvas.on('object:rotating', onObjectMoving);
+        canvas.on('object:moving', () => syncToY());
+        canvas.on('object:rotating', () => syncToY());
+        canvas.on('object:scaling', () => syncToY());
 
         // --- cleanup ---
         return () => {
             if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
 
             canvas.off('object:added', onObjectAdded);
-            canvas.off('object:modified', onObjectModified);
-            canvas.off('object:removed', onObjectRemoved);
+            canvas.off('object:modified');
+            canvas.off('object:removed');
             canvas.off('path:created', onPathCreated);
-            canvas.off('object:moving', onObjectMoving);
-            canvas.off('object:rotating', onObjectMoving);
+            canvas.off('object:moving');
+            canvas.off('object:rotating');
+            canvas.off('object:scaling');
 
             canvas.off('mouse:down', handleMouseDown);
             canvas.off('mouse:move', handleMouseMove);
             canvas.off('mouse:up', handleMouseUp);
 
+            socket.off('init');
+            socket.off('update');
             socket.off('drawing:start');
             socket.off('drawing:progress');
             socket.off('drawing:end');
+            socket.off('canvas:undo');
+            socket.off('canvas:redo');
 
             ydoc.off('update', onLocalYUpdate);
-            lastSyncHashRef.current.clear();
             ydoc.destroy();
+
+            // 글로벌 참조 정리
+            delete (window as any).__collaborativeUndo;
+            delete (window as any).__collaborativeRedo;
+            if ((window as any).__currentRoom === room) {
+                delete (window as any).__currentRoom;
+            }
+
+            // 참조 정리
+            canvasSnapshotsRef.current = [];
+            currentSnapshotIndexRef.current = -1;
+            undoManagerRef.current = null;
         };
     }, [canvas, socket, room]);
 }
