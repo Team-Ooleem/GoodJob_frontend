@@ -126,7 +126,7 @@ export default function AiInterviewSettingCalibrationCombined() {
     const [isProcessing, setIsProcessing] = useState(false);
     const [sessionId, setSessionId] = useState<string | null>(null);
 
-    const CALI_TEXT = '생각이 깊어 빠져죽기에 충분했다.';
+    const CALI_TEXT = '너무 맑고 초롱한 그 중 하나 별이여';
 
     useEffect(() => {
         if (phase !== 'running') return;
@@ -321,7 +321,7 @@ export default function AiInterviewSettingCalibrationCombined() {
             <Card className='w-full max-w-3xl shadow-xl border-0 rounded-xl overflow-hidden relative z-10'>
                 <CardHeader className='px-6 pt-6 pb-4 text-center'>
                     <div className='flex items-center justify-center mb-3'>
-                        <div className='w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center mr-3'>
+                        <div className='w-10 h-10 bg-sky-500 rounded-lg flex items-center justify-center mr-3'>
                             <Video className='text-white text-lg' />
                         </div>
                         <CardTitle className='text-2xl font-bold text-gray-900 mb-0'>
@@ -357,40 +357,52 @@ export default function AiInterviewSettingCalibrationCombined() {
                                 <Webcam ref={webcamRef} width={600} height={338} overlayGuide />
                             </div>
                             {/* 버튼을 영상 아래의 흰색 베이스 위에 배치 */}
-                            <div className='w-[600px] bg-white rounded-b-2xl shadow-sm flex items-center justify-center gap-3 py-4 -mt-1'>
-                                {phase !== 'running' ? (
-                                    <button
-                                        onClick={startCalibration}
-                                        className='w-12 h-12 rounded-full bg-white shadow-md flex items-center justify-center hover:scale-105 transition'
-                                        aria-label='기준 측정 시작'
-                                    >
-                                        <span className='w-5 h-5 rounded-full bg-red-500 block'></span>
-                                    </button>
-                                ) : (
-                                    <button
-                                        onClick={stopCalibration}
-                                        disabled={isProcessing}
-                                        className={`w-12 h-12 rounded-full shadow-md flex items-center justify-center hover:scale-105 transition ${isProcessing ? 'bg-red-300' : 'bg-red-500'}`}
-                                        aria-label='중지 및 결과 산출'
-                                    >
-                                        <span className='w-2.5 h-2.5 rounded-full bg-white block animate-pulse'></span>
-                                    </button>
-                                )}
-                                {phase === 'done' && (
-                                    <Button
-                                        onClick={resetCalibration}
-                                        size='sm'
-                                        disabled={isProcessing}
-                                        className='text-xs px-3 py-1 h-8'
-                                    >
-                                        다시 녹음하기
-                                    </Button>
-                                )}
+                            <div className='w-[600px] bg-white rounded-b-2xl shadow-sm flex flex-col items-center justify-center gap-3 py-4 -mt-1'>
+                                <div className='flex items-center gap-3'>
+                                    {phase !== 'running' ? (
+                                        <button
+                                            onClick={startCalibration}
+                                            className='w-14 h-14 rounded-full bg-white shadow-lg border-2 border-red-200 flex items-center justify-center hover:scale-110 hover:shadow-xl transition-all duration-300'
+                                            style={{
+                                                animation:
+                                                    'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                                            }}
+                                            aria-label='기준 측정 시작'
+                                        >
+                                            <span
+                                                className='w-6 h-6 rounded-full bg-red-500 block'
+                                                style={{
+                                                    animation:
+                                                        'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                                                }}
+                                            ></span>
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={stopCalibration}
+                                            disabled={isProcessing}
+                                            className={`w-14 h-14 rounded-full shadow-lg flex items-center justify-center hover:scale-105 transition-all duration-300 ${isProcessing ? 'bg-red-300' : 'bg-red-500'}`}
+                                            aria-label='중지 및 결과 산출'
+                                        >
+                                            <span className='w-3 h-3 rounded-full bg-white block animate-pulse'></span>
+                                        </button>
+                                    )}
+                                    {phase === 'done' && (
+                                        <Button
+                                            onClick={resetCalibration}
+                                            size='sm'
+                                            disabled={isProcessing}
+                                            className='text-xs px-3 py-1 h-8'
+                                        >
+                                            다시 녹음하기
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
 
                             {/* 캘리브레이션 문장 */}
                             <div className='mt-4'>
-                                <blockquote className='text-xl text-green-500/80 italic text-center px-5 py-3 border rounded-xl bg-green-50/40'>
+                                <blockquote className='text-xl text-sky-500/80 italic text-center px-5 py-3 border rounded-xl bg-sky-50/40'>
                                     "{CALI_TEXT}"
                                 </blockquote>
                             </div>
@@ -399,7 +411,7 @@ export default function AiInterviewSettingCalibrationCombined() {
                             <div className='mt-6 flex justify-center'>
                                 <Button
                                     size='lg'
-                                    className='h-12 px-8 text-base font-bold bg-green-600 hover:bg-green-700 border-0 rounded-xl shadow-lg text-white'
+                                    className='h-12 px-8 text-base font-bold bg-sky-500 hover:bg-sky-600 border-0 rounded-xl shadow-lg text-white'
                                     onClick={goToSession}
                                     disabled={!(webcamOk && micOk && phase === 'done')}
                                 >
@@ -416,16 +428,16 @@ export default function AiInterviewSettingCalibrationCombined() {
                     {phase === 'running' && (
                         <div className='px-6 pb-4 relative'>
                             <div className='flex items-center justify-center gap-2'>
-                                <Mic className='text-green-500 text-base animate-pulse' />
+                                <Mic className='text-sky-500 text-base animate-pulse' />
                                 <span className='text-sm text-gray-600 mr-3'>음성 감지 중</span>
                                 {/* Audio Level Visualization */}
                                 <div className='flex items-center gap-1 relative'>
                                     {/* Glow effect behind the bars */}
-                                    <div className='absolute inset-0 bg-green-400/20 rounded-full blur-sm animate-pulse'></div>
+                                    <div className='absolute inset-0 bg-sky-400/20 rounded-full blur-sm animate-pulse'></div>
                                     {[...Array(12)].map((_, i) => (
                                         <div
                                             key={i}
-                                            className={`w-1 bg-gradient-to-t from-green-400 to-green-600 rounded-full animate-pulse relative z-10 shadow-lg shadow-green-400/50`}
+                                            className={`w-1 bg-gradient-to-t from-sky-300 to-sky-500 rounded-full animate-pulse relative z-10 shadow-lg shadow-sky-400/50`}
                                             style={{
                                                 height: `${Math.random() * 20 + 8}px`,
                                                 animationDelay: `${i * 50}ms`,

@@ -134,7 +134,7 @@ export default function AiInterviewSelectPage() {
                             {/* 로딩 아이콘 */}
                             <div className='mb-6'>
                                 <div className='relative inline-block'>
-                                    <Loader2 className='w-16 h-16 text-blue-600 animate-spin' />
+                                    <Loader2 className='w-16 h-16 text-sky-500 animate-spin' />
                                 </div>
                             </div>
 
@@ -152,23 +152,23 @@ export default function AiInterviewSelectPage() {
                                 {/* 점 3개 애니메이션 */}
                                 <div className='flex items-center justify-center gap-1'>
                                     <div
-                                        className='w-2 h-2 bg-blue-500 rounded-full animate-bounce'
+                                        className='w-2 h-2 bg-sky-400 rounded-full animate-bounce'
                                         style={{ animationDelay: '0ms' }}
                                     ></div>
                                     <div
-                                        className='w-2 h-2 bg-blue-500 rounded-full animate-bounce'
+                                        className='w-2 h-2 bg-sky-400 rounded-full animate-bounce'
                                         style={{ animationDelay: '150ms' }}
                                     ></div>
                                     <div
-                                        className='w-2 h-2 bg-blue-500 rounded-full animate-bounce'
+                                        className='w-2 h-2 bg-sky-400 rounded-full animate-bounce'
                                         style={{ animationDelay: '300ms' }}
                                     ></div>
                                 </div>
                             </div>
 
                             {/* 안내 문구 */}
-                            <div className='mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg'>
-                                <p className='text-sm text-blue-700'>
+                            <div className='mt-6 p-4 bg-sky-50 border border-sky-200 rounded-lg'>
+                                <p className='text-sm text-sky-700'>
                                     이력서 분석이 완료되면 자동으로 면접 설정 페이지로 이동합니다.
                                 </p>
                             </div>
@@ -212,7 +212,7 @@ export default function AiInterviewSelectPage() {
                             {/* 이력서 선택 탭 */}
                             <TabsContent value='resume'>
                                 {uploadedFile ? (
-                                    <div className='p-4 border-2 border-blue-500 bg-blue-50 rounded-lg'>
+                                    <div className='p-4 border-2 border-sky-400 bg-sky-50 rounded-lg'>
                                         <div className='flex items-center justify-between'>
                                             <div>
                                                 <p className='font-semibold text-gray-900'>
@@ -230,7 +230,7 @@ export default function AiInterviewSelectPage() {
                                                     className={
                                                         'px-2 py-1 rounded text-xs ' +
                                                         (uploadedFile.parseStatus === 'done'
-                                                            ? 'bg-blue-100 text-blue-700'
+                                                            ? 'bg-sky-100 text-sky-700'
                                                             : uploadedFile.parseStatus ===
                                                                 'processing'
                                                               ? 'bg-yellow-100 text-yellow-700'
@@ -247,7 +247,7 @@ export default function AiInterviewSelectPage() {
                                                             ? '오류'
                                                             : '업로드 완료'}
                                                 </span>
-                                                <div className='w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center'>
+                                                <div className='w-5 h-5 bg-sky-400 rounded-full flex items-center justify-center'>
                                                     <div className='w-2 h-2 bg-white rounded-full'></div>
                                                 </div>
                                             </div>
@@ -379,7 +379,7 @@ export default function AiInterviewSelectPage() {
                                                 setButtonAnimation(true);
                                                 setTimeout(() => setButtonAnimation(false), 1000);
                                             }}
-                                            className='w-full px-4 py-4 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none transition-colors duration-200 text-lg'
+                                            className='w-full px-4 py-4 border-2 border-gray-200 rounded-lg focus:border-sky-400 focus:outline-none transition-colors duration-200 text-lg'
                                         />
                                     </div>
 
@@ -393,7 +393,7 @@ export default function AiInterviewSelectPage() {
                                                     <div
                                                         className={`p-4 border rounded-lg ${
                                                             isSaraminUrl
-                                                                ? 'bg-blue-50 border-blue-200'
+                                                                ? 'bg-sky-50 border-sky-200'
                                                                 : 'bg-yellow-50 border-yellow-200'
                                                         }`}
                                                     >
@@ -401,7 +401,7 @@ export default function AiInterviewSelectPage() {
                                                             <div
                                                                 className={`w-5 h-5 rounded-full flex items-center justify-center mr-3 ${
                                                                     isSaraminUrl
-                                                                        ? 'bg-blue-500'
+                                                                        ? 'bg-sky-400'
                                                                         : 'bg-yellow-500'
                                                                 }`}
                                                             >
@@ -410,7 +410,7 @@ export default function AiInterviewSelectPage() {
                                                             <p
                                                                 className={`text-base ${
                                                                     isSaraminUrl
-                                                                        ? 'text-blue-700'
+                                                                        ? 'text-sky-700'
                                                                         : 'text-yellow-700'
                                                                 }`}
                                                             >
@@ -446,7 +446,7 @@ export default function AiInterviewSelectPage() {
                         <div className='text-center'>
                             <Button
                                 size='lg'
-                                className={`!h-16 !px-16 !text-xl !font-semibold !bg-blue-600 hover:!bg-blue-700 !border-0 !rounded-xl !shadow-lg !text-white !transition-all !duration-300 ${
+                                className={`!h-16 !px-16 !text-xl !font-semibold !bg-sky-500 hover:!bg-sky-600 !border-0 !rounded-xl !shadow-lg !text-white !transition-all !duration-300 ${
                                     buttonAnimation ? '!animate-pulse !scale-105' : ''
                                 }`}
                                 onClick={handleStartInterview}
