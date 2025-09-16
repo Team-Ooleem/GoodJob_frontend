@@ -70,44 +70,29 @@ export function Header() {
                             로딩...
                         </Button>
                     ) : isAuthenticated ? (
-                        isMentor ? (
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant='ghost' className='flex items-center gap-1'>
-                                        안녕하세요, {user?.name}님{' '}
-                                        <ChevronDown className='h-4 w-4' />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align='end'>
-                                    <DropdownMenuLabel>계정</DropdownMenuLabel>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={() => router.push('/my-page')}>
-                                        마이페이지
-                                    </DropdownMenuItem>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant='ghost' className='flex items-center gap-1'>
+                                    안녕하세요, {user?.name}님 <ChevronDown className='h-4 w-4' />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align='end'>
+                                <DropdownMenuLabel>계정</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => router.push('/my-page')}>
+                                    마이페이지
+                                </DropdownMenuItem>
+                                {isMentor && (
                                     <DropdownMenuItem
                                         onClick={() => router.push('/admin/mentoring')}
                                     >
                                         멘토 관리자 페이지
                                     </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={handleLogout}>
-                                        로그아웃
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        ) : (
-                            <div className='flex items-center gap-2'>
-                                <span className='text-sm text-gray-600'>
-                                    안녕하세요, {user?.name}님!
-                                </span>
-                                <Button variant='ghost' onClick={handleLogout}>
-                                    로그아웃
-                                </Button>
-                                <Button variant='ghost' onClick={() => router.push('/my-page')}>
-                                    마이페이지
-                                </Button>
-                            </div>
-                        )
+                                )}
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={handleLogout}>로그아웃</DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     ) : (
                         <Button
                             onClick={() => {
