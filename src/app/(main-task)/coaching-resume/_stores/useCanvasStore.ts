@@ -79,6 +79,10 @@ type CanvasStoreState = {
     addHistory: (poppedObject: fabric.Object) => void;
     undo: () => void;
     redo: () => void;
+
+    // 변경 발생 알림 콜백
+    onChange?: () => void;
+    setOnChange: (fn: () => void) => void;
 };
 
 type DrawingBrush = fabric.PencilBrush | fabric.SprayBrush;
@@ -360,6 +364,7 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
                 const poppedObject = canvas._objects.pop() as fabric.Object;
                 get().addHistory(poppedObject);
                 canvas.renderAll();
+                get().onChange?.();
             }
         }
     },
@@ -373,9 +378,12 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
                 canvas.add(history[history.length - 1]);
                 const newHistory = history.slice(0, -1);
                 set({ history: newHistory });
+                get().onChange?.();
             }
         }
     },
+
+    setOnChange: (fn) => set({ onChange: fn }),
 }));
 
 function ensureFreeDrawingBrush(canvas: fabric.Canvas, brushConfig: BrushConfig) {

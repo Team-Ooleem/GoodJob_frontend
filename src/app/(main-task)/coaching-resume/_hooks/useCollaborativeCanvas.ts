@@ -312,6 +312,9 @@ export function useCollaborativeCanvas(room: string) {
             }, 50);
         };
 
+        // 🔹 undo/redo, delete, sticky note 등 Store 변경 발생 → syncToY 실행
+        useCanvasStore.getState().setOnChange(syncToY);
+
         // Fabric 이벤트
         const onObjectAdded = (e: any) => {
             const obj = e.target as FabricObject;
@@ -343,7 +346,6 @@ export function useCollaborativeCanvas(room: string) {
         };
 
         const onPathCreated = () => {
-            // freeDrawing 종료 후 최종 Path → Yjs에 반영
             syncToY();
         };
 
@@ -361,6 +363,7 @@ export function useCollaborativeCanvas(room: string) {
 
         // --- cleanup ---
         return () => {
+            useCanvasStore.getState().setOnChange(() => {}); // reset
             if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
 
             canvas.off('object:added', onObjectAdded);
