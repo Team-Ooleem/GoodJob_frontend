@@ -1,65 +1,44 @@
 import { useMutation } from '@tanstack/react-query';
 import { API_BASE_URL } from '@/constants/config';
+import type { InterviewAnalysisResult } from '@/types/report';
 
-// 면접 분석 API 타입 정의
-export interface InterviewAnalysisRequest {
-    messages: Array<{
-        role: 'system' | 'user' | 'assistant';
-        content: string;
-    }>;
+// 새 리포트 분석 요청/응답 타입 (백엔드 스키마 반영)
+export interface AnalyzeReportRequest {
+    sessionId: string;
+    qa: Array<{ question: string; answer: string }>;
+    llmContentScore?: number;
+    llmContextScore?: number;
 }
 
-export interface InterviewAnalysisResponse {
+export interface AnalyzeReportResponse {
     success: boolean;
-    data: {
-        overall_score: number;
-        detailed_scores: {
-            completeness: number;
-            specificity: number;
-            logic: number;
-            impression: number;
-        };
-        strengths: string[];
-        improvements: string[];
-        detailed_feedback: {
-            [key: string]: {
-                score: number;
-                feedback: string;
-            };
-        };
-        overall_evaluation: string;
-        recommendations: string[];
-    };
-    error?: string;
+    data: InterviewAnalysisResult;
 }
 
-// 면접 분석 API 함수
-const analyzeInterview = async (
-    request: InterviewAnalysisRequest,
-): Promise<InterviewAnalysisResponse> => {
-    const response = await fetch(`${API_BASE_URL}/interview/analyze`, {
+// 리포트 분석 호출
+const analyzeReport = async (
+    request: AnalyzeReportRequest,
+): Promise<AnalyzeReportResponse> => {
+    const { sessionId, qa, llmContentScore, llmContextScore } = request;
+    const response = await fetch(`${API_BASE_URL}/report/${sessionId}/analyze`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(request),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qa, llmContentScore, llmContextScore }),
     });
-
     if (!response.ok) {
-        throw new Error(`면접 분석 API 호출 실패: ${response.status}`);
+        throw new Error(`리포트 분석 API 호출 실패: ${response.status}`);
     }
-
     return response.json();
 };
 
 export const useInterviewAnalysis = () => {
-    return useMutation<InterviewAnalysisResponse, Error, InterviewAnalysisRequest>({
-        mutationFn: analyzeInterview,
+    return useMutation<AnalyzeReportResponse, Error, AnalyzeReportRequest>({
+        mutationFn: analyzeReport,
         onSuccess: (data) => {
-            console.log('✅ 면접 분석 성공:', data);
+            console.log('✅ 리포트 분석 성공:', data);
         },
         onError: (error) => {
-            console.error('❌ 면접 분석 실패:', error);
+            console.error('❌ 리포트 분석 실패:', error);
         },
     });
 };

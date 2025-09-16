@@ -7,27 +7,9 @@ import { ArrowLeftOutlined } from '@ant-design/icons';
 import Link from 'next/link';
 import { api } from '@/apis/api';
 import InterviewReport from '../_components/InterviewReport';
+import type { InterviewAnalysisResult } from '@/types/report';
 
-interface InterviewAnalysisResult {
-    overall_score: number;
-    detailed_scores: {
-        completeness: number;
-        specificity: number;
-        logic: number;
-        impression: number;
-    };
-    strengths: string[];
-    improvements: string[];
-    detailed_feedback: {
-        [key: string]: {
-            score: number;
-            feedback: string;
-            question?: string;
-        };
-    };
-    overall_evaluation: string;
-    recommendations: string[];
-}
+// Report type is imported from shared types
 
 interface QAPair {
     question: string;
