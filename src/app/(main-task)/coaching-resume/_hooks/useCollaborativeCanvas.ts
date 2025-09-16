@@ -5,10 +5,19 @@ import { useCanvasStore } from '../_stores';
 import * as Y from 'yjs';
 import * as fabric from 'fabric';
 
+type BrushKind = 'pencil' | 'highlighter';
+
+type BrushConfig = {
+    color: string;
+    width: number;
+    type: BrushKind;
+};
+
 type FabricObject = fabric.Object & {
     id?: string;
     __fromRemote?: boolean;
     __lastModified?: number;
+    __brushType?: BrushKind;
 };
 
 const makeId = () => `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
@@ -40,6 +49,7 @@ const toU8 = (payload: unknown): Uint8Array => {
 export function useCollaborativeCanvas(room: string) {
     const canvas = useCanvasStore((s) => s.canvasInstance);
     const socket = useCanvasStore((s) => s.socket);
+    const brushConfig = useCanvasStore((s) => s.brush);
 
     const syncTimeoutRef = useRef<NodeJS.Timeout>();
     const lastSyncHashRef = useRef<Map<string, string>>(new Map());
@@ -47,6 +57,12 @@ export function useCollaborativeCanvas(room: string) {
 
     const isDrawingRef = useRef(false);
     const currentPathIdRef = useRef<string | null>(null);
+    const currentBrushRef = useRef<BrushConfig>(brushConfig);
+
+    // 브러시 상태 추적
+    useEffect(() => {
+        currentBrushRef.current = brushConfig;
+    }, [brushConfig]);
 
     useEffect(() => {
         if (!canvas || !socket) return;
@@ -90,7 +106,7 @@ export function useCollaborativeCanvas(room: string) {
         });
 
         // ----------------------------
-        // FreeDrawing 실시간 스트리밍 (방법 A)
+        // FreeDrawing 실시간 스트리밍
         // ----------------------------
         const handleMouseDown = () => {
             if (!canvas.isDrawingMode) return;
@@ -99,6 +115,7 @@ export function useCollaborativeCanvas(room: string) {
             socket.emit('drawing:start', {
                 room,
                 id: currentPathIdRef.current,
+                brush: currentBrushRef.current,
             });
         };
 
@@ -112,6 +129,7 @@ export function useCollaborativeCanvas(room: string) {
                 room,
                 id: currentPathIdRef.current,
                 points,
+                brush: currentBrushRef.current,
             });
         };
 
@@ -130,28 +148,25 @@ export function useCollaborativeCanvas(room: string) {
         canvas.on('mouse:up', handleMouseUp);
 
         // --- 원격 수신 ---
-        socket.on('drawing:start', ({ id }) => {
-            // 시작 시에는 일단 빈 Path를 추가
+        socket.on('drawing:start', ({ id, brush }) => {
+            const { color, width, type } = brush as BrushConfig;
             const path = new fabric.Path('', {
-                stroke: 'black',
-                strokeWidth: 2,
+                stroke: type === 'highlighter' ? 'rgba(255,255,0,0.3)' : color,
+                strokeWidth: type === 'highlighter' ? width * 1.2 : width,
                 fill: null,
                 selectable: false,
             }) as FabricObject;
             path.id = id;
             path.__fromRemote = true;
+            path.__brushType = type;
             canvas.add(path);
         });
 
-        socket.on('drawing:progress', ({ id, points }) => {
-            // 기존 Path 제거 후 새로 추가 (간단한 방식)
+        socket.on('drawing:progress', ({ id, points, brush }) => {
             const oldPath = canvas
                 .getObjects()
                 .find((o) => (o as FabricObject).id === id) as fabric.Path;
-
-            if (oldPath) {
-                canvas.remove(oldPath);
-            }
+            if (oldPath) canvas.remove(oldPath);
 
             const pathData = points
                 .map((p: number[], i: number) =>
@@ -159,14 +174,19 @@ export function useCollaborativeCanvas(room: string) {
                 )
                 .join(' ');
 
+            const { color, width, type } = brush as BrushConfig;
+            const strokeColor = type === 'highlighter' ? 'rgba(255,255,0,0.3)' : color;
+            const strokeWidth = type === 'highlighter' ? width * 2 : width;
+
             const newPath = new fabric.Path(pathData, {
-                stroke: 'black',
-                strokeWidth: 2,
+                stroke: strokeColor,
+                strokeWidth,
                 fill: null,
                 selectable: false,
             }) as FabricObject;
             newPath.id = id;
             newPath.__fromRemote = true;
+            newPath.__brushType = type;
 
             canvas.add(newPath);
             canvas.requestRenderAll();
@@ -176,9 +196,7 @@ export function useCollaborativeCanvas(room: string) {
             const pathObj = canvas
                 .getObjects()
                 .find((o) => (o as FabricObject).id === id) as FabricObject;
-            if (pathObj) {
-                pathObj.__fromRemote = false;
-            }
+            if (pathObj) pathObj.__fromRemote = false;
             canvas.requestRenderAll();
         });
 
@@ -247,9 +265,7 @@ export function useCollaborativeCanvas(room: string) {
             });
 
             updatedObjects.forEach((obj) => {
-                setTimeout(() => {
-                    obj.__fromRemote = false;
-                }, 100);
+                setTimeout(() => (obj.__fromRemote = false), 100);
             });
             canvas.requestRenderAll();
         };
