@@ -22,6 +22,7 @@ export default function ReservationPage({ params }: Props) {
     } = useMentoringProductSlots(productId);
     const [date, setDate] = useState<Date | undefined>(undefined);
     const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
+    const [selectedRegularSlotsIdx, setSelectedRegularSlotsIdx] = useState<number | null>(null);
 
     if (isLoading || slotsLoading) {
         return (
@@ -95,7 +96,12 @@ export default function ReservationPage({ params }: Props) {
                                                     startTime={startTime}
                                                     endTime={endTime}
                                                     selected={selectedSlot === slotKey}
-                                                    onClick={() => setSelectedSlot(slotKey)}
+                                                    onClick={() => {
+                                                        setSelectedSlot(slotKey);
+                                                        setSelectedRegularSlotsIdx(
+                                                            slot.regular_slots_idx,
+                                                        );
+                                                    }}
                                                 />
                                             );
                                         })
@@ -134,6 +140,7 @@ export default function ReservationPage({ params }: Props) {
                         productIdx={productId}
                         selectedDate={date}
                         selectedSlot={selectedSlot}
+                        selectedRegularSlotsIdx={selectedRegularSlotsIdx}
                         mentorName={product?.mentor?.name}
                     />
                     <Alert className='mt-4'>

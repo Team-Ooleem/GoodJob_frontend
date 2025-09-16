@@ -12,6 +12,7 @@ type Props = {
     productIdx?: string;
     selectedDate?: Date;
     selectedSlot?: string | null;
+    selectedRegularSlotsIdx?: number | null;
     mentorName?: string;
 };
 
@@ -21,6 +22,7 @@ export function BuyCard({
     productIdx,
     selectedDate,
     selectedSlot,
+    selectedRegularSlotsIdx,
     mentorName,
 }: Props) {
     const router = useRouter();
@@ -46,6 +48,7 @@ export function BuyCard({
                     mentorName,
                     selectedDate: selectedDate?.toISOString(),
                     selectedSlot,
+                    selectedRegularSlotsIdx,
                     price,
                 };
 
