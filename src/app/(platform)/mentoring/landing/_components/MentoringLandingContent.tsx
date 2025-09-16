@@ -1,38 +1,26 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import {
-    FileText,
-    Users,
-    MessageCircle,
-    Rocket,
-    CheckCircle2,
-    ArrowRight,
-    Sparkles,
-    Timer,
-    Crown,
-    Star,
-    ShieldCheck,
-    Target,
-    PenTool,
-} from 'lucide-react';
+import { Rocket, ArrowRight, Timer, Star, ShieldCheck, Target, PenTool } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { useMentoringProducts } from '../../../_hooks/useMentoringProducts';
+import { MentoringCard } from '../../../_components/MentoringCard';
 
 export default function MentoringLandingContent() {
-    const [showAllServices, setShowAllServices] = useState(false);
     const { setTheme } = useTheme();
+    const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, error } =
+        useMentoringProducts();
+
+    // 모든 페이지의 상품들을 하나의 배열로 합치기
+    const allProducts = data?.pages?.flatMap((page: any) => page?.products || []) ?? [];
 
     const scrollToList = useCallback(() => {
         document.getElementById('coaching-list')?.scrollIntoView({ behavior: 'smooth' });
         // setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
-    }, []);
-
-    const loadMoreServices = useCallback(() => {
-        setShowAllServices(true);
     }, []);
 
     return (
@@ -355,147 +343,30 @@ export default function MentoringLandingContent() {
                         </p>
                     </div>
 
-                    {/* 서비스 카드는 추후 컴포넌트와 연결해야 함 */}
-                    <div className='grid sm:grid-cols-2 lg:grid-cols-3 gap-6'>
-                        <ServiceCard
-                            badge='베스트'
-                            title='이력서 집중 코칭(개발자)'
-                            subtitle='JD 기반 역량 매핑 + 문장 다듬기'
-                            price={69000}
-                            rating={4.94}
-                            reviews={321}
-                            bullets={[
-                                '핵심 경험 재구성',
-                                '임팩트 지표·키워드 강화',
-                                'ATS 가독성 개선',
-                            ]}
-                        />
-                        <ServiceCard
-                            badge='실시간'
-                            title='자소서 1:1 화상 코칭'
-                            subtitle='문항 구조 설계 + 실시간 피드백'
-                            price={99000}
-                            rating={4.9}
-                            reviews={182}
-                            bullets={[
-                                '문항별 스토리라인 설계',
-                                '면접 연계 질문 대비',
-                                '최대 24시간 내 추가 코멘트',
-                            ]}
-                        />
-                        <ServiceCard
-                            badge='패키지'
-                            title='서류 풀패키지(이력서+자소서)'
-                            subtitle='전체 문서 일관성/브랜딩 정렬'
-                            price={159000}
-                            rating={5.0}
-                            reviews={96}
-                            bullets={[
-                                '브랜딩 메시지 정렬',
-                                '경험 카테고리 재배치',
-                                '최종 검수 & 수정 1회',
-                            ]}
-                        />
-
-                        {/* 추가 서비스 카드들 */}
-                        {showAllServices && (
-                            <>
-                                <ServiceCard
-                                    badge='신규'
-                                    title='포트폴리오 리뷰 코칭'
-                                    subtitle='프로젝트 구조 및 기술 스택 최적화'
-                                    price={45000}
-                                    rating={4.8}
-                                    reviews={78}
-                                    bullets={[
-                                        '프로젝트 구조 분석',
-                                        '기술 스택 최적화',
-                                        'README 작성 가이드',
-                                    ]}
-                                />
-                                <ServiceCard
-                                    badge='인기'
-                                    title='면접 대비 코칭'
-                                    subtitle='기술 면접 + 인성 면접 종합 준비'
-                                    price={120000}
-                                    rating={4.9}
-                                    reviews={156}
-                                    bullets={[
-                                        '기술 질문 대비',
-                                        '인성 질문 연습',
-                                        '실전 면접 시뮬레이션',
-                                    ]}
-                                />
-                                <ServiceCard
-                                    badge='특가'
-                                    title='이력서 기본 패키지'
-                                    subtitle='신입 개발자 맞춤 이력서 작성'
-                                    price={35000}
-                                    rating={4.7}
-                                    reviews={89}
-                                    bullets={[
-                                        '기본 이력서 작성',
-                                        '프로젝트 경험 정리',
-                                        '기술 스택 정리',
-                                    ]}
-                                />
-                                <ServiceCard
-                                    badge='프리미엄'
-                                    title='VIP 종합 코칭'
-                                    subtitle='이력서+자소서+면접+포트폴리오 전체'
-                                    price={250000}
-                                    rating={5.0}
-                                    reviews={45}
-                                    bullets={[
-                                        '전체 서류 패키지',
-                                        '1:1 면접 코칭 3회',
-                                        '포트폴리오 리뷰',
-                                        '무제한 수정 지원',
-                                    ]}
-                                />
-                                <ServiceCard
-                                    badge='빠른'
-                                    title='긴급 자소서 첨삭'
-                                    subtitle='24시간 내 완성 보장'
-                                    price={80000}
-                                    rating={4.6}
-                                    reviews={124}
-                                    bullets={[
-                                        '24시간 내 완성',
-                                        '긴급 마감 대응',
-                                        '핵심만 간추려서',
-                                    ]}
-                                />
-                                <ServiceCard
-                                    badge='맞춤'
-                                    title='대기업 특화 코칭'
-                                    subtitle='삼성, LG, SK 등 대기업 맞춤'
-                                    price={180000}
-                                    rating={4.9}
-                                    reviews={67}
-                                    bullets={[
-                                        '대기업 채용 트렌드 분석',
-                                        '특화 자소서 작성',
-                                        '면접 질문 예상 문제',
-                                    ]}
-                                />
-                            </>
-                        )}
-                    </div>
-
-                    <div className='text-center mt-10'>
-                        {!showAllServices ? (
-                            <Button
-                                onClick={loadMoreServices}
-                                className='bg-gray-900 text-white hover:bg-black rounded-xl px-8 py-6'
-                            >
-                                서비스 더 보러 가기
-                                <ArrowRight className='ml-2 h-5 w-5' />
-                            </Button>
-                        ) : (
-                            <p className='text-gray-500 text-sm'>모든 서비스를 확인했습니다</p>
-                        )}
-                    </div>
+                    {/* 멘토링 상품 카드들 */}
+                    {isLoading ? (
+                        <div className='text-center py-12'>
+                            <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4'></div>
+                            <p className='text-muted-foreground'>멘토링 상품을 불러오는 중...</p>
+                        </div>
+                    ) : error ? (
+                        <div className='text-center py-12'>
+                            <p className='text-red-500 mb-4'>
+                                멘토링 상품을 불러오는 중 오류가 발생했습니다.
+                            </p>
+                            <Button onClick={() => window.location.reload()}>다시 시도</Button>
+                        </div>
+                    ) : allProducts.length === 0 ? (
+                        <div className='text-center py-12'>
+                            <p className='text-muted-foreground'>멘토링 상품이 없습니다.</p>
+                        </div>
+                    ) : (
+                        <div className='grid sm:grid-cols-2 lg:grid-cols-3 gap-6'>
+                            {allProducts.map((mentoring: any) => (
+                                <MentoringCard key={mentoring?.product_idx} mentoring={mentoring} />
+                            ))}
+                        </div>
+                    )}
                 </div>
             </section>
 
@@ -554,64 +425,6 @@ function BenefitCard({
                         <h4 className='text-lg font-semibold text-white'>{title}</h4>
                         <p className='text-gray-300 mt-1 text-sm leading-relaxed'>{desc}</p>
                     </div>
-                </div>
-            </CardContent>
-        </Card>
-    );
-}
-
-function ServiceCard({
-    badge,
-    title,
-    subtitle,
-    price,
-    rating,
-    reviews,
-    bullets,
-}: {
-    badge?: string;
-    title: string;
-    subtitle: string;
-    price: number;
-    rating: number;
-    reviews: number;
-    bullets: string[];
-}) {
-    return (
-        <Card className='group overflow-hidden rounded-2xl border-gray-200 hover:shadow-2xl transition-all'>
-            <CardContent className='p-6'>
-                <div className='flex items-center justify-between mb-4'>
-                    <div className='flex items-center gap-2'>
-                        {badge && <Badge className='bg-blue-500 text-white'>{badge}</Badge>}
-                        <div className='flex items-center gap-1 text-blue-500'>
-                            <Star className='h-4 w-4 fill-current' />
-                            <span className='text-sm font-semibold'>{rating.toFixed(2)}</span>
-                            <span className='text-xs text-gray-500'>({reviews})</span>
-                        </div>
-                    </div>
-                    <span className='text-sm text-gray-500'>최대 24시간 내</span>
-                </div>
-                <h3 className='text-lg font-bold text-gray-900'>{title}</h3>
-                <p className='text-sm text-gray-600 mt-1'>{subtitle}</p>
-
-                <ul className='mt-4 space-y-2'>
-                    {bullets.map((b, i) => (
-                        <li key={i} className='flex items-start gap-2 text-sm text-gray-700'>
-                            <CheckCircle2 className='h-5 w-5 text-green-600 mt-0.5' /> {b}
-                        </li>
-                    ))}
-                </ul>
-
-                <div className='mt-6 flex items-end justify-between'>
-                    <div>
-                        <div className='text-sm text-gray-500'>가격</div>
-                        <div className='text-2xl font-extrabold tracking-tight'>
-                            {price.toLocaleString()}원
-                        </div>
-                    </div>
-                    <Button className='rounded-xl bg-blue-600 text-white hover:bg-blue-700'>
-                        신청하기 <ArrowRight className='ml-2 h-5 w-5' />
-                    </Button>
                 </div>
             </CardContent>
         </Card>
