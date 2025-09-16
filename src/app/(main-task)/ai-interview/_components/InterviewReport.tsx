@@ -34,44 +34,9 @@ import {
     ThunderboltOutlined,
 } from '@ant-design/icons';
 
-const { Title, Paragraph, Text } = Typography;
+import type { InterviewAnalysisResult } from '@/types/report';
 
-// 서버 리포트 데이터 타입
-interface InterviewAnalysisResult {
-    overall_score: number;
-    detailed_scores: {
-        completeness: number;
-        specificity: number;
-        logic: number;
-        impression: number;
-    };
-    strengths: string[];
-    improvements: string[];
-    detailed_feedback: {
-        [key: string]: {
-            score: number;
-            feedback: string;
-            question?: string;
-        };
-    };
-    overall_evaluation: string;
-    recommendations: string[];
-    // NEW: 백엔드 텍스트(내용/맥락) 분석 요약
-    text_analysis_summary?: {
-        content_avg100: number;
-        context_avg100: number;
-        overall_llm10: number;
-        top_reasons?: string[];
-        top_improvements?: string[];
-    };
-    // NEW: 상위 근거 링크
-    evidence_links?: Array<{
-        answer_span: string;
-        resume_ref?: string;
-        similarity?: number;
-        explanation?: string;
-    }>;
-}
+const { Title, Paragraph, Text } = Typography;
 
 interface QAPair {
     question: string;
@@ -177,7 +142,10 @@ interface InterviewReportProps {
             baseline?: any;
             normalizedOverall?: any;
             normalizedPerQuestion?: Record<string, any> | null;
-            serverQuestionScores?: Record<string, { score: number; calibrationApplied?: boolean }> | null;
+            serverQuestionScores?: Record<
+                string,
+                { score: number; calibrationApplied?: boolean }
+            > | null;
         };
         audio?: {
             baseline?: any;
@@ -217,6 +185,13 @@ export default function InterviewReport({
         if (score >= 80) return '#1890ff';
         if (score >= 70) return '#faad14';
         return '#ff4d4f';
+    };
+
+    // 부분 점수(30/30/40)를 퍼센트(0-100)로 환산
+    const pctOf = (v: number | undefined, max: number) => {
+        const n = typeof v === 'number' ? v : 0;
+        const clamped = Math.max(0, Math.min(max, n));
+        return Math.round((clamped / max) * 100);
     };
 
     const getScoreLevel = (score: number) => {
@@ -325,67 +300,157 @@ export default function InterviewReport({
                 </div>
             </Card>
 
-            {/* 세부 점수 */}
+            {/* 세부 점수 (내용/맥락/표현 = 30/30/40) */}
             <Row gutter={[24, 24]} className='mb-8'>
-                <Col xs={24} sm={12} md={6}>
+                <Col xs={24} sm={12} md={8}>
                     <Card className='!border-0 !shadow-lg text-center'>
                         <Statistic
-                            title='완성도'
-                            value={analysisResult.detailed_scores.completeness}
-                            suffix='/ 10'
+                            title='내용'
+                            value={analysisResult.detailed_scores?.content30 ?? 0}
+                            suffix='/ 30'
                             prefix={<CheckCircleOutlined className='text-green-500' />}
                             valueStyle={{
                                 color: getScoreColor(
-                                    analysisResult.detailed_scores.completeness * 10,
+                                    pctOf(analysisResult.detailed_scores?.content30, 30),
                                 ),
                             }}
                         />
                     </Card>
                 </Col>
-                <Col xs={24} sm={12} md={6}>
+                <Col xs={24} sm={12} md={8}>
                     <Card className='!border-0 !shadow-lg text-center'>
                         <Statistic
-                            title='구체성'
-                            value={analysisResult.detailed_scores.specificity}
-                            suffix='/ 10'
+                            title='맥락'
+                            value={analysisResult.detailed_scores?.context30 ?? 0}
+                            suffix='/ 30'
                             prefix={<MessageOutlined className='text-blue-500' />}
                             valueStyle={{
                                 color: getScoreColor(
-                                    analysisResult.detailed_scores.specificity * 10,
+                                    pctOf(analysisResult.detailed_scores?.context30, 30),
                                 ),
                             }}
                         />
                     </Card>
                 </Col>
-                <Col xs={24} sm={12} md={6}>
+                <Col xs={24} sm={12} md={8}>
                     <Card className='!border-0 !shadow-lg text-center'>
                         <Statistic
-                            title='논리성'
-                            value={analysisResult.detailed_scores.logic}
-                            suffix='/ 10'
-                            prefix={<BulbOutlined className='text-purple-500' />}
-                            valueStyle={{
-                                color: getScoreColor(analysisResult.detailed_scores.logic * 10),
-                            }}
-                        />
-                    </Card>
-                </Col>
-                <Col xs={24} sm={12} md={6}>
-                    <Card className='!border-0 !shadow-lg text-center'>
-                        <Statistic
-                            title='인상'
-                            value={analysisResult.detailed_scores.impression}
-                            suffix='/ 10'
-                            prefix={<EyeOutlined className='text-orange-500' />}
+                            title='표현'
+                            value={analysisResult.detailed_scores?.expression40 ?? 0}
+                            suffix='/ 40'
+                            prefix={<TrophyOutlined className='text-yellow-500' />}
                             valueStyle={{
                                 color: getScoreColor(
-                                    analysisResult.detailed_scores.impression * 10,
+                                    pctOf(analysisResult.detailed_scores?.expression40, 40),
                                 ),
                             }}
                         />
                     </Card>
                 </Col>
             </Row>
+
+            {/* 표현 지수 (confidence/clarity/engagement/composure/professionalism/consistency) */}
+            {analysisResult.expression_indices && (
+                <Card className='!border-0 !shadow-lg mb-8' title='표현 지수'>
+                    <Row gutter={[16, 16]}>
+                        <Col xs={24} md={8}>
+                            <Card size='small' className='text-center'>
+                                <div className='text-gray-600 mb-1'>자신감</div>
+                                <div
+                                    className='text-3xl font-bold'
+                                    style={{
+                                        color: getScoreColor(
+                                            analysisResult.expression_indices.confidence,
+                                        ),
+                                    }}
+                                >
+                                    {analysisResult.expression_indices.confidence}
+                                </div>
+                            </Card>
+                        </Col>
+                        <Col xs={24} md={8}>
+                            <Card size='small' className='text-center'>
+                                <div className='text-gray-600 mb-1'>명료성</div>
+                                <div
+                                    className='text-3xl font-bold'
+                                    style={{
+                                        color: getScoreColor(
+                                            analysisResult.expression_indices.clarity,
+                                        ),
+                                    }}
+                                >
+                                    {analysisResult.expression_indices.clarity}
+                                </div>
+                            </Card>
+                        </Col>
+                        <Col xs={24} md={8}>
+                            <Card size='small' className='text-center'>
+                                <div className='text-gray-600 mb-1'>몰입도</div>
+                                <div
+                                    className='text-3xl font-bold'
+                                    style={{
+                                        color: getScoreColor(
+                                            analysisResult.expression_indices.engagement,
+                                        ),
+                                    }}
+                                >
+                                    {analysisResult.expression_indices.engagement}
+                                </div>
+                            </Card>
+                        </Col>
+                        <Col xs={24} md={8}>
+                            <Card size='small' className='text-center'>
+                                <div className='text-gray-600 mb-1'>침착성</div>
+                                <div
+                                    className='text-3xl font-bold'
+                                    style={{
+                                        color: getScoreColor(
+                                            analysisResult.expression_indices.composure,
+                                        ),
+                                    }}
+                                >
+                                    {analysisResult.expression_indices.composure}
+                                </div>
+                            </Card>
+                        </Col>
+                        <Col xs={24} md={8}>
+                            <Card size='small' className='text-center'>
+                                <div className='text-gray-600 mb-1'>전문성</div>
+                                <div
+                                    className='text-3xl font-bold'
+                                    style={{
+                                        color: getScoreColor(
+                                            analysisResult.expression_indices.professionalism,
+                                        ),
+                                    }}
+                                >
+                                    {analysisResult.expression_indices.professionalism}
+                                </div>
+                            </Card>
+                        </Col>
+                        <Col xs={24} md={8}>
+                            <Card size='small' className='text-center'>
+                                <div className='text-gray-600 mb-1'>일관성</div>
+                                <div
+                                    className='text-3xl font-bold'
+                                    style={{
+                                        color: getScoreColor(
+                                            analysisResult.expression_indices.consistency,
+                                        ),
+                                    }}
+                                >
+                                    {analysisResult.expression_indices.consistency}
+                                </div>
+                            </Card>
+                        </Col>
+                    </Row>
+                    {typeof analysisResult.expression_indices.reliabilityWeight === 'number' && (
+                        <div className='mt-3 text-right text-xs text-gray-500'>
+                            신뢰도 가중치: {analysisResult.expression_indices.reliabilityWeight}
+                        </div>
+                    )}
+                </Card>
+            )}
 
             {/* 텍스트 분석 요약 (내용/맥락) */}
             {analysisResult.text_analysis_summary && (
@@ -398,7 +463,8 @@ export default function InterviewReport({
                                     className='text-4xl font-bold'
                                     style={{
                                         color: getScoreColor(
-                                            (analysisResult.text_analysis_summary.overall_llm10 || 0) * 10,
+                                            (analysisResult.text_analysis_summary.overall_llm10 ||
+                                                0) * 10,
                                         ),
                                     }}
                                 >
@@ -411,7 +477,9 @@ export default function InterviewReport({
                             <Card size='small'>
                                 <div className='mb-2'>내용 적합도</div>
                                 <Progress
-                                    percent={analysisResult.text_analysis_summary.content_avg100 || 0}
+                                    percent={
+                                        analysisResult.text_analysis_summary.content_avg100 || 0
+                                    }
                                     strokeColor={getScoreColor(
                                         analysisResult.text_analysis_summary.content_avg100 || 0,
                                     )}
@@ -422,7 +490,9 @@ export default function InterviewReport({
                             <Card size='small'>
                                 <div className='mb-2'>맥락 일치도</div>
                                 <Progress
-                                    percent={analysisResult.text_analysis_summary.context_avg100 || 0}
+                                    percent={
+                                        analysisResult.text_analysis_summary.context_avg100 || 0
+                                    }
                                     strokeColor={getScoreColor(
                                         analysisResult.text_analysis_summary.context_avg100 || 0,
                                     )}
@@ -452,7 +522,9 @@ export default function InterviewReport({
                             <div className='mb-2 font-semibold'>개선 팁</div>
                             <List
                                 size='small'
-                                dataSource={analysisResult.text_analysis_summary.top_improvements || []}
+                                dataSource={
+                                    analysisResult.text_analysis_summary.top_improvements || []
+                                }
                                 locale={{ emptyText: '개선 팁 없음' }}
                                 renderItem={(item) => (
                                     <List.Item>
@@ -474,7 +546,11 @@ export default function InterviewReport({
                                 dataSource={analysisResult.evidence_links}
                                 renderItem={(link) => (
                                     <List.Item>
-                                        <Space direction='vertical' size={0} style={{ width: '100%' }}>
+                                        <Space
+                                            direction='vertical'
+                                            size={0}
+                                            style={{ width: '100%' }}
+                                        >
                                             <div>
                                                 <Tag color='green'>답변</Tag>
                                                 <Text>{link.answer_span}</Text>
@@ -518,17 +594,23 @@ export default function InterviewReport({
                                             </div>
                                             <Space>
                                                 {typeof content?.content_score === 'number' && (
-                                                    <Tag color={getScoreColor(content.content_score)}>
+                                                    <Tag
+                                                        color={getScoreColor(content.content_score)}
+                                                    >
                                                         내용 {content.content_score}
                                                     </Tag>
                                                 )}
                                                 {typeof context?.context_score === 'number' && (
-                                                    <Tag color={getScoreColor(context.context_score)}>
+                                                    <Tag
+                                                        color={getScoreColor(context.context_score)}
+                                                    >
                                                         맥락 {context.context_score}
                                                     </Tag>
                                                 )}
                                                 {contradiction && (
-                                                    <Tag color='red' icon={<WarningOutlined />}>모순 감지</Tag>
+                                                    <Tag color='red' icon={<WarningOutlined />}>
+                                                        모순 감지
+                                                    </Tag>
                                                 )}
                                             </Space>
                                         </div>
@@ -550,10 +632,17 @@ export default function InterviewReport({
                                                 />
                                                 {!!content?.star && (
                                                     <div className='mt-2 text-xs text-gray-600'>
-                                                        <div>Situation: {content.star.situation || '-'}</div>
+                                                        <div>
+                                                            Situation:{' '}
+                                                            {content.star.situation || '-'}
+                                                        </div>
                                                         <div>Task: {content.star.task || '-'}</div>
-                                                        <div>Action: {content.star.action || '-'}</div>
-                                                        <div>Result: {content.star.result || '-'}</div>
+                                                        <div>
+                                                            Action: {content.star.action || '-'}
+                                                        </div>
+                                                        <div>
+                                                            Result: {content.star.result || '-'}
+                                                        </div>
                                                     </div>
                                                 )}
                                             </Col>
@@ -580,20 +669,31 @@ export default function InterviewReport({
                                                     locale={{ emptyText: '링크 없음' }}
                                                     renderItem={(lnk) => (
                                                         <List.Item>
-                                                            <Space direction='vertical' size={0} style={{ width: '100%' }}>
+                                                            <Space
+                                                                direction='vertical'
+                                                                size={0}
+                                                                style={{ width: '100%' }}
+                                                            >
                                                                 <div>
                                                                     <Tag color='green'>답변</Tag>
                                                                     <Text>{lnk.answer_span}</Text>
                                                                 </div>
                                                                 {lnk.resume_ref && (
                                                                     <div>
-                                                                        <Tag color='blue'>이력서</Tag>
-                                                                        <Text>{lnk.resume_ref}</Text>
+                                                                        <Tag color='blue'>
+                                                                            이력서
+                                                                        </Tag>
+                                                                        <Text>
+                                                                            {lnk.resume_ref}
+                                                                        </Text>
                                                                     </div>
                                                                 )}
                                                                 <div className='text-xs text-gray-500'>
-                                                                    유사도: {fmt(lnk.similarity ?? '-', 3)}
-                                                                    {lnk.explanation ? ` · ${lnk.explanation}` : ''}
+                                                                    유사도:{' '}
+                                                                    {fmt(lnk.similarity ?? '-', 3)}
+                                                                    {lnk.explanation
+                                                                        ? ` · ${lnk.explanation}`
+                                                                        : ''}
                                                                 </div>
                                                             </Space>
                                                         </List.Item>
@@ -721,13 +821,16 @@ export default function InterviewReport({
                             dataSource={Object.keys(visualData.perQuestion)}
                             renderItem={(qid, idx) => {
                                 const raw = (visualData.perQuestion as any)[qid] || {};
-                                const norm = calibrationCompare?.visual?.normalizedPerQuestion?.[qid];
+                                const norm =
+                                    calibrationCompare?.visual?.normalizedPerQuestion?.[qid];
                                 const svr = calibrationCompare?.visual?.serverQuestionScores?.[qid];
                                 return (
                                     <List.Item>
                                         <div className='w-full'>
                                             <div className='flex justify-between items-start mb-2'>
-                                                <Text strong>Q{idx + 1} ({qid})</Text>
+                                                <Text strong>
+                                                    Q{idx + 1} ({qid})
+                                                </Text>
                                                 {svr?.score != null && (
                                                     <Tag color={getScoreColor(svr.score)}>
                                                         정규화 {svr.score.toFixed(0)}
@@ -737,19 +840,44 @@ export default function InterviewReport({
                                             </div>
                                             <div className='grid grid-cols-1 md:grid-cols-3 gap-3'>
                                                 <Card size='small'>
-                                                    <div className='text-gray-500 text-sm mb-1'>Raw</div>
-                                                    <div className='text-sm'>confidence_mean: {fmt(raw?.confidence_mean)}</div>
-                                                    <div className='text-sm'>smile_mean: {fmt(raw?.smile_mean)}</div>
+                                                    <div className='text-gray-500 text-sm mb-1'>
+                                                        Raw
+                                                    </div>
+                                                    <div className='text-sm'>
+                                                        confidence_mean: {fmt(raw?.confidence_mean)}
+                                                    </div>
+                                                    <div className='text-sm'>
+                                                        smile_mean: {fmt(raw?.smile_mean)}
+                                                    </div>
                                                 </Card>
                                                 <Card size='small'>
-                                                    <div className='text-gray-500 text-sm mb-1'>Calibrated</div>
-                                                    <div className='text-sm'>confidence_mean: {fmt(norm?.confidence_mean)}</div>
-                                                    <div className='text-sm'>smile_mean: {fmt(norm?.smile_mean)}</div>
+                                                    <div className='text-gray-500 text-sm mb-1'>
+                                                        Calibrated
+                                                    </div>
+                                                    <div className='text-sm'>
+                                                        confidence_mean:{' '}
+                                                        {fmt(norm?.confidence_mean)}
+                                                    </div>
+                                                    <div className='text-sm'>
+                                                        smile_mean: {fmt(norm?.smile_mean)}
+                                                    </div>
                                                 </Card>
                                                 <Card size='small'>
-                                                    <div className='text-gray-500 text-sm mb-1'>Presence/Level</div>
-                                                    <div className='text-xs text-gray-600'>good/avg/need: {raw?.presence_dist ? `${raw.presence_dist.good}/${raw.presence_dist.average}/${raw.presence_dist.needs_improvement}` : '-'}</div>
-                                                    <div className='text-xs text-gray-600'>warn/crit: {raw?.level_dist ? `${raw.level_dist.warning}/${raw.level_dist.critical}` : '-'}</div>
+                                                    <div className='text-gray-500 text-sm mb-1'>
+                                                        Presence/Level
+                                                    </div>
+                                                    <div className='text-xs text-gray-600'>
+                                                        good/avg/need:{' '}
+                                                        {raw?.presence_dist
+                                                            ? `${raw.presence_dist.good}/${raw.presence_dist.average}/${raw.presence_dist.needs_improvement}`
+                                                            : '-'}
+                                                    </div>
+                                                    <div className='text-xs text-gray-600'>
+                                                        warn/crit:{' '}
+                                                        {raw?.level_dist
+                                                            ? `${raw.level_dist.warning}/${raw.level_dist.critical}`
+                                                            : '-'}
+                                                    </div>
                                                 </Card>
                                             </div>
                                         </div>
@@ -941,17 +1069,17 @@ export default function InterviewReport({
             {audioData?.perQuestion &&
                 audioData.perQuestion.length > 0 &&
                 displayOptions.showAudioAnalysis && (
-                <Card title='질문별 음성 분석' className='!border-0 !shadow-lg mb-8'>
-                    <List
-                        dataSource={audioData.perQuestion}
-                        renderItem={(item) => (
-                            <List.Item>
-                                <div className='w-full'>
-                                    <div className='flex justify-between items-start mb-3'>
-                                        <Text strong className='text-lg'>
-                                            Q{item.questionNumber}. {item.question}
-                                        </Text>
-                                        <Space>
+                    <Card title='질문별 음성 분석' className='!border-0 !shadow-lg mb-8'>
+                        <List
+                            dataSource={audioData.perQuestion}
+                            renderItem={(item) => (
+                                <List.Item>
+                                    <div className='w-full'>
+                                        <div className='flex justify-between items-start mb-3'>
+                                            <Text strong className='text-lg'>
+                                                Q{item.questionNumber}. {item.question}
+                                            </Text>
+                                            <Space>
                                                 {typeof item.tone_score === 'number' && (
                                                     <Tag color={getScoreColor(item.tone_score)}>
                                                         <SoundOutlined /> 톤 {item.tone_score}
@@ -968,58 +1096,78 @@ export default function InterviewReport({
                                                         {item.pace_score}
                                                     </Tag>
                                                 )}
-                                                {typeof (item as any).normalized_score === 'number' && (
-                                                    <Tag color={getScoreColor((item as any).normalized_score as number)}>
+                                                {typeof (item as any).normalized_score ===
+                                                    'number' && (
+                                                    <Tag
+                                                        color={getScoreColor(
+                                                            (item as any)
+                                                                .normalized_score as number,
+                                                        )}
+                                                    >
                                                         <ThunderboltOutlined /> 정규화{' '}
-                                                        {((item as any).normalized_score as number).toFixed(2)}
+                                                        {(
+                                                            (item as any).normalized_score as number
+                                                        ).toFixed(2)}
                                                     </Tag>
                                                 )}
-                                        </Space>
+                                            </Space>
+                                        </div>
+                                        {item.audioUrl && (
+                                            <audio
+                                                controls
+                                                src={item.audioUrl}
+                                                className='w-full'
+                                            />
+                                        )}
+                                        {calibrationCompare?.audio?.ratiosPerQuestion &&
+                                            (() => {
+                                                const key = String(item.questionNumber);
+                                                const ratios =
+                                                    calibrationCompare?.audio?.ratiosPerQuestion?.[
+                                                        key
+                                                    ];
+                                                if (!ratios) return null;
+                                                return (
+                                                    <div className='mt-2 text-xs text-gray-600'>
+                                                        <span className='mr-2'>정규화 비율:</span>
+                                                        <Space size={8} wrap>
+                                                            {'f0_mean' in ratios && (
+                                                                <Tag>f0 {fmt(ratios.f0_mean)}</Tag>
+                                                            )}
+                                                            {'f0_std' in ratios && (
+                                                                <Tag>f0σ {fmt(ratios.f0_std)}</Tag>
+                                                            )}
+                                                            {'rms_cv' in ratios && (
+                                                                <Tag>
+                                                                    rms_cv {fmt(ratios.rms_cv)}
+                                                                </Tag>
+                                                            )}
+                                                            {'jitter_like' in ratios && (
+                                                                <Tag>
+                                                                    jitter {fmt(ratios.jitter_like)}
+                                                                </Tag>
+                                                            )}
+                                                            {'shimmer_like' in ratios && (
+                                                                <Tag>
+                                                                    shimmer{' '}
+                                                                    {fmt(ratios.shimmer_like)}
+                                                                </Tag>
+                                                            )}
+                                                            {'silence_ratio' in ratios && (
+                                                                <Tag>
+                                                                    silence{' '}
+                                                                    {fmt(ratios.silence_ratio)}
+                                                                </Tag>
+                                                            )}
+                                                        </Space>
+                                                    </div>
+                                                );
+                                            })()}
                                     </div>
-                                    {item.audioUrl && (
-                                        <audio
-                                            controls
-                                            src={item.audioUrl}
-                                            className='w-full'
-                                        />
-                                    )}
-                                    {calibrationCompare?.audio?.ratiosPerQuestion && (
-                                        (() => {
-                                            const key = String(item.questionNumber);
-                                            const ratios = calibrationCompare?.audio?.ratiosPerQuestion?.[key];
-                                            if (!ratios) return null;
-                                            return (
-                                                <div className='mt-2 text-xs text-gray-600'>
-                                                    <span className='mr-2'>정규화 비율:</span>
-                                                    <Space size={8} wrap>
-                                                        {'f0_mean' in ratios && (
-                                                            <Tag>f0 {fmt(ratios.f0_mean)}</Tag>
-                                                        )}
-                                                        {'f0_std' in ratios && (
-                                                            <Tag>f0σ {fmt(ratios.f0_std)}</Tag>
-                                                        )}
-                                                        {'rms_cv' in ratios && (
-                                                            <Tag>rms_cv {fmt(ratios.rms_cv)}</Tag>
-                                                        )}
-                                                        {'jitter_like' in ratios && (
-                                                            <Tag>jitter {fmt(ratios.jitter_like)}</Tag>
-                                                        )}
-                                                        {'shimmer_like' in ratios && (
-                                                            <Tag>shimmer {fmt(ratios.shimmer_like)}</Tag>
-                                                        )}
-                                                        {'silence_ratio' in ratios && (
-                                                            <Tag>silence {fmt(ratios.silence_ratio)}</Tag>
-                                                        )}
-                                                    </Space>
-                                                </div>
-                                            );
-                                        })()
-                                    )}
-                                </div>
-                            </List.Item>
-                        )}
-                    />
-                </Card>
+                                </List.Item>
+                            )}
+                        />
+                    </Card>
                 )}
 
             {/* 종합 평가 */}
@@ -1036,7 +1184,7 @@ export default function InterviewReport({
                 <Col xs={24} lg={12}>
                     <Card title='강점' className='!border-0 !shadow-lg'>
                         <List
-                            dataSource={analysisResult.strengths}
+                            dataSource={analysisResult.strengths || []}
                             renderItem={(item) => (
                                 <List.Item>
                                     <CheckCircleOutlined className='text-green-500 mr-2' />
@@ -1049,7 +1197,7 @@ export default function InterviewReport({
                 <Col xs={24} lg={12}>
                     <Card title='개선사항' className='!border-0 !shadow-lg'>
                         <List
-                            dataSource={analysisResult.improvements}
+                            dataSource={analysisResult.improvements || []}
                             renderItem={(item) => (
                                 <List.Item>
                                     <RiseOutlined className='text-orange-500 mr-2' />
@@ -1087,7 +1235,7 @@ export default function InterviewReport({
                                     renderItem={(qa, index) => {
                                         const questionKey = `question_${index + 1}`;
                                         const feedback =
-                                            analysisResult.detailed_feedback[questionKey];
+                                            analysisResult.detailed_feedback?.[questionKey];
 
                                         return (
                                             <List.Item>
@@ -1127,10 +1275,10 @@ export default function InterviewReport({
                                 />
                             ) : (
                                 <List<string>
-                                    dataSource={Object.keys(analysisResult.detailed_feedback)}
+                                    dataSource={Object.keys(analysisResult.detailed_feedback || {})}
                                     renderItem={(questionKey, index) => {
                                         const feedback =
-                                            analysisResult.detailed_feedback[questionKey];
+                                            analysisResult.detailed_feedback?.[questionKey];
                                         const question = feedback?.question || `질문 ${index + 1}`;
 
                                         return (
@@ -1170,17 +1318,20 @@ export default function InterviewReport({
                 </Card>
             )}
 
-            {/* 추천사항 */}
-            <Card title='추천사항' className='!border-0 !shadow-lg mb-8'>
-                <List
-                    dataSource={analysisResult.recommendations}
-                    renderItem={(item) => (
-                        <List.Item>
-                            <BulbOutlined className='text-yellow-500 mr-2' />
-                            <Text>{item}</Text>
-                        </List.Item>
-                    )}
-                />
+            {/* 1분 자기소개 대본 */}
+            <Card title='1분 자기소개 대본' className='!border-0 !shadow-lg mb-8'>
+                {analysisResult.self_intro_script ? (
+                    <div className='whitespace-pre-line text-gray-800 leading-relaxed'>
+                        {analysisResult.self_intro_script}
+                    </div>
+                ) : (
+                    <Alert
+                        type='info'
+                        message='대본 준비 중'
+                        description='이력서 요약을 바탕으로 대본을 생성하고 있습니다. 잠시 후 새로고침해보세요.'
+                        showIcon
+                    />
+                )}
             </Card>
 
             {/* 인쇄용 스타일 */}
