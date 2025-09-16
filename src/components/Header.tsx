@@ -8,6 +8,7 @@ import { Flex } from 'antd';
 import { HeaderNavigation } from './HeaderNavigation';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -72,8 +73,15 @@ export function Header() {
                     ) : isAuthenticated ? (
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant='ghost' className='flex items-center gap-1'>
-                                    안녕하세요, {user?.name}님 <ChevronDown className='h-4 w-4' />
+                                <Button variant='ghost' className='flex items-center gap-2'>
+                                    <Avatar className='h-8 w-8'>
+                                        <AvatarImage src={user?.picture} alt={user?.name} />
+                                        <AvatarFallback>
+                                            {user?.name?.charAt(0)?.toUpperCase() || 'U'}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <span className='hidden sm:inline'>{user?.name}님</span>
+                                    <ChevronDown className='h-4 w-4' />
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align='end'>
