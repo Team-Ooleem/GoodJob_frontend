@@ -5,25 +5,22 @@ import { useCanvasStore } from '../_stores';
 import * as Y from 'yjs';
 import * as fabric from 'fabric';
 
+type BrushKind = 'pencil' | 'highlighter';
+
+type BrushConfig = {
+    color: string;
+    width: number;
+    type: BrushKind;
+};
+
 type FabricObject = fabric.Object & {
     id?: string;
     __fromRemote?: boolean;
     __lastModified?: number;
+    __brushType?: BrushKind;
 };
 
 const makeId = () => `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-
-const toU8 = (payload: unknown): Uint8Array => {
-    if (payload instanceof Uint8Array) return payload;
-    if (payload instanceof ArrayBuffer) return new Uint8Array(payload);
-    if (Array.isArray(payload)) return Uint8Array.from(payload as number[]);
-    if (payload && typeof payload === 'object' && 'data' in (payload as any)) {
-        const p = (payload as any).data;
-        if (p instanceof ArrayBuffer) return new Uint8Array(p);
-        if (Array.isArray(p)) return Uint8Array.from(p as number[]);
-    }
-    throw new Error('Unknown binary format from server');
-};
 
 const enlivenObjects = (arr: any[]): Promise<fabric.Object[]> =>
     (fabric.util.enlivenObjects as unknown as (a: any[]) => Promise<fabric.Object[]>)(arr);
@@ -37,24 +34,43 @@ const getObjectHash = (obj: FabricObject): string => {
     return `${obj.left || 0}_${obj.top || 0}_${obj.angle || 0}_${obj.scaleX || 1}_${obj.scaleY || 1}`;
 };
 
+const toU8 = (payload: unknown): Uint8Array => {
+    if (payload instanceof Uint8Array) return payload;
+    if (payload instanceof ArrayBuffer) return new Uint8Array(payload);
+    if (Array.isArray(payload)) return Uint8Array.from(payload as number[]);
+    if (payload && typeof payload === 'object' && 'data' in (payload as any)) {
+        const p = (payload as any).data;
+        if (p instanceof ArrayBuffer) return new Uint8Array(p);
+        if (Array.isArray(p)) return Uint8Array.from(p as number[]);
+    }
+    throw new Error('Unknown binary format from server');
+};
+
 export function useCollaborativeCanvas(room: string) {
     const canvas = useCanvasStore((s) => s.canvasInstance);
-    const socket = useCanvasStore((s) => s.socket); // ✅ 스토어에서 가져오기
+    const socket = useCanvasStore((s) => s.socket);
+    const brushConfig = useCanvasStore((s) => s.brush);
+
     const syncTimeoutRef = useRef<NodeJS.Timeout>();
     const lastSyncHashRef = useRef<Map<string, string>>(new Map());
     const isApplyingRemoteRef = useRef(false);
 
+    const isDrawingRef = useRef(false);
+    const currentPathIdRef = useRef<string | null>(null);
+    const currentBrushRef = useRef<BrushConfig>(brushConfig);
+
+    // 브러시 상태 추적
+    useEffect(() => {
+        currentBrushRef.current = brushConfig;
+    }, [brushConfig]);
+
     useEffect(() => {
         if (!canvas || !socket) return;
 
-        // --- Socket 이벤트 등록 ---
+        // --- Socket 연결 ---
         socket.on('connect', () => {
             console.log('Socket connected, joining room:', room);
             socket.emit('joinCanvas', room);
-        });
-
-        socket.on('disconnect', () => {
-            console.log('Socket disconnected');
         });
 
         // --- Y.Doc 설정 ---
@@ -65,7 +81,6 @@ export function useCollaborativeCanvas(room: string) {
             if (isApplyingRemoteRef.current || origin === 'remote') return;
             socket.emit('sync', { room, update: Array.from(u8) });
         };
-
         ydoc.on('update', onLocalYUpdate);
 
         const applyRemoteUpdate = async (u8: Uint8Array) => {
@@ -90,10 +105,106 @@ export function useCollaborativeCanvas(room: string) {
             applyRemoteUpdate(toU8(payload));
         });
 
-        // --- Y.js → Canvas 동기화 ---
+        // ----------------------------
+        // FreeDrawing 실시간 스트리밍
+        // ----------------------------
+        const handleMouseDown = () => {
+            if (!canvas.isDrawingMode) return;
+            isDrawingRef.current = true;
+            currentPathIdRef.current = makeId();
+            socket.emit('drawing:start', {
+                room,
+                id: currentPathIdRef.current,
+                brush: currentBrushRef.current,
+            });
+        };
+
+        const handleMouseMove = () => {
+            if (!canvas.isDrawingMode || !isDrawingRef.current) return;
+            const brush = canvas.freeDrawingBrush as any;
+            if (!brush || !brush._points) return;
+
+            const points = brush._points.map((p: any) => [p.x, p.y]);
+            socket.emit('drawing:progress', {
+                room,
+                id: currentPathIdRef.current,
+                points,
+                brush: currentBrushRef.current,
+            });
+        };
+
+        const handleMouseUp = () => {
+            if (!canvas.isDrawingMode || !isDrawingRef.current) return;
+            isDrawingRef.current = false;
+            socket.emit('drawing:end', {
+                room,
+                id: currentPathIdRef.current,
+            });
+            currentPathIdRef.current = null;
+        };
+
+        canvas.on('mouse:down', handleMouseDown);
+        canvas.on('mouse:move', handleMouseMove);
+        canvas.on('mouse:up', handleMouseUp);
+
+        // --- 원격 수신 ---
+        socket.on('drawing:start', ({ id, brush }) => {
+            const { color, width, type } = brush as BrushConfig;
+            const path = new fabric.Path('', {
+                stroke: type === 'highlighter' ? 'rgba(255,255,0,0.3)' : color,
+                strokeWidth: type === 'highlighter' ? width * 1.2 : width,
+                fill: null,
+                selectable: false,
+            }) as FabricObject;
+            path.id = id;
+            path.__fromRemote = true;
+            path.__brushType = type;
+            canvas.add(path);
+        });
+
+        socket.on('drawing:progress', ({ id, points, brush }) => {
+            const oldPath = canvas
+                .getObjects()
+                .find((o) => (o as FabricObject).id === id) as fabric.Path;
+            if (oldPath) canvas.remove(oldPath);
+
+            const pathData = points
+                .map((p: number[], i: number) =>
+                    i === 0 ? `M ${p[0]} ${p[1]}` : `L ${p[0]} ${p[1]}`,
+                )
+                .join(' ');
+
+            const { color, width, type } = brush as BrushConfig;
+            const strokeColor = type === 'highlighter' ? 'rgba(255,255,0,0.3)' : color;
+            const strokeWidth = type === 'highlighter' ? width * 2 : width;
+
+            const newPath = new fabric.Path(pathData, {
+                stroke: strokeColor,
+                strokeWidth,
+                fill: null,
+                selectable: false,
+            }) as FabricObject;
+            newPath.id = id;
+            newPath.__fromRemote = true;
+            newPath.__brushType = type;
+
+            canvas.add(newPath);
+            canvas.requestRenderAll();
+        });
+
+        socket.on('drawing:end', ({ id }) => {
+            const pathObj = canvas
+                .getObjects()
+                .find((o) => (o as FabricObject).id === id) as FabricObject;
+            if (pathObj) pathObj.__fromRemote = false;
+            canvas.requestRenderAll();
+        });
+
+        // ----------------------------
+        // Y.js → Canvas 동기화
+        // ----------------------------
         const syncFromY = async () => {
             if (!isApplyingRemoteRef.current) return;
-
             const canvasObjects = new Map<string, FabricObject>();
             canvas.getObjects().forEach((obj) => {
                 const fo = obj as FabricObject;
@@ -101,7 +212,6 @@ export function useCollaborativeCanvas(room: string) {
             });
 
             const updatedObjects: FabricObject[] = [];
-
             for (const [id, data] of yObjects.entries()) {
                 if (data.type instanceof fabric.ActiveSelection) continue;
 
@@ -113,7 +223,6 @@ export function useCollaborativeCanvas(room: string) {
                     if (lastHash !== newHash) {
                         existing.__fromRemote = true;
                         existing.__lastModified = Date.now();
-
                         existing.set({
                             left: data.left,
                             top: data.top,
@@ -132,7 +241,6 @@ export function useCollaborativeCanvas(room: string) {
                         obj.id = id;
                         obj.__fromRemote = true;
                         obj.__lastModified = Date.now();
-
                         obj.set({
                             hasControls: false,
                             lockScalingX: true,
@@ -141,7 +249,6 @@ export function useCollaborativeCanvas(room: string) {
                             lockSkewingX: true,
                             lockSkewingY: true,
                         });
-
                         canvas.add(obj);
                         lastSyncHashRef.current.set(id, newHash);
                         updatedObjects.push(obj);
@@ -154,37 +261,28 @@ export function useCollaborativeCanvas(room: string) {
             canvasObjects.forEach((obj) => {
                 obj.__fromRemote = true;
                 canvas.remove(obj);
-                if (obj.id) {
-                    lastSyncHashRef.current.delete(obj.id);
-                }
+                if (obj.id) lastSyncHashRef.current.delete(obj.id);
             });
 
             updatedObjects.forEach((obj) => {
-                setTimeout(() => {
-                    obj.__fromRemote = false;
-                }, 100);
+                setTimeout(() => (obj.__fromRemote = false), 100);
             });
-
             canvas.requestRenderAll();
         };
 
-        // --- Canvas → Y.js 동기화 (디바운스) ---
+        // ----------------------------
+        // Canvas → Y.js 동기화
+        // ----------------------------
         const syncToY = () => {
             if (isApplyingRemoteRef.current) return;
-
-            if (syncTimeoutRef.current) {
-                clearTimeout(syncTimeoutRef.current);
-            }
+            if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
 
             syncTimeoutRef.current = setTimeout(() => {
                 Y.transact(ydoc, () => {
                     const currentIds = new Set<string>();
-
                     canvas.getObjects().forEach((obj) => {
                         if (obj instanceof fabric.ActiveSelection) return;
-
                         const fo = obj as FabricObject;
-
                         if (
                             fo.__fromRemote &&
                             fo.__lastModified &&
@@ -192,16 +290,12 @@ export function useCollaborativeCanvas(room: string) {
                         ) {
                             return;
                         }
-
                         const id = ensureId(fo);
                         currentIds.add(id);
-
                         const data = fo.toObject();
                         data.id = id;
-
                         const currentHash = getObjectHash(fo);
                         const lastHash = lastSyncHashRef.current.get(id);
-
                         if (lastHash !== currentHash) {
                             yObjects.set(id, data);
                             lastSyncHashRef.current.set(id, currentHash);
@@ -218,13 +312,11 @@ export function useCollaborativeCanvas(room: string) {
             }, 50);
         };
 
-        // --- 이벤트 핸들러 ---
+        // Fabric 이벤트
         const onObjectAdded = (e: any) => {
             const obj = e.target as FabricObject;
             if (obj.__fromRemote) return;
-
             ensureId(obj);
-
             obj.set({
                 hasControls: false,
                 lockScalingX: true,
@@ -233,24 +325,12 @@ export function useCollaborativeCanvas(room: string) {
                 lockSkewingX: true,
                 lockSkewingY: true,
             });
-
             syncToY();
         };
 
         const onObjectModified = (e: any) => {
             const target = e.target as FabricObject | undefined;
             if (!target || target.__fromRemote) return;
-
-            if (target instanceof fabric.ActiveSelection) {
-                const sel = target as fabric.ActiveSelection;
-                sel.getObjects().forEach((child) => {
-                    ensureId(child as FabricObject);
-                    (child as FabricObject).__fromRemote = false;
-                });
-                sel.forEachObject((child) => canvas.add(child));
-                canvas.remove(sel);
-            }
-
             syncToY();
             canvas.requestRenderAll();
         };
@@ -258,19 +338,16 @@ export function useCollaborativeCanvas(room: string) {
         const onObjectRemoved = (e: any) => {
             const obj = e.target as FabricObject;
             if (obj.__fromRemote) return;
-            if (obj.id) {
-                lastSyncHashRef.current.delete(obj.id);
-            }
+            if (obj.id) lastSyncHashRef.current.delete(obj.id);
             syncToY();
         };
 
         const onPathCreated = () => {
+            // freeDrawing 종료 후 최종 Path → Yjs에 반영
             syncToY();
         };
 
-        const onObjectMoving = (e: any) => {
-            const obj = e.target as FabricObject;
-            if (obj.__fromRemote) return;
+        const onObjectMoving = () => {
             if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
             syncTimeoutRef.current = setTimeout(syncToY, 16);
         };
@@ -292,6 +369,14 @@ export function useCollaborativeCanvas(room: string) {
             canvas.off('path:created', onPathCreated);
             canvas.off('object:moving', onObjectMoving);
             canvas.off('object:rotating', onObjectMoving);
+
+            canvas.off('mouse:down', handleMouseDown);
+            canvas.off('mouse:move', handleMouseMove);
+            canvas.off('mouse:up', handleMouseUp);
+
+            socket.off('drawing:start');
+            socket.off('drawing:progress');
+            socket.off('drawing:end');
 
             ydoc.off('update', onLocalYUpdate);
             lastSyncHashRef.current.clear();

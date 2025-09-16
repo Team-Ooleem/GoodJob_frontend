@@ -397,7 +397,7 @@ function ensureFreeDrawingBrush(canvas: fabric.Canvas, brushConfig: BrushConfig)
 
     // 형광펜 전용 옵션
     if (type === 'highlighter') {
-        brush.width = width * 2; // 더 두껍게
+        brush.width = width * 1.2; // 더 두껍게
         brush.color = 'rgba(255, 255, 0, 0.3)'; // 형광펜 색상
     }
 }
