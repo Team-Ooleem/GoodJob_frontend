@@ -74,7 +74,6 @@ export async function fetchMentoringProducts(
 ): Promise<MentoringProductsResponse> {
     try {
         // 모든 멘토의 상품을 조회하기 위해 멘토 목록을 먼저 가져옴
-        console.log('🚀 멘토링 상품 목록 조회 시작');
         const mentors = mentorIdx
             ? [
                   {
@@ -86,15 +85,10 @@ export async function fetchMentoringProducts(
                   } as Mentor,
               ]
             : await fetchMentors();
-        console.log('👥 조회된 멘토 목록:', {
-            mentors_count: mentors.length,
-            mentors: mentors.map((m) => ({ mentor_idx: m.mentor_idx, name: m.name })),
-        });
         const allProducts: MentoringProduct[] = [];
 
         // 멘토가 없는 경우 빈 결과 반환
         if (mentors.length === 0) {
-            console.warn('⚠️ 조회된 멘토가 없습니다. 빈 상품 목록을 반환합니다.');
             return {
                 products: [],
                 page_info: {
@@ -110,12 +104,6 @@ export async function fetchMentoringProducts(
         // 각 멘토별로 상품 목록 조회 (병렬 처리로 성능 최적화)
         const mentorPromises = mentors.map(async (mentor) => {
             try {
-                console.log(`🔍 멘토 ${mentor.mentor_idx} 상품 조회 시작:`, {
-                    mentor_name: mentor.name,
-                    mentor_idx: mentor.mentor_idx,
-                    url: `${BASE_URL}/mentors/${mentor.mentor_idx}/mentoring-products`,
-                });
-
                 const response = await fetch(
                     `${BASE_URL}/mentors/${mentor.mentor_idx}/mentoring-products`,
                     {
@@ -127,67 +115,20 @@ export async function fetchMentoringProducts(
                     },
                 );
 
-                console.log(`📡 멘토 ${mentor.mentor_idx} API 응답 상태:`, {
-                    status: response.status,
-                    statusText: response.statusText,
-                    ok: response.ok,
-                    headers: Object.fromEntries(response.headers.entries()),
-                });
-
                 if (response.ok) {
                     const mentorProducts = await response.json();
-                    console.log(`✅ 멘토 ${mentor.mentor_idx} API 응답 데이터:`, {
-                        raw_response: mentorProducts,
-                        is_array: Array.isArray(mentorProducts),
-                        has_products: mentorProducts.products
-                            ? Array.isArray(mentorProducts.products)
-                            : false,
-                        has_data: mentorProducts.data ? Array.isArray(mentorProducts.data) : false,
-                        products_count: Array.isArray(mentorProducts)
-                            ? mentorProducts.length
-                            : mentorProducts.products
-                              ? mentorProducts.products.length
-                              : mentorProducts.data
-                                ? mentorProducts.data.length
-                                : 0,
-                    });
 
                     // API 응답이 배열인지 확인하고 처리
                     if (Array.isArray(mentorProducts)) {
-                        console.log(
-                            `📦 멘토 ${mentor.mentor_idx} - 배열 형태 응답 처리, 상품 수: ${mentorProducts.length}`,
-                        );
                         return mentorProducts;
                     } else if (mentorProducts.products && Array.isArray(mentorProducts.products)) {
-                        console.log(
-                            `📦 멘토 ${mentor.mentor_idx} - products 속성 처리, 상품 수: ${mentorProducts.products.length}`,
-                        );
                         return mentorProducts.products;
                     } else if (mentorProducts.data && Array.isArray(mentorProducts.data)) {
-                        console.log(
-                            `📦 멘토 ${mentor.mentor_idx} - data 속성 처리, 상품 수: ${mentorProducts.data.length}`,
-                        );
                         return mentorProducts.data;
-                    } else {
-                        console.warn(
-                            `⚠️ 멘토 ${mentor.mentor_idx} - 예상치 못한 응답 구조:`,
-                            mentorProducts,
-                        );
                     }
-                } else {
-                    const errorText = await response.text().catch(() => 'Unknown error');
-                    console.error(`❌ 멘토 ${mentor.mentor_idx}의 상품 조회 실패:`, {
-                        status: response.status,
-                        statusText: response.statusText,
-                        error: errorText,
-                    });
                 }
                 return [];
             } catch (mentorError) {
-                console.error(`💥 멘토 ${mentor.mentor_idx}의 상품 조회 중 오류:`, {
-                    error: mentorError,
-                    message: mentorError instanceof Error ? mentorError.message : 'Unknown error',
-                });
                 return [];
             }
         });
@@ -202,15 +143,6 @@ export async function fetchMentoringProducts(
             }
         });
 
-        console.log('📊 최종 상품 데이터 집계:', {
-            total_products: allProducts.length,
-            products_by_mentor: mentorProductsArrays.map((products, index) => ({
-                mentor_idx: mentors[index]?.mentor_idx,
-                mentor_name: mentors[index]?.name,
-                products_count: Array.isArray(products) ? products.length : 0,
-            })),
-        });
-
         // 페이지네이션 처리
         const startIndex = (page - 1) * limit;
         const endIndex = startIndex + limit;
@@ -218,15 +150,6 @@ export async function fetchMentoringProducts(
 
         const total = allProducts.length;
         const total_pages = Math.ceil(total / limit);
-
-        console.log('📄 페이지네이션 결과:', {
-            page,
-            limit,
-            total,
-            total_pages,
-            has_next: endIndex < allProducts.length,
-            paginated_products_count: paginatedProducts.length,
-        });
 
         return {
             products: paginatedProducts,
@@ -239,7 +162,6 @@ export async function fetchMentoringProducts(
             },
         };
     } catch (error) {
-        console.error('멘토링 상품 목록 조회 실패:', error);
         throw new Error('멘토링 상품 목록을 불러오는데 실패했습니다.');
     }
 }
@@ -325,24 +247,19 @@ export async function fetchMentors(): Promise<Mentor[]> {
 
     for (const endpoint of possibleEndpoints) {
         try {
-            console.log(`🔍 멘토 API 시도: ${endpoint}`);
             const res = await fetch(endpoint, {
                 credentials: 'include',
             });
 
             if (res.ok) {
-                console.log(`✅ 멘토 API 성공: ${endpoint}`);
                 return res.json();
-            } else {
-                console.warn(`❌ 멘토 API 실패: ${endpoint} (${res.status})`);
             }
         } catch (error) {
-            console.warn(`💥 멘토 API 오류: ${endpoint}`, error);
+            // 에러 무시하고 다음 엔드포인트 시도
         }
     }
 
-    // 모든 엔드포인트 실패 시 빈 배열 반환 (더미 데이터 없이)
-    console.warn('⚠️ 모든 멘토 API 엔드포인트 실패, 빈 배열 반환');
+    // 모든 엔드포인트 실패 시 빈 배열 반환
     return [];
 }
 
