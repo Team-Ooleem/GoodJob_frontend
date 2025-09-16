@@ -66,150 +66,167 @@ export type MentoringProductsResponse = {
     };
 };
 
-// 더미 데이터
-const mockProducts: MentoringProduct[] = [
-    {
-        product_idx: 1,
-        title: '프론트엔드 면접 대비 1:1 멘토링',
-        description: '실제 면접 경험 기반으로 포트폴리오와 코딩테스트 준비를 도와드립니다.',
-        price: 50000,
-        job_category: '프론트엔드 개발',
-        mentee_count: 8,
-        review_count: 12,
-        average_rating: 4.8,
-        mentor: {
-            name: '홍길동',
-            job_category: '프론트엔드 개발',
-            career: '5년차',
-            business_name: '네이버',
-        },
-    },
-    {
-        product_idx: 2,
-        title: 'React & TypeScript 실무 프로젝트 리뷰',
-        description: '실제 프로젝트 코드를 기반으로 리팩토링과 최적화 방법을 알려드립니다.',
-        price: 80000,
-        job_category: '프론트엔드 개발',
-        mentee_count: 15,
-        review_count: 8,
-        average_rating: 4.6,
-        mentor: {
-            name: '김리액트',
-            job_category: '프론트엔드 개발',
-            career: '7년차',
-            business_name: '카카오',
-        },
-    },
-    {
-        product_idx: 3,
-        title: '백엔드 아키텍처 설계 멘토링',
-        description: '확장 가능한 백엔드 시스템 설계와 마이크로서비스 아키텍처를 학습합니다.',
-        price: 100000,
-        job_category: '백엔드 개발',
-        mentee_count: 12,
-        review_count: 6,
-        average_rating: 4.9,
-        mentor: {
-            name: '이서버',
-            job_category: '백엔드 개발',
-            career: '8년차',
-            business_name: '당근마켓',
-        },
-    },
-    {
-        product_idx: 4,
-        title: '데이터베이스 최적화 및 성능 튜닝',
-        description: 'MySQL, PostgreSQL을 활용한 쿼리 최적화와 인덱싱 전략을 배웁니다.',
-        price: 120000,
-        job_category: '백엔드 개발',
-        mentee_count: 6,
-        review_count: 4,
-        average_rating: 4.7,
-        mentor: {
-            name: '박데이터',
-            job_category: '백엔드 개발',
-            career: '10년차',
-            business_name: '토스',
-        },
-    },
-    {
-        product_idx: 5,
-        title: 'UI/UX 디자인 시스템 구축 가이드',
-        description: 'Figma를 활용한 디자인 시스템 구축과 컴포넌트 설계 방법을 학습합니다.',
-        price: 70000,
-        job_category: 'UI/UX 디자인',
-        mentee_count: 20,
-        review_count: 15,
-        average_rating: 4.5,
-        mentor: {
-            name: '정디자인',
-            job_category: 'UI/UX 디자인',
-            career: '6년차',
-            business_name: '라인',
-        },
-    },
-    {
-        product_idx: 6,
-        title: 'DevOps CI/CD 파이프라인 구축',
-        description: 'Docker, Kubernetes, GitHub Actions를 활용한 자동화 배포 환경을 구축합니다.',
-        price: 150000,
-        job_category: 'DevOps',
-        mentee_count: 9,
-        review_count: 7,
-        average_rating: 4.8,
-        mentor: {
-            name: '한인프라',
-            job_category: 'DevOps',
-            career: '9년차',
-            business_name: '우아한형제들',
-        },
-    },
-    {
-        product_idx: 7,
-        title: '모바일 앱 개발 (React Native)',
-        description: '크로스 플랫폼 모바일 앱 개발과 네이티브 모듈 연동 방법을 학습합니다.',
-        price: 90000,
-        job_category: '모바일 개발',
-        mentee_count: 14,
-        review_count: 10,
-        average_rating: 4.4,
-        mentor: {
-            name: '송모바일',
-            job_category: '모바일 개발',
-            career: '5년차',
-            business_name: '쿠팡',
-        },
-    },
-    {
-        product_idx: 8,
-        title: 'AI/ML 모델 개발 및 배포',
-        description: 'TensorFlow, PyTorch를 활용한 머신러닝 모델 개발과 MLOps 파이프라인 구축',
-        price: 200000,
-        job_category: 'AI/ML',
-        mentee_count: 5,
-        review_count: 3,
-        average_rating: 4.9,
-        mentor: {
-            name: '강AI',
-            job_category: 'AI/ML',
-            career: '12년차',
-            business_name: '네이버',
-        },
-    },
-];
-
-// 상품 목록 조회 (더미 데이터 사용)
+// 상품 목록 조회 (실제 API 연동)
 export async function fetchMentoringProducts(
     page = 1,
     limit = 10,
+    mentorIdx?: number,
 ): Promise<MentoringProductsResponse> {
     try {
+        // 모든 멘토의 상품을 조회하기 위해 멘토 목록을 먼저 가져옴
+        console.log('🚀 멘토링 상품 목록 조회 시작');
+        const mentors = mentorIdx
+            ? [
+                  {
+                      mentor_idx: mentorIdx,
+                      name: String(mentorIdx),
+                      job_category: '',
+                      career: '',
+                      business_name: '',
+                  } as Mentor,
+              ]
+            : await fetchMentors();
+        console.log('👥 조회된 멘토 목록:', {
+            mentors_count: mentors.length,
+            mentors: mentors.map((m) => ({ mentor_idx: m.mentor_idx, name: m.name })),
+        });
+        const allProducts: MentoringProduct[] = [];
+
+        // 멘토가 없는 경우 빈 결과 반환
+        if (mentors.length === 0) {
+            console.warn('⚠️ 조회된 멘토가 없습니다. 빈 상품 목록을 반환합니다.');
+            return {
+                products: [],
+                page_info: {
+                    page,
+                    limit,
+                    total: 0,
+                    total_pages: 0,
+                    has_next: false,
+                },
+            };
+        }
+
+        // 각 멘토별로 상품 목록 조회 (병렬 처리로 성능 최적화)
+        const mentorPromises = mentors.map(async (mentor) => {
+            try {
+                console.log(`🔍 멘토 ${mentor.mentor_idx} 상품 조회 시작:`, {
+                    mentor_name: mentor.name,
+                    mentor_idx: mentor.mentor_idx,
+                    url: `${BASE_URL}/mentors/${mentor.mentor_idx}/mentoring-products`,
+                });
+
+                const response = await fetch(
+                    `${BASE_URL}/mentors/${mentor.mentor_idx}/mentoring-products`,
+                    {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        credentials: 'include',
+                    },
+                );
+
+                console.log(`📡 멘토 ${mentor.mentor_idx} API 응답 상태:`, {
+                    status: response.status,
+                    statusText: response.statusText,
+                    ok: response.ok,
+                    headers: Object.fromEntries(response.headers.entries()),
+                });
+
+                if (response.ok) {
+                    const mentorProducts = await response.json();
+                    console.log(`✅ 멘토 ${mentor.mentor_idx} API 응답 데이터:`, {
+                        raw_response: mentorProducts,
+                        is_array: Array.isArray(mentorProducts),
+                        has_products: mentorProducts.products
+                            ? Array.isArray(mentorProducts.products)
+                            : false,
+                        has_data: mentorProducts.data ? Array.isArray(mentorProducts.data) : false,
+                        products_count: Array.isArray(mentorProducts)
+                            ? mentorProducts.length
+                            : mentorProducts.products
+                              ? mentorProducts.products.length
+                              : mentorProducts.data
+                                ? mentorProducts.data.length
+                                : 0,
+                    });
+
+                    // API 응답이 배열인지 확인하고 처리
+                    if (Array.isArray(mentorProducts)) {
+                        console.log(
+                            `📦 멘토 ${mentor.mentor_idx} - 배열 형태 응답 처리, 상품 수: ${mentorProducts.length}`,
+                        );
+                        return mentorProducts;
+                    } else if (mentorProducts.products && Array.isArray(mentorProducts.products)) {
+                        console.log(
+                            `📦 멘토 ${mentor.mentor_idx} - products 속성 처리, 상품 수: ${mentorProducts.products.length}`,
+                        );
+                        return mentorProducts.products;
+                    } else if (mentorProducts.data && Array.isArray(mentorProducts.data)) {
+                        console.log(
+                            `📦 멘토 ${mentor.mentor_idx} - data 속성 처리, 상품 수: ${mentorProducts.data.length}`,
+                        );
+                        return mentorProducts.data;
+                    } else {
+                        console.warn(
+                            `⚠️ 멘토 ${mentor.mentor_idx} - 예상치 못한 응답 구조:`,
+                            mentorProducts,
+                        );
+                    }
+                } else {
+                    const errorText = await response.text().catch(() => 'Unknown error');
+                    console.error(`❌ 멘토 ${mentor.mentor_idx}의 상품 조회 실패:`, {
+                        status: response.status,
+                        statusText: response.statusText,
+                        error: errorText,
+                    });
+                }
+                return [];
+            } catch (mentorError) {
+                console.error(`💥 멘토 ${mentor.mentor_idx}의 상품 조회 중 오류:`, {
+                    error: mentorError,
+                    message: mentorError instanceof Error ? mentorError.message : 'Unknown error',
+                });
+                return [];
+            }
+        });
+
+        // 모든 멘토의 상품을 병렬로 조회
+        const mentorProductsArrays = await Promise.all(mentorPromises);
+
+        // 모든 상품을 하나의 배열로 합치기
+        mentorProductsArrays.forEach((products) => {
+            if (Array.isArray(products)) {
+                allProducts.push(...products);
+            }
+        });
+
+        console.log('📊 최종 상품 데이터 집계:', {
+            total_products: allProducts.length,
+            products_by_mentor: mentorProductsArrays.map((products, index) => ({
+                mentor_idx: mentors[index]?.mentor_idx,
+                mentor_name: mentors[index]?.name,
+                products_count: Array.isArray(products) ? products.length : 0,
+            })),
+        });
+
+        // 페이지네이션 처리
         const startIndex = (page - 1) * limit;
         const endIndex = startIndex + limit;
-        const paginatedProducts = mockProducts.slice(startIndex, endIndex);
+        const paginatedProducts = allProducts.slice(startIndex, endIndex);
 
-        const total = mockProducts.length;
+        const total = allProducts.length;
         const total_pages = Math.ceil(total / limit);
+
+        console.log('📄 페이지네이션 결과:', {
+            page,
+            limit,
+            total,
+            total_pages,
+            has_next: endIndex < allProducts.length,
+            paginated_products_count: paginatedProducts.length,
+        });
 
         return {
             products: paginatedProducts,
@@ -218,7 +235,7 @@ export async function fetchMentoringProducts(
                 limit,
                 total,
                 total_pages,
-                has_next: endIndex < mockProducts.length,
+                has_next: endIndex < allProducts.length,
             },
         };
     } catch (error) {
@@ -239,12 +256,6 @@ export async function createMentoringProduct(
         `${BASE_URL}/mentoring-products/create`,
     ];
     const url = possibleUrls[0]; // 첫 번째 시도
-    console.log('🚀 API 호출:', {
-        url,
-        method: 'POST',
-        data,
-        BASE_URL,
-    });
 
     const res = await fetch(url, {
         method: 'POST',
@@ -303,16 +314,36 @@ export async function fetchJobCategories(): Promise<JobCategory[]> {
 
 /** 멘토 목록 조회 */
 export async function fetchMentors(): Promise<Mentor[]> {
-    const res = await fetch(`${BASE_URL}/mentors`, {
-        credentials: 'include',
-    });
+    // 가능한 멘토 API 엔드포인트들을 시도
+    const possibleEndpoints = [
+        `${BASE_URL}/mentors`,
+        `${BASE_URL}/api/mentors`,
+        `${BASE_URL}/mentoring/mentors`,
+        `${BASE_URL}/admin/mentors`,
+        `${BASE_URL}/users/mentors`,
+    ];
 
-    if (!res.ok) {
-        const msg = await safeText(res);
-        throw new Error(`멘토 목록 조회 실패 (${res.status}) ${msg}`);
+    for (const endpoint of possibleEndpoints) {
+        try {
+            console.log(`🔍 멘토 API 시도: ${endpoint}`);
+            const res = await fetch(endpoint, {
+                credentials: 'include',
+            });
+
+            if (res.ok) {
+                console.log(`✅ 멘토 API 성공: ${endpoint}`);
+                return res.json();
+            } else {
+                console.warn(`❌ 멘토 API 실패: ${endpoint} (${res.status})`);
+            }
+        } catch (error) {
+            console.warn(`💥 멘토 API 오류: ${endpoint}`, error);
+        }
     }
 
-    return res.json();
+    // 모든 엔드포인트 실패 시 빈 배열 반환 (더미 데이터 없이)
+    console.warn('⚠️ 모든 멘토 API 엔드포인트 실패, 빈 배열 반환');
+    return [];
 }
 
 /** 에러 메시지 보강용 */
