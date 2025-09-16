@@ -2,12 +2,14 @@
 
 import { useEffect, useRef } from 'react';
 import { useCanvasStore } from '../_stores/useCanvasStore';
+import { useSessionStore } from '../_stores/useSessionStore';
 import * as fabric from 'fabric';
 
 type RemoteCursor = {
     clientUUID: string;
     x: number; // 월드 좌표
     y: number; // 월드 좌표
+    userName?: string; // 사용자 이름
 };
 
 function safeRandomUUID(): string {
@@ -47,13 +49,32 @@ function getClientUUID() {
     }
 }
 
+function getUserName(): string {
+    if (typeof window === 'undefined') return 'Anonymous';
+    try {
+        // localStorage에서 사용자 이름을 가져오거나 기본값 설정
+        const userName = window.localStorage.getItem('userName');
+        if (userName) return userName;
+
+        // 랜덤한 사용자 이름 생성
+        const names = ['Alex', 'Jordan', 'Casey', 'Riley', 'Avery', 'Quinn', 'Blake', 'Sage'];
+        const randomName =
+            names[Math.floor(Math.random() * names.length)] + Math.floor(Math.random() * 100);
+        window.localStorage.setItem('userName', randomName);
+        return randomName;
+    } catch {
+        return 'Anonymous';
+    }
+}
+
 export function useCollaborativeCursor(room: string, canvas: fabric.Canvas | null) {
     const socket = useCanvasStore((s) => s.socket);
-    const cursorsRef = useRef<Map<string, HTMLImageElement>>(new Map());
+    const cursorsRef = useRef<Map<string, HTMLDivElement>>(new Map());
 
     useEffect(() => {
         if (!socket || !canvas) return;
         const clientUUID = getClientUUID();
+        const userName = getUserName();
 
         const container = document.getElementById('canvas-container');
         if (!container) {
@@ -76,12 +97,13 @@ export function useCollaborativeCursor(room: string, canvas: fabric.Canvas | nul
                 clientUUID,
                 x: point.x,
                 y: point.y,
+                userName,
             });
         };
 
         const handleConnect = () => {
             console.log('✅ connected for cursor, joining room:', room);
-            socket.emit('joinCursor', { room, clientUUID });
+            socket.emit('joinCursor', { room, clientUUID, userName });
             canvas.on('mouse:move', handleMouseMove);
         };
 
@@ -91,23 +113,50 @@ export function useCollaborativeCursor(room: string, canvas: fabric.Canvas | nul
         };
 
         // --- 다른 사람 커서 업데이트 ---
-        const handleCursor = ({ clientUUID: remoteId, x, y }: RemoteCursor) => {
+        const handleCursor = ({
+            clientUUID: remoteId,
+            x,
+            y,
+            userName: remoteUserName,
+        }: RemoteCursor) => {
             if (remoteId === clientUUID) return;
 
-            let cursorEl = cursorsRef.current.get(remoteId);
-            if (!cursorEl) {
-                cursorEl = new Image();
-                cursorEl.src = '/assets/cursor.png';
-                cursorEl.alt = 'remote-cursor';
-                cursorEl.style.position = 'absolute';
-                cursorEl.style.width = '34px';
-                cursorEl.style.height = '34px';
-                cursorEl.style.pointerEvents = 'none';
-                cursorEl.style.userSelect = 'none';
-                cursorEl.style.zIndex = '9999';
-                cursorEl.style.transform = 'translate(-2px, -2px)';
-                container.appendChild(cursorEl);
-                cursorsRef.current.set(remoteId, cursorEl);
+            let cursorContainer = cursorsRef.current.get(remoteId);
+            if (!cursorContainer) {
+                // 커서 컨테이너 생성
+                cursorContainer = document.createElement('div');
+                cursorContainer.style.position = 'absolute';
+                cursorContainer.style.pointerEvents = 'none';
+                cursorContainer.style.userSelect = 'none';
+                cursorContainer.style.zIndex = '9999';
+                cursorContainer.style.transform = 'translate(-2px, -2px)';
+
+                // 커서 이미지
+                const cursorImg = document.createElement('img');
+                cursorImg.src = '/assets/cursor.png';
+                cursorImg.alt = 'remote-cursor';
+                cursorImg.style.width = '24px';
+                cursorImg.style.height = '24px';
+                cursorImg.style.display = 'block';
+
+                // 사용자 이름 라벨
+                const nameLabel = document.createElement('div');
+                nameLabel.textContent = remoteUserName || 'Anonymous';
+                nameLabel.style.position = 'absolute';
+                nameLabel.style.top = '36px';
+                nameLabel.style.left = '0px';
+                nameLabel.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+                nameLabel.style.color = 'white';
+                nameLabel.style.fontSize = '12px';
+                nameLabel.style.padding = '2px 6px';
+                nameLabel.style.borderRadius = '4px';
+                nameLabel.style.whiteSpace = 'nowrap';
+                nameLabel.style.fontFamily = 'system-ui, -apple-system, sans-serif';
+
+                cursorContainer.appendChild(cursorImg);
+                cursorContainer.appendChild(nameLabel);
+                container.appendChild(cursorContainer);
+                cursorsRef.current.set(remoteId, cursorContainer);
             }
 
             // --- 월드 좌표 → 화면 좌표 변환 ---
@@ -118,12 +167,12 @@ export function useCollaborativeCursor(room: string, canvas: fabric.Canvas | nul
             // viewport 안에 있는지 체크
             const rect = canvas.upperCanvasEl.getBoundingClientRect();
             if (screenX < 0 || screenX > rect.width || screenY < 0 || screenY > rect.height) {
-                cursorEl.style.display = 'none';
+                cursorContainer.style.display = 'none';
                 return;
             }
-            cursorEl.style.display = 'block';
-            cursorEl.style.left = `${screenX}px`;
-            cursorEl.style.top = `${screenY}px`;
+            cursorContainer.style.display = 'block';
+            cursorContainer.style.left = `${screenX}px`;
+            cursorContainer.style.top = `${screenY}px`;
 
             // 디버깅 로그
             // console.log('📥 recv cursor', remoteId, { worldX: x, worldY: y, screenX, screenY });
@@ -131,9 +180,9 @@ export function useCollaborativeCursor(room: string, canvas: fabric.Canvas | nul
 
         // --- 다른 사람 나감 ---
         const handleUserLeft = (remoteId: string) => {
-            const cursorEl = cursorsRef.current.get(remoteId);
-            if (cursorEl) {
-                cursorEl.remove();
+            const cursorContainer = cursorsRef.current.get(remoteId);
+            if (cursorContainer) {
+                cursorContainer.remove();
                 cursorsRef.current.delete(remoteId);
             }
         };
