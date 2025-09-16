@@ -253,11 +253,11 @@ export function WaitingRoom() {
                 {/* Right: Participants + CTA */}
                 <div className='flex-1 flex justify-center items-center flex-col'>
                     <div className='w-full space-y-6'>
-                        <div className='space-y-4 pr-30'>
+                        <div className='space-y-4 lg:pr-30'>
                             <h2 className='text-2xl font-semibold'>참석자 목록</h2>
 
                             {/* Mentor Card */}
-                            <div className='flex gap-2'>
+                            <div className='flex gap-2 sm:flex-col'>
                                 <Card className='flex-1 p-0'>
                                     <CardContent className='flex items-center space-x-4 p-4'>
                                         <div className='w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center'>

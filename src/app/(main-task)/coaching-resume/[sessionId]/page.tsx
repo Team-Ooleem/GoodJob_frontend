@@ -2,14 +2,12 @@
 
 import { useSessionStore } from '../_stores';
 import {
-    CanvasTitle,
-    SessionToolbar,
     FabricToolbar,
     FabricCanvas,
-    ParticipantCamera,
     RecordingListPopup,
     SocketProvider,
     WaitingRoom,
+    CanvasHeader,
 } from '../_components';
 
 export default function CoachingResumePage() {
@@ -27,11 +25,9 @@ export default function CoachingResumePage() {
     return (
         <>
             <SocketProvider />
-            <CanvasTitle />
-            <SessionToolbar />
-            <ParticipantCamera />
+            <CanvasHeader title='김아무개의 세션' onExit={() => console.log('나가기')} />
             <FabricToolbar />
-            <FabricCanvas />
+            <FabricCanvas mentorName='신우진' menteeName='김민규' />
             <RecordingListPopup />
         </>
     );

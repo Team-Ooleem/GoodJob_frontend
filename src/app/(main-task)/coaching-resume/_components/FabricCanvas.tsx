@@ -19,6 +19,8 @@ import {
     useCollaborativeCursor,
 } from '../_hooks';
 
+import { ParticipantCamera } from './ParticipantCamera';
+
 // local stores
 import { useCanvasStore } from '../_stores';
 
@@ -27,7 +29,12 @@ import { useCanvasStore } from '../_stores';
 // 스티커 메모 생성 후 스티커 메모 옮기면 다른 PC에서 텍스트만 움직임
 // 객체 트랜스폼 기능이 여러개 객체 선택하면 활성화됨 : 해결
 // 객체를 생성하고 이동하면 상대방 PC에 원래 위치에 원본이 남아있고 복사되어 이동됨
-export function FabricCanvas() {
+type Props = {
+    mentorName?: string;
+    menteeName?: string;
+};
+
+export function FabricCanvas({ mentorName, menteeName }: Props) {
     const { width, height } = useWindowSize();
     const { canvasRef, canvas } = useFabricCanvas({
         width,
@@ -89,9 +96,9 @@ export function FabricCanvas() {
     const isRecording = useCanvasStore((store) => store.isRecording);
 
     return (
-        <canvas
-            ref={canvasRef}
-            className={isRecording ? 'border border-2 border-red-500' : undefined}
-        />
+        <div className='relative'>
+            <ParticipantCamera mentorName={mentorName} menteeName={menteeName} />
+            <canvas ref={canvasRef} />
+        </div>
     );
 }
