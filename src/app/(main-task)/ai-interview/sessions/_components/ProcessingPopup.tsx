@@ -7,8 +7,7 @@ export type ProcessingStep =
     | 'audio-analysis'
     | 'stt-transcription'
     | 'content-analysis'
-    | 'next-question'
-    | 'finalizing';
+    | 'next-question';
 
 interface ProcessingPopupProps {
     isVisible: boolean;
@@ -22,7 +21,6 @@ const STEP_MESSAGES: Record<ProcessingStep, string> = {
     'stt-transcription': '구글 STT로 답변을 전사하고 있습니다...',
     'content-analysis': '답변 내용을 분석하고 있습니다...',
     'next-question': '다음 질문을 생성하고 있습니다...',
-    finalizing: '면접 결과를 최종 분석하고 있습니다...',
 };
 
 const STEP_ORDER: ProcessingStep[] = [
@@ -31,7 +29,6 @@ const STEP_ORDER: ProcessingStep[] = [
     'stt-transcription',
     'content-analysis',
     'next-question',
-    'finalizing',
 ];
 
 export default function ProcessingPopup({
@@ -50,15 +47,7 @@ export default function ProcessingPopup({
         setIsAnimating(true);
     }, [isVisible]);
 
-    useEffect(() => {
-        if (currentStep === 'finalizing') {
-            // 모든 단계 완료
-            setTimeout(() => {
-                setIsAnimating(false);
-                onComplete?.();
-            }, 1000);
-        }
-    }, [currentStep, onComplete]);
+    // finalizing 단계는 제거되었으므로 이 useEffect는 더 이상 필요하지 않음
 
     if (!isVisible) return null;
 
