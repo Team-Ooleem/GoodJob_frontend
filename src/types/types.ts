@@ -56,103 +56,6 @@ export interface ApiErrorResponse {
 }
 // =============Job Types=============
 
-// =============Location Types=============
-export interface Sido {
-    sido_code: string;
-    sido_name: string;
-}
-
-export interface Gu {
-    gu_code: string;
-    gu_name: string;
-}
-
-export interface SidoResponse {
-    success: boolean;
-    data: {
-        sido: Sido[];
-    };
-}
-
-export interface GuResponse {
-    success: boolean;
-    data: {
-        gu: Gu[];
-    };
-}
-
-export interface LocationGroup {
-    sido_code: string;
-    sido_name: string;
-    gu: Gu[];
-}
-
-export interface AllLocationsResponse {
-    success: boolean;
-    data: {
-        locations: LocationGroup[];
-    };
-}
-
-// 사용자 희망 근무지 선호도 관련 타입
-export interface UserLocationPreference {
-    sidoCode: string;
-    guCode: string;
-}
-
-export interface UserLocationPreferenceResponse {
-    success: boolean;
-    message: string;
-    data?: {
-        sidoCode: string;
-        guCode: string;
-    };
-}
-// =============Location Types=============
-
-// =============Salary Types=============
-export interface SalaryRange {
-    id: number;
-    min_salary: number | null;
-    max_salary: number | null;
-    display_text: string;
-}
-
-export interface SalaryRangesResponse {
-    success: boolean;
-    data: {
-        salary_ranges: SalaryRange[];
-    };
-}
-
-export interface SalaryRangeResponse {
-    success: boolean;
-    data: {
-        salary_range: SalaryRange;
-    };
-}
-
-export interface SalarySearchResponse {
-    success: boolean;
-    data: {
-        salary_ranges: SalaryRange[];
-    };
-}
-
-// 사용자 희망 연봉 선호도 관련 타입
-export interface UserSalaryPreference {
-    salaryRangeId: number;
-}
-
-export interface UserSalaryPreferenceResponse {
-    success: boolean;
-    message: string;
-    data?: {
-        salaryRangeId: number;
-    };
-}
-// =============Salary Types=============
-
 // =============Profile Types=============
 export interface Profile {
     idx: number;
@@ -162,7 +65,6 @@ export interface Profile {
     short_bio?: string;
     bio?: string;
     profile_img?: string;
-    onboarding_completed: boolean;
     created_at: string;
     updated_at: string;
 }

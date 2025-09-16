@@ -1,8 +1,5 @@
 import { authApi } from '@/apis/api';
 
-/**
- * 로그인 후 온보딩 상태에 따른 리다이렉트 처리
- */
 export const handleAuthRedirect = async (maxRetries = 3, baseDelay = 500): Promise<string> => {
     let retryCount = 0;
 
@@ -19,17 +16,12 @@ export const handleAuthRedirect = async (maxRetries = 3, baseDelay = 500): Promi
                 throw new Error('Authentication failed');
             }
 
-            // 온보딩 상태에 따른 경로 결정
-            if (authData.onboarding?.isOnboarded) {
-                return '/'; // 메인 페이지
-            } else {
-                return '/job-selection'; // 온보딩 페이지
-            }
+            // 인증 성공 시 메인 페이지로 이동
+            return '/';
         } catch (error) {
             retryCount++;
 
             if (retryCount <= maxRetries) {
-                console.log(`인증 확인 재시도 ${retryCount}/${maxRetries}`);
                 return attemptAuth();
             }
 

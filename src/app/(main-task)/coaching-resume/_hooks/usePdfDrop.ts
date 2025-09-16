@@ -1,11 +1,14 @@
 'use client';
 
 import { useEffect } from 'react';
+import { isAxiosError } from 'axios';
 import * as fabric from 'fabric';
 import { useCanvasStore } from '../_stores';
+import { useCanvasImageUpload } from './useCanvasImageUpload';
 
 export function usePdfDrop(canvasRef: React.RefObject<HTMLCanvasElement>) {
     const canvas = useCanvasStore((store) => store.canvasInstance);
+    const { uploadCanvasImage } = useCanvasImageUpload();
 
     useEffect(() => {
         if (!canvas || !canvasRef.current) return;
@@ -60,16 +63,29 @@ export function usePdfDrop(canvasRef: React.RefObject<HTMLCanvasElement>) {
 
                     console.log(`✅ 페이지 ${i} 렌더링 완료`);
 
-                    // 캔버스를 이미지 데이터로 변환
+                    // 캔버스를 이미지 데이터로 변환 후 업로드
                     const dataUrl = canvasEl.toDataURL('image/png', 0.8);
-                    console.log(
-                        `🖼️ 페이지 ${i} 이미지 데이터 생성:`,
-                        dataUrl.substring(0, 50) + '...',
-                    );
-
-                    // Fabric v6: FabricImage 사용 + await 버전
+                    const fileName = `canvas-page-${i}.png`;
+                    let imageUrl = dataUrl; // 업로드 실패 시 fallback
                     try {
-                        const img = await fabric.FabricImage.fromURL(dataUrl);
+                        const { url } = await uploadCanvasImage({ dataUrl, fileName });
+                        if (url) imageUrl = url;
+                    } catch (uploadErr) {
+                        if (isAxiosError(uploadErr)) {
+                            console.warn(
+                                `⚠️ 페이지 ${i} 업로드 실패: status=${uploadErr.response?.status}`,
+                                uploadErr.response?.data,
+                            );
+                        } else {
+                            console.warn(`⚠️ 페이지 ${i} 업로드 실패, dataUrl로 대체:`, uploadErr);
+                        }
+                    }
+
+                    // Fabric v6: 원격 URL(or dataUrl)로 이미지 생성
+                    try {
+                        const img = await fabric.FabricImage.fromURL(imageUrl, {
+                            crossOrigin: 'anonymous',
+                        } as any);
                         console.log(`🎨 페이지 ${i} Fabric 이미지 생성 완료:`, img);
 
                         if (!img) {
@@ -104,6 +120,7 @@ export function usePdfDrop(canvasRef: React.RefObject<HTMLCanvasElement>) {
                         // 메타데이터 추가
                         (img as any).pageNumber = i;
                         (img as any).isPdfPage = true;
+                        (img as any).sourceUrl = imageUrl;
 
                         // 캔버스에 추가
                         canvas.add(img);
@@ -118,7 +135,8 @@ export function usePdfDrop(canvasRef: React.RefObject<HTMLCanvasElement>) {
                 console.log('🎉 모든 페이지 처리 완료!');
             } catch (error) {
                 console.error('❌ PDF 처리 중 오류:', error);
-                alert('PDF 처리 중 오류가 발생했습니다: ' + error.message);
+                const msg = error instanceof Error ? error.message : String(error);
+                alert('PDF 처리 중 오류가 발생했습니다: ' + msg);
             } finally {
                 el.style.opacity = '1';
                 el.style.backgroundColor = 'transparent';
@@ -164,5 +182,5 @@ export function usePdfDrop(canvasRef: React.RefObject<HTMLCanvasElement>) {
             el.removeEventListener('dragover', handleDragOver);
             el.removeEventListener('dragleave', handleDragLeave);
         };
-    }, [canvas, canvasRef]);
+    }, [canvas, canvasRef, uploadCanvasImage]);
 }

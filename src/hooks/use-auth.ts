@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { authApi } from '@/apis/api';
 
 export interface User {
@@ -13,13 +14,10 @@ export interface User {
 export interface AuthState {
     authenticated: boolean;
     user?: User;
-    onboarding?: {
-        isOnboarded: boolean;
-        redirectUrl: string;
-    };
 }
 
 export const useAuth = () => {
+    const router = useRouter();
     const {
         data: authData,
         isLoading,
@@ -30,8 +28,24 @@ export const useAuth = () => {
         queryFn: authApi.me,
         retry: false,
         refetchOnWindowFocus: false,
-        staleTime: 5 * 60 * 1000, // 5분간 캐시
     });
+
+    // 인증되지 않은 경우 자동 리다이렉트 처리
+    useEffect(() => {
+        if (!isLoading && authData && !authData.authenticated) {
+            // 현재 페이지가 로그인 페이지가 아닐 때만 처리
+            if (typeof window !== 'undefined') {
+                const currentPath = window.location.pathname;
+
+                const isAuthPage = currentPath.includes('/login');
+                const isHomePage = currentPath === '/';
+
+                if (!isAuthPage && !isHomePage) {
+                    router.push('/login');
+                }
+            }
+        }
+    }, [authData, isLoading, router]);
 
     const logout = async () => {
         try {
@@ -39,9 +53,7 @@ export const useAuth = () => {
             // 쿼리 캐시 무효화
             refetch();
             // 홈페이지로 리다이렉트
-            if (typeof window !== 'undefined') {
-                window.location.href = '/';
-            }
+            router.push('/');
         } catch (error) {
             console.error('로그아웃 실패:', error);
         }
@@ -50,7 +62,6 @@ export const useAuth = () => {
     return {
         user: authData?.user,
         isAuthenticated: authData?.authenticated || false,
-        onboarding: authData?.onboarding,
         isLoading,
         error,
         refetch,

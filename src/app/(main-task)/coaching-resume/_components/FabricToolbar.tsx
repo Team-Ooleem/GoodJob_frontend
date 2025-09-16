@@ -1,239 +1,272 @@
 'use client';
 
-import { Flex } from 'antd';
 import Image from 'next/image';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Plus } from 'lucide-react';
 
 // local stores
 import { useCanvasStore } from '../_stores';
-
-// local hooks
-import { startRecording, stopRecording } from '../_hooks';
-
-// local components
-import { ReplayButton } from './ReplayButton';
-import { is } from 'date-fns/locale';
 
 export function FabricToolbar() {
     const isDrawingMode = useCanvasStore((store) => store.isDrawingMode);
     const setDrawingMode = useCanvasStore((store) => store.setDrawingMode);
     const setBrushOptions = useCanvasStore((store) => store.setBrushOptions);
-    const hasCanvas = useCanvasStore((store) => !!store.canvasInstance);
     const setEraserMode = useCanvasStore((store) => store.setEraserMode);
     const setStickyMode = useCanvasStore((store) => store.setStickyMode);
     const isMicEnabled = useCanvasStore((store) => store.isMicEnabled);
     const isCamEnabled = useCanvasStore((store) => store.isCamEnabled);
     const toggleMic = useCanvasStore((store) => store.toggleMic);
     const toggleCam = useCanvasStore((store) => store.toggleCam);
-    const isRecording = useCanvasStore((store) => store.isRecording);
-    const toggleRecording = useCanvasStore((store) => store.toggleRecording);
-    const setRecording = useCanvasStore((store) => store.setRecording);
-    const isRecordingListOpen = useCanvasStore((store) => store.isRecordingListOpen);
-    const toggleRecordingList = useCanvasStore((store) => store.toggleRecordingList);
     const [hoverMic, setHoverMic] = useState(false);
     const [hoverCam, setHoverCam] = useState(false);
 
     const previewMicEnabled = hoverMic ? !isMicEnabled : isMicEnabled;
     const previewCamEnabled = hoverCam ? !isCamEnabled : isCamEnabled;
 
-    // TODO: 툴바 버튼 컴포넌트 분리 및 스타일링 필요
+    // Figma-like active style for the current selection tool
+    const isSelectActive = useMemo(() => !isDrawingMode, [isDrawingMode]);
+
     return (
-        <div className='absolute bottom-[20px] left-1/2 -translate-x-1/2 transform z-[10] flex justify-center items-center gap-3'>
-            <div className='h-[55px] bg-white shadow-[0_2px_6px_rgba(0,0,0,0.25)] rounded-full px-4 py-1 flex items-center gap-1'>
-                {/* 마이크 */}
-                <button
-                    className='p-2 rounded hover:bg-gray-100'
-                    onClick={toggleMic}
-                    onMouseEnter={() => setHoverMic(true)}
-                    onMouseLeave={() => setHoverMic(false)}
-                    title={previewMicEnabled ? '마이크 끄기' : '마이크 켜기'}
+        <TooltipProvider>
+            <div className='fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex justify-center items-center'>
+                {/* Figma-like pill container */}
+                <div
+                    className='
+                        flex items-center divide-x divide-black/10
+                        rounded-full border border-black/10
+                        bg-white/80 supports-[backdrop-filter]:bg-white/60 backdrop-blur
+                        shadow-[0_6px_24px_rgba(0,0,0,0.12),0_1px_0_rgba(255,255,255,0.6)_inset]
+                        px-2 py-1
+                    '
                 >
-                    <Image
-                        src={previewMicEnabled ? '/assets/mic-none.svg' : '/assets/mic-off.svg'}
-                        width={20}
-                        height={20}
-                        alt='mic-toggle'
-                    />
-                </button>
+                    {/* group: media */}
+                    <div className='flex items-center gap-1 px-1'>
+                        {/* 마이크 */}
+                        <Tooltip>
+                            <TooltipTrigger>
+                                <Button
+                                    variant='ghost'
+                                    size='sm'
+                                    className='h-9 w-9 p-0 rounded-[10px] hover:bg-black/5'
+                                    onClick={toggleMic}
+                                    onMouseEnter={() => setHoverMic(true)}
+                                    onMouseLeave={() => setHoverMic(false)}
+                                    aria-label='toggle-mic'
+                                >
+                                    <Image
+                                        src={
+                                            previewMicEnabled
+                                                ? '/assets/mic-none.svg'
+                                                : '/assets/mic-off.svg'
+                                        }
+                                        width={16}
+                                        height={16}
+                                        alt='mic-toggle'
+                                        className='object-contain'
+                                    />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>{previewMicEnabled ? '마이크 끄기' : '마이크 켜기'}</p>
+                            </TooltipContent>
+                        </Tooltip>
 
-                {/* 카메라 */}
-                <button
-                    className='p-2 rounded hover:bg-gray-100'
-                    onClick={toggleCam}
-                    onMouseEnter={() => setHoverCam(true)}
-                    onMouseLeave={() => setHoverCam(false)}
-                    title={previewCamEnabled ? '카메라 끄기' : '카메라 켜기'}
-                >
-                    <Image
-                        src={
-                            previewCamEnabled ? '/assets/videocam.svg' : '/assets/videocam-off.svg'
-                        }
-                        width={20}
-                        height={20}
-                        alt='camera-toggle'
-                    />
-                </button>
+                        {/* 카메라 */}
+                        <Tooltip>
+                            <TooltipTrigger>
+                                <Button
+                                    variant='ghost'
+                                    size='sm'
+                                    className='h-9 w-9 p-0 rounded-[10px] hover:bg-black/5'
+                                    onClick={toggleCam}
+                                    onMouseEnter={() => setHoverCam(true)}
+                                    onMouseLeave={() => setHoverCam(false)}
+                                    aria-label='toggle-camera'
+                                >
+                                    <Image
+                                        src={
+                                            previewCamEnabled
+                                                ? '/assets/videocam.svg'
+                                                : '/assets/videocam-off.svg'
+                                        }
+                                        width={16}
+                                        height={16}
+                                        alt='camera-toggle'
+                                        className='object-contain'
+                                    />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>{previewCamEnabled ? '카메라 끄기' : '카메라 켜기'}</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </div>
 
-                <div className='w-px h-6 bg-gray-200' />
+                    {/* group: drawing tools */}
+                    <div className='flex items-center gap-1 px-2'>
+                        {/* 선택 도구 */}
+                        <Tooltip>
+                            <TooltipTrigger>
+                                <Button
+                                    variant='ghost'
+                                    size='sm'
+                                    className={`h-9 w-9 p-0 rounded-[10px] hover:bg-black/5 transition-colors ${
+                                        isSelectActive
+                                            ? 'bg-violet-500 text-white hover:bg-violet-500 shadow-[0_6px_14px_rgba(124,58,237,0.35)]'
+                                            : ''
+                                    }`}
+                                    onClick={() => setDrawingMode(false)}
+                                    aria-label='select-tool'
+                                >
+                                    <Image
+                                        src='/assets/selector.svg'
+                                        width={16}
+                                        height={16}
+                                        alt='selector'
+                                        className={isSelectActive ? 'invert' : ''}
+                                    />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>선택 도구</p>
+                            </TooltipContent>
+                        </Tooltip>
 
-                {/* 펜 / 형광펜 / 지우개 */}
-                <Flex gap={2} align='center'>
-                    {/* 선택 */}
-                    <button
-                        className='p-2 rounded hover:bg-gray-100'
-                        onClick={() => setDrawingMode(false)}
-                    >
-                        <Image src='/assets/selector.svg' width={20} height={20} alt='selector' />
-                    </button>
-                    <button
-                        className='p-2 rounded hover:bg-gray-100'
-                        onClick={() => {
-                            setDrawingMode(true);
-                            setBrushOptions({ type: 'pencil', color: '#000000', width: 3 });
-                        }}
-                    >
-                        <Image
-                            src='/assets/pencel.svg'
-                            width={24}
-                            height={20}
-                            alt='pencil'
-                            className='object-contain'
-                        />
-                    </button>
-                    <button
-                        className='p-2 rounded hover:bg-gray-100'
-                        onClick={() => {
-                            setDrawingMode(true);
-                            setBrushOptions({ type: 'highlighter', width: 20 });
-                        }}
-                    >
-                        <Image
-                            src='/assets/highlighter.svg'
-                            width={24}
-                            height={20}
-                            alt='highlighter'
-                            className='object-contain'
-                        />
-                    </button>
-                    <button
-                        className='p-2 rounded hover:bg-gray-100'
-                        onClick={() => {
-                            setStickyMode(true);
-                            setDrawingMode(false);
-                            setEraserMode(false);
-                        }}
-                    >
-                        <Image
-                            src='/assets/sticky.svg'
-                            width={30}
-                            height={20}
-                            alt='sticky'
-                            className='object-contain'
-                        />
-                    </button>
-                    <button
-                        className='p-2 rounded hover:bg-gray-100'
-                        onClick={() => {
-                            setEraserMode(true);
-                        }}
-                    >
-                        <Image
-                            src='/assets/eraser.svg'
-                            width={15}
-                            height={20}
-                            alt='eraser'
-                            className='object-contain'
-                        />
-                    </button>
-                </Flex>
+                        {/* 펜 */}
+                        <Tooltip>
+                            <TooltipTrigger>
+                                <Button
+                                    variant='ghost'
+                                    size='sm'
+                                    className='h-9 w-9 p-0 rounded-[10px] hover:bg-black/5'
+                                    onClick={() => {
+                                        setDrawingMode(true);
+                                        setBrushOptions({
+                                            type: 'pencil',
+                                            color: '#000000',
+                                            width: 3,
+                                        });
+                                    }}
+                                    aria-label='pencil-tool'
+                                >
+                                    <Image
+                                        src='/assets/pencel.svg'
+                                        width={18}
+                                        height={16}
+                                        alt='pencil'
+                                        className='object-contain'
+                                    />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>펜</p>
+                            </TooltipContent>
+                        </Tooltip>
+
+                        {/* 형광펜 */}
+                        <Tooltip>
+                            <TooltipTrigger>
+                                <Button
+                                    variant='ghost'
+                                    size='sm'
+                                    className='h-9 w-9 p-0 rounded-[10px] hover:bg-black/5'
+                                    onClick={() => {
+                                        setDrawingMode(true);
+                                        setBrushOptions({ type: 'highlighter', width: 20 });
+                                    }}
+                                    aria-label='highlighter-tool'
+                                >
+                                    <Image
+                                        src='/assets/highlighter.svg'
+                                        width={18}
+                                        height={16}
+                                        alt='highlighter'
+                                        className='object-contain'
+                                    />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>형광펜</p>
+                            </TooltipContent>
+                        </Tooltip>
+
+                        {/* 스티커 노트 */}
+                        <Tooltip>
+                            <TooltipTrigger>
+                                <Button
+                                    variant='ghost'
+                                    size='sm'
+                                    className='h-9 w-9 p-0 rounded-[10px] hover:bg-black/5'
+                                    onClick={() => {
+                                        setStickyMode(true);
+                                        setDrawingMode(false);
+                                        setEraserMode(false);
+                                    }}
+                                    aria-label='sticky-note-tool'
+                                >
+                                    <Image
+                                        src='/assets/sticky.svg'
+                                        width={20}
+                                        height={16}
+                                        alt='sticky'
+                                        className='object-contain'
+                                    />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>스티커 노트</p>
+                            </TooltipContent>
+                        </Tooltip>
+
+                        {/* 지우개 */}
+                        <Tooltip>
+                            <TooltipTrigger>
+                                <Button
+                                    variant='ghost'
+                                    size='sm'
+                                    className='h-9 w-9 p-0 rounded-[10px] hover:bg-black/5'
+                                    onClick={() => {
+                                        setEraserMode(true);
+                                    }}
+                                    aria-label='eraser-tool'
+                                >
+                                    <Image
+                                        src='/assets/eraser.svg'
+                                        width={14}
+                                        height={16}
+                                        alt='eraser'
+                                        className='object-contain'
+                                    />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>지우개</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </div>
+
+                    {/* group: plus */}
+                    <div className='flex items-center px-1'>
+                        <Tooltip>
+                            <TooltipTrigger>
+                                <Button
+                                    variant='ghost'
+                                    size='sm'
+                                    className='h-9 w-9 p-0 rounded-[999px] hover:bg-black/5'
+                                    aria-label='more-tools'
+                                >
+                                    <Plus className='h-5 w-5 text-black/80' />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>더 보기</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </div>
+                </div>
             </div>
-            <div className='h-[55px] bg-white shadow-[0_2px_6px_rgba(0,0,0,0.25)] rounded-full px-4 py-1 flex justify-center items-center gap-1'>
-                {/* 녹음 */}
-                <button
-                    className='p-2 rounded hover:bg-gray-100'
-                    onClick={() => {
-                        if (isRecording) {
-                            stopRecording();
-                        } else {
-                            startRecording();
-                        }
-
-                        toggleRecording();
-                    }}
-                    title={isRecording ? '녹음 중지' : '녹음 시작'}
-                >
-                    <Image
-                        src={isRecording ? '/assets/stop-circle.svg' : '/assets/mic.svg'}
-                        width={20}
-                        height={20}
-                        alt='record-toggle'
-                    />
-                </button>
-                <button
-                    className={`p-2 rounded hover:bg-gray-100 ${
-                        isRecordingListOpen ? 'bg-gray-100' : ''
-                    }`}
-                    onClick={toggleRecordingList}
-                    title={isRecordingListOpen ? '녹음 리스트 닫기' : '녹음 리스트 열기'}
-                    aria-pressed={isRecordingListOpen}
-                >
-                    <Image
-                        src={
-                            isRecordingListOpen
-                                ? '/assets/all-inbox-outline.svg'
-                                : '/assets/all-inbox.svg'
-                        }
-                        width={20}
-                        height={20}
-                        alt='record-list'
-                    />
-                </button>
-            </div>
-        </div>
-        // <Flex
-        //     className='absolute bottom-[10px] left-1/2 -translate-x-1/2 transform z-[10]'
-        //     justify='center'
-        //     align='center'
-        //     gap={20}
-        // >
-        //     <Button disabled={!hasCanvas} onClick={() => setDrawingMode(false)}>
-        //         선택
-        //     </Button>
-        //     <Button
-        //         disabled={!hasCanvas}
-        //         onClick={() => {
-        //             setDrawingMode(true);
-        //             setBrushOptions({ type: 'pencil', color: '#000000', width: 3 });
-        //         }}
-        //     >
-        //         <Image src='/assets/pencel.svg' width={32} height={71} alt='pencel' />
-        //     </Button>
-        //     <Button
-        //         disabled={!hasCanvas}
-        //         onClick={() => {
-        //             setDrawingMode(true);
-        //             setBrushOptions({ type: 'highlighter', width: 20 });
-        //         }}
-        //     >
-        //         <Image src='/assets/highlighter.svg' width={32} height={71} alt='pencel' />
-        //     </Button>
-        //     <Button
-        //         disabled={!hasCanvas}
-        //         onClick={() => {
-        //             setStickyMode(true);
-        //             setDrawingMode(false);
-        //             setEraserMode(false);
-        //         }}
-        //     >
-        //         스티커 메모
-        //     </Button>
-        //     <Button disabled={!hasCanvas} onClick={() => setEraserMode(true)}>
-        //         <Image src='/assets/eraser.svg' width={32} height={71} alt='pencel' />
-        //     </Button>
-        //     <Button type='default' onClick={handleRecord}>
-        //         {isRecordingRef.current ? '녹음 중' : '녹음'}
-        //     </Button>
-        //     <ReplayButton canvasIdx={0} />
-        // </Flex>
+        </TooltipProvider>
     );
 }

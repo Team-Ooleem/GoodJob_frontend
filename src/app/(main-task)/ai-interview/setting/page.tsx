@@ -1,16 +1,15 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Card, Typography, Button, Alert, message } from 'antd';
-import { ArrowRightOutlined, VideoCameraOutlined, AudioOutlined } from '@ant-design/icons';
-import axios from 'axios';
+import { ArrowRight, Video, Mic } from 'lucide-react';
+import { api } from '@/apis/api';
 
 import { Webcam, WebcamHandle } from '../_components/Webcam';
 import { VisualAggregatePayload } from '../_components/RealMediaPipeAnalyzer';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
-const { Title, Paragraph, Text } = Typography;
-
-// 간단 WAV 레코더 (레벨 콜백은 사용하지 않음)
+// 간단 WAV 레코더
 class WavRecorder {
     private audioCtx: AudioContext | null = null;
     private stream: MediaStream | null = null;
@@ -19,6 +18,7 @@ class WavRecorder {
     private buffers: Float32Array[] = [];
     private recording = false;
     private stopped = false;
+
     async start() {
         if (this.recording) return;
         this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -36,6 +36,7 @@ class WavRecorder {
             this.buffers.push(new Float32Array(ch0));
         };
     }
+
     async stop(): Promise<Blob> {
         if (this.stopped) {
             return this.encodeWAV(new Float32Array(0), this.audioCtx?.sampleRate || 44100);
@@ -67,6 +68,7 @@ class WavRecorder {
         this.buffers = [];
         return wav;
     }
+
     private merge(chunks: Float32Array[]) {
         const total = chunks.reduce((a, b) => a + b.length, 0);
         const out = new Float32Array(total);
@@ -77,6 +79,7 @@ class WavRecorder {
         }
         return out;
     }
+
     private encodeWAV(samples: Float32Array, sampleRate: number) {
         const buffer = new ArrayBuffer(44 + samples.length * 2);
         const view = new DataView(buffer);
@@ -108,15 +111,6 @@ class WavRecorder {
     }
 }
 
-const AI_API_BASE = process.env.AI_API_BASE;
-async function analyzeAudioBlob(blob: Blob) {
-    if (!AI_API_BASE) return null;
-    const form = new FormData();
-    form.append('file', blob, 'calibration.wav');
-    const res = await axios.post(`${AI_API_BASE}/audio/analyze`, form, { timeout: 60000 });
-    return res.data?.features ?? null;
-}
-
 export default function AiInterviewSettingCalibrationCombined() {
     const webcamRef = useRef<WebcamHandle>(null);
     const recRef = useRef<WavRecorder | null>(null);
@@ -130,8 +124,9 @@ export default function AiInterviewSettingCalibrationCombined() {
     const [webcamOk, setWebcamOk] = useState(false);
     const [micOk, setMicOk] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [sessionId, setSessionId] = useState<string | null>(null);
 
-    const CALI_TEXT = '나는 어려움을 이겨내며 성장한다.';
+    const CALI_TEXT = '너무 맑고 초롱한 그 중 하나 별이여';
 
     useEffect(() => {
         if (phase !== 'running') return;
@@ -149,7 +144,6 @@ export default function AiInterviewSettingCalibrationCombined() {
                             // 비디오 버퍼 클리어만 수행(결과 사용 안 함)
                             webcamRef.current?.endQuestion();
                         } catch {}
-                        message.warning('다시 말씀해 주세요');
                         setPhase('idle');
                         setTimeLeft(15);
                     })();
@@ -163,7 +157,7 @@ export default function AiInterviewSettingCalibrationCombined() {
         };
     }, [phase]);
 
-    // 장치 존재 체크(간단)
+    // 초기 세션 생성(항상 신규) + 장치 존재 체크
     useEffect(() => {
         (async () => {
             try {
@@ -171,9 +165,40 @@ export default function AiInterviewSettingCalibrationCombined() {
                 setWebcamOk(devices.some((d) => d.kind === 'videoinput'));
                 setMicOk(devices.some((d) => d.kind === 'audioinput'));
             } catch (e) {
-                // 권한 미부여 등으로 실패 시 버튼 비활성 유지
                 setWebcamOk(false);
                 setMicOk(false);
+            }
+            // 세션 ID: 설정 페이지 진입 시마다 항상 신규 발급
+            try {
+                const prevSid = localStorage.getItem('aiInterviewSessionId');
+                // 이전 세션 산출물(지표/리포트 캐시)은 혼선 방지를 위해 정리
+                try {
+                    const keysToClear = [
+                        'interviewAudioOverallServer',
+                        'interviewAudioPerQuestionServer',
+                        'interviewAudioOverall',
+                        'interviewAudioPerQuestion',
+                        'interviewVisualOverall',
+                        'interviewVisualPerQuestion',
+                        'interviewAnalysis',
+                        'interviewQA',
+                    ];
+                    keysToClear.forEach((k) => localStorage.removeItem(k));
+                } catch {}
+
+                const sid = `sess_${Math.random().toString(36).slice(2, 10)}_${Date.now()}`;
+                localStorage.setItem('aiInterviewSessionId', sid);
+                setSessionId(sid);
+
+                // 인터뷰 세션 보장: finalize를 호출하면 interview_sessions에 INSERT IGNORE 됨
+                try {
+                    await api.post(`/metrics/${sid}/finalize`, {}, { timeout: 10000 });
+                } catch (e) {
+                    // 비어있는 세션 finalize는 실패해도 무방하므로 로그만
+                    console.warn('세션 보장(finalize) 실패 또는 무시 가능:', e);
+                }
+            } catch (e) {
+                console.warn('세션 ID 초기화 실패:', e);
             }
         })();
     }, []);
@@ -188,10 +213,9 @@ export default function AiInterviewSettingCalibrationCombined() {
             webcamRef.current?.startQuestion('calibration', { text: 'Calibration' });
             recRef.current = new WavRecorder();
             await recRef.current.start();
-            message.info('녹음을 시작했습니다. 자연스럽게 문장을 읽어주세요.');
         } catch (e: any) {
             setPhase('idle');
-            setError(e?.message || '캘리브레이션 시작 실패');
+            setError(e?.message || '모의면접 준비 실패');
         }
     };
 
@@ -208,26 +232,66 @@ export default function AiInterviewSettingCalibrationCombined() {
 
     const finishCalibration: () => Promise<void> = async () => {
         try {
+            const startTime = Date.now();
+
+            // 영상 집계 데이터 수집
             const vAgg = webcamRef.current?.endQuestion() ?? null;
             if (vAgg) setVisualAgg(vAgg);
-            let feats: any | null = null;
+
+            // 음성 데이터 수집
+            let audioBlob: Blob | null = null;
             if (recRef.current) {
-                const wav = await recRef.current.stop();
-                try {
-                    feats = await analyzeAudioBlob(wav);
-                } catch (err) {
-                    console.warn('오디오 분석 서버 미응답 또는 실패', err);
+                audioBlob = await recRef.current.stop();
+            }
+
+            const endTime = Date.now();
+            const durationMs = endTime - startTime;
+
+            // 백엔드로 캘리브레이션 데이터 전송
+            if (audioBlob || vAgg) {
+                const formData = new FormData();
+
+                if (audioBlob) {
+                    formData.append('file', audioBlob, 'calibration.wav');
+                }
+
+                if (vAgg) {
+                    formData.append('visualData', JSON.stringify(vAgg));
+                }
+
+                formData.append('durationMs', durationMs.toString());
+
+                if (!sessionId)
+                    throw new Error(
+                        '세션 ID가 준비되지 않았습니다. 새로고침 후 다시 시도해주세요.',
+                    );
+                const response = await api.post(`calibration/${sessionId}/combined`, formData, {
+                    timeout: 60000,
+                });
+
+                if (response.data?.ok) {
+                    setAudioFeatures(response.data.audioFeatures);
+
+                    // 로컬 저장소에도 저장 (호환성)
+                    localStorage.setItem(
+                        'aiInterviewCalibration',
+                        JSON.stringify({
+                            createdAt: new Date().toISOString(),
+                            sessionId,
+                            audio: response.data.audioFeatures,
+                            visual: vAgg,
+                        }),
+                    );
+
+                    // 세션 ID 저장 (면접에서 사용)
+                    localStorage.setItem('calibrationSessionId', sessionId);
                 }
             }
-            setAudioFeatures(feats);
-            localStorage.setItem(
-                'aiInterviewCalibration',
-                JSON.stringify({ createdAt: new Date().toISOString(), audio: feats, visual: vAgg }),
-            );
+
             setPhase('done');
-            message.success('캘리브레이션 저장 완료! 이제 세션을 시작할 수 있어요.');
         } catch (e: any) {
-            setError(e?.message || '캘리브레이션 종료 실패');
+            console.error('캘리브레이션 저장 실패:', e);
+            setError(e?.response?.data?.message || e?.message || '환경설정 실패');
             setPhase('idle');
         }
     };
@@ -241,150 +305,152 @@ export default function AiInterviewSettingCalibrationCombined() {
     };
 
     const goToSession: () => void = () => {
-        window.location.href = '/ai-interview/sessions';
+        // 캘리브레이션이 완료된 상태에서만 면접 시작 가능
+        if (phase === 'done') {
+            window.location.href = '/ai-interview/sessions';
+        }
     };
 
     return (
-        <div className='min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4 relative overflow-hidden'>
-            {/* Voice Activity Glow Effect */}
+        <div className='min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-3 relative overflow-hidden'>
+            {/* 화면 하단 초록색 마이크 애니메이션 */}
             <div className='absolute bottom-0 left-1/2 transform -translate-x-1/2 w-full'>
-                <div className='w-full h-64 bg-green-400/20 rounded-full blur-3xl animate-pulse translate-y-8'></div>
+                <div className='w-full h-16 bg-green-400/20 rounded-full blur-3xl animate-pulse translate-y-1'></div>
+                <div className='absolute bottom-0 left-1/2 transform -translate-x-1/2 w-[256px] h-[8px] bg-green-300 rounded-full'></div>
             </div>
 
-            <Card className='w-full max-w-4xl shadow-xl border-0 rounded-2xl overflow-hidden relative z-10'>
-                {/* Header Section */}
-                <div className='px-8 pt-8 pb-6 text-center'>
-                    <div className='flex items-center justify-center mb-4'>
-                        <div className='w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center mr-4'>
-                            <VideoCameraOutlined className='text-white text-xl' />
+            <Card className='w-full max-w-3xl shadow-xl border-0 rounded-xl overflow-hidden relative z-10'>
+                <CardHeader className='px-6 pt-6 pb-4 text-center'>
+                    <div className='flex items-center justify-center mb-3'>
+                        <div className='w-10 h-10 bg-sky-500 rounded-lg flex items-center justify-center mr-3'>
+                            <Video className='text-white text-lg' />
                         </div>
-                        <h2 className='text-3xl font-bold text-gray-900 mb-0'>
+                        <CardTitle className='text-2xl font-bold text-gray-900 mb-0'>
                             AI 모의면접 환경 설정
-                        </h2>
+                        </CardTitle>
                     </div>
-                    <p className='text-gray-600 text-lg'>
+                    <p className='text-gray-600 text-base'>
                         최적의 면접 환경을 위해 카메라와 마이크를 테스트해주세요.
                     </p>
-                </div>
+                </CardHeader>
 
                 {error && (
-                    <div className='px-8 mb-6'>
-                        <Alert
-                            type='error'
-                            showIcon
-                            message='오류'
-                            description={error}
-                            className='!rounded-xl'
-                        />
+                    <div className='px-6 mb-4'>
+                        <div className='bg-red-50 border border-red-200 text-red-800 px-3 py-2 rounded-lg flex items-center'>
+                            <div className='w-3 h-3 bg-red-500 rounded-full mr-2'></div>
+                            <div>
+                                <div className='font-semibold text-sm'>오류</div>
+                                <div className='text-xs'>{error}</div>
+                            </div>
+                        </div>
                     </div>
                 )}
 
                 {/* Main Content */}
-                <div className='px-8 pb-8'>
+                <CardContent className='px-6 pb-6'>
                     <div className='flex flex-col items-center'>
                         {/* Video Container */}
-                        <div className='relative mb-6'>
+                        <div className='relative mb-4'>
                             <div
-                                className='rounded-2xl overflow-hidden shadow-lg relative bg-gray-100'
-                                style={{ width: 640, height: 360 }}
+                                className='rounded-2xl overflow-hidden shadow-md relative'
+                                style={{ width: 600, height: 338, background: '#e5e7eb' }}
                             >
-                                <Webcam ref={webcamRef} width={640} height={360} overlayGuide />
+                                <Webcam ref={webcamRef} width={600} height={338} overlayGuide />
+                            </div>
+                            {/* 버튼을 영상 아래의 흰색 베이스 위에 배치 */}
+                            <div className='w-[600px] bg-white rounded-b-2xl shadow-sm flex flex-col items-center justify-center gap-3 py-4 -mt-1'>
+                                <div className='flex items-center gap-3'>
+                                    {phase !== 'running' ? (
+                                        <button
+                                            onClick={startCalibration}
+                                            className='w-14 h-14 rounded-full bg-white shadow-lg border-2 border-red-200 flex items-center justify-center hover:scale-110 hover:shadow-xl transition-all duration-300'
+                                            style={{
+                                                animation:
+                                                    'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                                            }}
+                                            aria-label='기준 측정 시작'
+                                        >
+                                            <span
+                                                className='w-6 h-6 rounded-full bg-red-500 block'
+                                                style={{
+                                                    animation:
+                                                        'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                                                }}
+                                            ></span>
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={stopCalibration}
+                                            disabled={isProcessing}
+                                            className={`w-14 h-14 rounded-full shadow-lg flex items-center justify-center hover:scale-105 transition-all duration-300 ${isProcessing ? 'bg-red-300' : 'bg-red-500'}`}
+                                            aria-label='중지 및 결과 산출'
+                                        >
+                                            <span className='w-3 h-3 rounded-full bg-white block animate-pulse'></span>
+                                        </button>
+                                    )}
+                                    {phase === 'done' && (
+                                        <Button
+                                            onClick={resetCalibration}
+                                            size='sm'
+                                            disabled={isProcessing}
+                                            className='text-xs px-3 py-1 h-8'
+                                        >
+                                            다시 녹음하기
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
 
-                            {/* Recording Controls */}
-                            <div className='absolute -bottom-6 left-1/2 transform -translate-x-1/2'>
-                                {phase !== 'running' ? (
-                                    <button
-                                        onClick={startCalibration}
-                                        className='w-16 h-16 rounded-full bg-white shadow-lg flex items-center justify-center hover:scale-110 transition-all duration-200 border-4 border-gray-100'
-                                        aria-label='환경 테스트 시작'
-                                    >
-                                        <span className='w-6 h-6 rounded-full bg-red-500 block'></span>
-                                    </button>
-                                ) : (
-                                    <button
-                                        onClick={stopCalibration}
-                                        disabled={isProcessing}
-                                        className={`w-16 h-16 rounded-full shadow-lg flex items-center justify-center hover:scale-110 transition-all duration-200 border-4 border-gray-100 ${isProcessing ? 'bg-red-300' : 'bg-red-500'}`}
-                                        aria-label='테스트 완료'
-                                    >
-                                        <span className='w-4 h-4 rounded-sm bg-white block'></span>
-                                    </button>
-                                )}
+                            {/* 캘리브레이션 문장 */}
+                            <div className='mt-4'>
+                                <blockquote className='text-xl text-sky-500/80 italic text-center px-5 py-3 border rounded-xl bg-sky-50/40'>
+                                    "{CALI_TEXT}"
+                                </blockquote>
+                            </div>
+
+                            {/* 최종 버튼 */}
+                            <div className='mt-6 flex justify-center'>
+                                <Button
+                                    size='lg'
+                                    className='h-12 px-8 text-base font-bold bg-sky-500 hover:bg-sky-600 border-0 rounded-xl shadow-lg text-white'
+                                    onClick={goToSession}
+                                    disabled={!(webcamOk && micOk && phase === 'done')}
+                                >
+                                    <ArrowRight className='mr-2 w-4 h-4' />
+                                    {phase === 'done'
+                                        ? 'AI 모의면접 시작하기'
+                                        : '환경 테스트를 완료해주세요'}
+                                </Button>
                             </div>
                         </div>
+                    </div>
 
-                        {/* Test Instructions */}
-                        <div className='w-full max-w-2xl mb-8'>
-                            <div className='bg-gradient-to-r from-blue-50 to-green-50 rounded-2xl p-6 border border-blue-100'>
-                                <div className='text-center'>
-                                    <h3 className='text-xl font-semibold text-gray-800 mb-3'>
-                                        📢 테스트 문장을 읽어주세요
-                                    </h3>
-                                    <blockquote className='text-2xl font-medium text-green-600 italic mb-4'>
-                                        "{CALI_TEXT}"
-                                    </blockquote>
-                                    <p className='text-gray-600'>
-                                        녹화 버튼을 누르고 위 문장을 자연스럽게 읽어주세요
-                                    </p>
+                    {/* Audio Visualization - Bottom */}
+                    {phase === 'running' && (
+                        <div className='px-6 pb-4 relative'>
+                            <div className='flex items-center justify-center gap-2'>
+                                <Mic className='text-sky-500 text-base animate-pulse' />
+                                <span className='text-sm text-gray-600 mr-3'>음성 감지 중</span>
+                                {/* Audio Level Visualization */}
+                                <div className='flex items-center gap-1 relative'>
+                                    {/* Glow effect behind the bars */}
+                                    <div className='absolute inset-0 bg-sky-400/20 rounded-full blur-sm animate-pulse'></div>
+                                    {[...Array(12)].map((_, i) => (
+                                        <div
+                                            key={i}
+                                            className={`w-1 bg-gradient-to-t from-sky-300 to-sky-500 rounded-full animate-pulse relative z-10 shadow-lg shadow-sky-400/50`}
+                                            style={{
+                                                height: `${Math.random() * 20 + 8}px`,
+                                                animationDelay: `${i * 50}ms`,
+                                                animationDuration: `${600 + Math.random() * 300}ms`,
+                                            }}
+                                        />
+                                    ))}
                                 </div>
                             </div>
                         </div>
-
-                        {/* Action Buttons */}
-                        <div className='flex gap-4 items-center'>
-                            {phase === 'done' && (
-                                <Button
-                                    onClick={resetCalibration}
-                                    size='large'
-                                    className='!h-12 !px-6 !text-base !rounded-xl'
-                                    disabled={isProcessing}
-                                >
-                                    다시 테스트하기
-                                </Button>
-                            )}
-
-                            <Button
-                                type='primary'
-                                size='large'
-                                className='!h-16 !px-12 !text-xl !font-bold !bg-green-600 hover:!bg-green-700 !border-0 !rounded-2xl !shadow-lg !text-white'
-                                icon={<ArrowRightOutlined />}
-                                onClick={goToSession}
-                                disabled={!(webcamOk && micOk && phase === 'done')}
-                            >
-                                {phase === 'done'
-                                    ? 'AI 모의면접 시작하기'
-                                    : '환경 테스트를 완료해주세요'}
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Audio Visualization - Bottom */}
-                {phase === 'running' && (
-                    <div className='px-8 pb-6 relative'>
-                        <div className='flex items-center justify-center gap-2'>
-                            <AudioOutlined className='text-green-500 text-lg animate-pulse' />
-                            <span className='text-sm text-gray-600 mr-4'>음성 감지 중</span>
-                            {/* Audio Level Visualization */}
-                            <div className='flex items-center gap-1 relative'>
-                                {/* Glow effect behind the bars */}
-                                <div className='absolute inset-0 bg-green-400/20 rounded-full blur-md animate-pulse'></div>
-                                {[...Array(12)].map((_, i) => (
-                                    <div
-                                        key={i}
-                                        className={`w-1.5 bg-gradient-to-t from-green-400 to-green-600 rounded-full animate-pulse relative z-10 shadow-lg shadow-green-400/50`}
-                                        style={{
-                                            height: `${Math.random() * 24 + 10}px`,
-                                            animationDelay: `${i * 50}ms`,
-                                            animationDuration: `${600 + Math.random() * 300}ms`,
-                                        }}
-                                    />
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                )}
+                    )}
+                </CardContent>
             </Card>
         </div>
     );

@@ -4,23 +4,51 @@ import { useEffect } from 'react';
 import { CameraBox } from './CameraBox';
 import { useWebRTC } from '../_hooks';
 
-export function ParticipantCamera() {
-    const { localStream, remoteStream, joinRoom, isLocalSpeaking, isRemoteSpeaking } =
-        useWebRTC('resume-room');
+type Props = {
+    mentorName?: string;
+    menteeName?: string;
+};
+
+export function ParticipantCamera({ mentorName, menteeName }: Props) {
+    const {
+        localStream,
+        remoteStream,
+        joinRoom,
+        isLocalSpeaking,
+        isRemoteSpeaking,
+        isMuted,
+        isRemoteMuted,
+        isRemoteCameraOff,
+        isConnected,
+    } = useWebRTC('resume-room');
 
     useEffect(() => {
         joinRoom('resume-room');
     }, [joinRoom]);
 
     return (
-        <div className='flex justify-center items-center gap-3 absolute top-5 left-1/2 -translate-x-1/2 z-10'>
-            <CameraBox
-                isLocal={false}
-                isSpeaking={isRemoteSpeaking}
-                name='상대방'
-                stream={remoteStream}
-            />
-            <CameraBox isLocal={true} isSpeaking={isLocalSpeaking} name='나' stream={localStream} />
+        <div className='absolute top-5 right-5 z-40'>
+            <div className='relative flex flex-col items-end gap-3'>
+                <CameraBox
+                    isLocal={false}
+                    isSpeaking={isRemoteSpeaking}
+                    isMuted={isRemoteMuted}
+                    isCamMuted={isRemoteCameraOff}
+                    name={mentorName ?? '상대방'}
+                    stream={remoteStream}
+                    size='lg'
+                    isConnected={isConnected}
+                />
+                <CameraBox
+                    isLocal={true}
+                    isSpeaking={isLocalSpeaking}
+                    isMuted={isMuted}
+                    name={menteeName ?? '나'}
+                    stream={localStream}
+                    size='sm'
+                    isConnected={isConnected}
+                />
+            </div>
         </div>
     );
 }
