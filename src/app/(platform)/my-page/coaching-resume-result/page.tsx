@@ -1,7 +1,15 @@
-import { CoachingResumeResultCard } from '../_components';
-import { mockCoachingResumeResults } from '../_lib/mock-data';
+'use client';
+
+import { CoachingResumeResultSection } from '../_components';
+import { useMentoringApplications } from '../_hooks/useMentoringApplications';
 
 export default function CoachingResumeResultPage() {
+    // TODO: 실제 사용자 ID를 가져와야 함 (예: 인증 컨텍스트에서)
+    const user_idx = 1; // 임시 하드코딩
+
+    const { data: mentoringData, isLoading, error } = useMentoringApplications({ user_idx });
+    const mentoringApplications = mentoringData?.applications || [];
+
     return (
         <div className='space-y-6'>
             <div className='bg-card rounded-lg border p-6'>
@@ -11,17 +19,12 @@ export default function CoachingResumeResultPage() {
                 </p>
             </div>
 
-            {mockCoachingResumeResults.length > 0 ? (
-                <div className='grid gap-4 md:grid-cols-2 lg:grid-cols-3'>
-                    {mockCoachingResumeResults.map((result) => (
-                        <CoachingResumeResultCard key={result.id} result={result} />
-                    ))}
-                </div>
-            ) : (
-                <div className='text-center py-12'>
-                    <p className='text-muted-foreground'>아직 코칭 결과가 없습니다.</p>
-                </div>
-            )}
+            <CoachingResumeResultSection
+                results={mentoringApplications}
+                showAll={true}
+                isLoading={isLoading}
+                error={error}
+            />
         </div>
     );
 }
