@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { MarkdownEditor } from '@/components/MarkdownEditor';
 import {
     Select,
     SelectContent,
@@ -34,7 +34,7 @@ const mentoringProductSchema = z.object({
     description: z
         .string()
         .min(1, '상품 설명을 입력해주세요')
-        .max(1000, '설명은 1000자 이하로 입력해주세요'),
+        .max(2000, '설명은 2000자 이하로 입력해주세요'),
     price: z.number().min(0, '가격은 0원 이상이어야 합니다'),
     slots: z
         .array(
@@ -116,15 +116,22 @@ export default function MentoringProductForm({
 
                     <div className='space-y-2'>
                         <Label htmlFor='description'>상품 설명</Label>
-                        <Textarea
-                            id='description'
-                            {...register('description')}
-                            placeholder='멘토링의 내용과 특징을 자세히 설명해주세요'
-                            rows={4}
+                        <MarkdownEditor
+                            value={watch('description')}
+                            onChange={(value) => setValue('description', value || '')}
+                            placeholder='멘토링의 내용과 특징을 마크다운으로 자세히 설명해주세요'
+                            height={300}
+                            dataColorMode='auto'
+                            preview='live'
+                            visibleDragbar={false}
                         />
                         {errors.description && (
                             <p className='text-sm text-red-500'>{errors.description.message}</p>
                         )}
+                        <p className='text-xs text-muted-foreground'>
+                            마크다운 문법을 사용하여 작성해주세요. (예: **굵은글씨**, *기울임*,
+                            `코드` 등)
+                        </p>
                     </div>
 
                     <div className='space-y-2'>
