@@ -147,24 +147,24 @@ export default function ProfileSection() {
                                     <div className='flex items-center gap-2 text-sm'>
                                         <Building2 className='h-3 w-3 text-muted-foreground' />
                                         <span>
-                                            {profile.mentorProfile?.businessName || '회사명 없음'}
+                                            {profile?.mentorProfile?.businessName || '회사명 없음'}
                                         </span>
                                     </div>
                                     <div className='flex items-center gap-2 text-sm'>
                                         <Briefcase className='h-3 w-3 text-muted-foreground' />
                                         <span>
-                                            {profile.mentorProfile?.preferredField || '분야 없음'}
+                                            {profile?.mentorProfile?.preferredField || '분야 없음'}
                                         </span>
                                     </div>
                                     <div className='flex items-center gap-2 text-sm'>
                                         <Star className='h-3 w-3 text-yellow-500 dark:text-yellow-400' />
                                         <span>
-                                            {profile.mentorProfile?.avgMentoringRating?.toFixed(
-                                                1,
-                                            ) || '0.0'}
+                                            {Number(
+                                                profile?.mentorProfile?.avgMentoringRating,
+                                            ).toFixed(1) || '0.0'}
                                         </span>
                                         <span className='text-muted-foreground'>
-                                            ({profile.mentorProfile?.totalMentoringReviews || 0}개
+                                            ({profile?.mentorProfile?.totalMentoringReviews || 0}개
                                             리뷰)
                                         </span>
                                     </div>
