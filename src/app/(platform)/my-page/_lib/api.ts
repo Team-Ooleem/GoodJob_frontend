@@ -16,12 +16,15 @@ export async function fetchMentoringApplications({
         limit: limit.toString(),
     });
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/mentoring-applications/${user_idx}?${params}`, {
-        method: 'GET',
-        headers: {
-            'Content-Type': 'application/json',
+    const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/mentoring-applications/my/${user_idx}?${params}`,
+        {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
         },
-    });
+    );
 
     if (!response.ok) {
         throw new Error('Failed to fetch mentoring applications');

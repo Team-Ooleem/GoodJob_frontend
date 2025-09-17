@@ -12,7 +12,6 @@ interface CoachingResumeResultCardProps {
 }
 
 export default function CoachingResumeResultCard({ application }: CoachingResumeResultCardProps) {
-    // 현재 시간과 세션 예정 시간 비교
     const sessionDate = new Date(application.booked_date);
     const now = new Date();
     const isUpcoming = sessionDate > now;
