@@ -82,10 +82,7 @@ export default function CoachingResumePage() {
     return (
         <>
             <SocketProvider />
-            <CanvasHeader
-                title={canvasData?.name || '코칭 세션'}
-                onExit={() => console.log('나가기')}
-            />
+            <CanvasHeader title={canvasData?.name || '코칭 세션'} onExit={() => router.back()} />
             <FabricToolbar />
             <FabricCanvas
                 mentorName={canvasData?.mentor?.name}
