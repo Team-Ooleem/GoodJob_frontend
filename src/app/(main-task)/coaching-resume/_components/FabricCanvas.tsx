@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useParams } from 'next/navigation';
 
 // global hooks
 import { useWindowSize } from '@/hooks';
@@ -35,6 +36,7 @@ type Props = {
 };
 
 export function FabricCanvas({ mentorName, menteeName }: Props) {
+    const { sessionId } = useParams<{ sessionId: string }>();
     const { width, height } = useWindowSize();
     const { canvasRef, canvas } = useFabricCanvas({
         width,
@@ -84,11 +86,11 @@ export function FabricCanvas({ mentorName, menteeName }: Props) {
     // 모든 객체에 대해 크기, 로테이션 조작 금지
     useLockTransform();
 
-    // 화면 공유 소켓 접속
-    useCollaborativeCanvas('resume-room');
+    // 화면 공유 소켓 접속 (세션 ID 사용)
+    useCollaborativeCanvas(sessionId);
 
-    // 커서 위치 공유
-    useCollaborativeCursor('resume-room', canvas);
+    // 커서 위치 공유 (세션 ID 사용)
+    useCollaborativeCursor(sessionId, canvas);
 
     // pdf drag & drop
     usePdfDrop(canvasRef);
