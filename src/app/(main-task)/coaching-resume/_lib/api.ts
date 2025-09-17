@@ -5,6 +5,7 @@ interface CoachingResumeCanvasResponse {
     name: string;
     created_by: number;
     created_at: string;
+    scheduled_at?: string; // 예약된 세션 시간 (ISO string)
     role: 'mentor' | 'mentee';
     mentor: {
         user_id: number;

@@ -20,7 +20,14 @@ type MediaDevice = {
     label: string;
 };
 
-export function WaitingRoom() {
+type Props = {
+    canvasData?: {
+        scheduled_at?: string;
+        [key: string]: any;
+    };
+};
+
+export function WaitingRoom({ canvasData }: Props) {
     const router = useRouter();
     const {
         startSession,
@@ -123,8 +130,31 @@ export function WaitingRoom() {
         setCamOn(next);
     };
 
+    // 세션 예약 시간 확인
+    const isSessionAvailable = () => {
+        if (!canvasData?.scheduled_at) {
+            return true; // 예약 시간이 없으면 참석 가능
+        }
+
+        const scheduledTime = new Date(canvasData.scheduled_at);
+        const now = new Date();
+
+        return now >= scheduledTime;
+    };
+
     const handleJoinSession = () => {
-        startSession();
+        if (isSessionAvailable()) {
+            startSession();
+        }
+    };
+
+    const getJoinButtonText = () => {
+        if (!isSessionAvailable()) {
+            const scheduledTime = new Date(canvasData!.scheduled_at!);
+            const formattedTime = scheduledTime.toLocaleString('ko-KR');
+            return `세션 시작 예정 시간: ${formattedTime}`;
+        }
+        return '세션 참석하기';
     };
 
     return (
@@ -304,8 +334,13 @@ export function WaitingRoom() {
                                 </Card>
                             </div>
 
-                            <Button size='lg' className='w-full' onClick={handleJoinSession}>
-                                세션 참석하기
+                            <Button
+                                size='lg'
+                                className='w-full'
+                                onClick={handleJoinSession}
+                                disabled={!isSessionAvailable()}
+                            >
+                                {getJoinButtonText()}
                             </Button>
                         </div>
                     </div>
