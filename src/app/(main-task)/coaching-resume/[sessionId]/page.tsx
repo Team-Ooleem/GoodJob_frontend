@@ -1,8 +1,7 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { AxiosError } from 'axios';
+import { useState, useEffect } from 'react';
 import { useSessionStore } from '../_stores';
 import { useCoachingResumeCanvas } from '../_hooks';
 import {
@@ -27,9 +26,20 @@ export default function CoachingResumePage() {
     const { sessionId } = useParams<{ sessionId: string }>();
     const router = useRouter();
     const sessionStarted = useSessionStore((s) => s.sessionStarted);
+    const setRole = useSessionStore((s) => s.setRole);
+    const setMentorName = useSessionStore((s) => s.setMentorName);
+    const setMenteeName = useSessionStore((s) => s.setMenteeName);
     const [showAccessDeniedAlert, setShowAccessDeniedAlert] = useState(true);
 
     const { data: canvasData, isError, isLoading } = useCoachingResumeCanvas(sessionId);
+
+    useEffect(() => {
+        if (canvasData) {
+            setRole(canvasData.role);
+            setMentorName(canvasData.mentor?.name || '');
+            setMenteeName(canvasData.mentee?.name || '');
+        }
+    }, [canvasData, setRole, setMentorName, setMenteeName]);
 
     if (isLoading) {
         return <div>Loading...</div>;
