@@ -161,7 +161,17 @@ export class RealMediaPipeAnalyzer {
             if (!mat) return null;
             const arr: any = (mat as any).data ?? mat;
             // 두 가지 인덱스 가정(행우선/열우선) 모두 시도 후 더 보수적인(합이 작은) 것을 채택
-            const pickEuler = (r00: number, r01: number, r02: number, r10: number, r11: number, r12: number, r20: number, r21: number, r22: number) => {
+            const pickEuler = (
+                r00: number,
+                r01: number,
+                r02: number,
+                r10: number,
+                r11: number,
+                r12: number,
+                r20: number,
+                r21: number,
+                r22: number,
+            ) => {
                 // ZYX 순서 가정
                 const clamp = (x: number) => Math.max(-1, Math.min(1, x));
                 const pitch = Math.asin(clamp(-r20));
@@ -173,9 +183,29 @@ export class RealMediaPipeAnalyzer {
 
             if (Array.isArray(arr) || (typeof arr.length === 'number' && arr.length >= 9)) {
                 // 가정1: 행우선 4x4
-                const R1 = pickEuler(arr[0], arr[1], arr[2], arr[4], arr[5], arr[6], arr[8], arr[9], arr[10]);
+                const R1 = pickEuler(
+                    arr[0],
+                    arr[1],
+                    arr[2],
+                    arr[4],
+                    arr[5],
+                    arr[6],
+                    arr[8],
+                    arr[9],
+                    arr[10],
+                );
                 // 가정2: 열우선 4x4
-                const R2 = pickEuler(arr[0], arr[4], arr[8], arr[1], arr[5], arr[9], arr[2], arr[6], arr[10]);
+                const R2 = pickEuler(
+                    arr[0],
+                    arr[4],
+                    arr[8],
+                    arr[1],
+                    arr[5],
+                    arr[9],
+                    arr[2],
+                    arr[6],
+                    arr[10],
+                );
                 const sum1 = Math.abs(R1.yaw) + Math.abs(R1.pitch) + Math.abs(R1.roll);
                 const sum2 = Math.abs(R2.yaw) + Math.abs(R2.pitch) + Math.abs(R2.roll);
                 return sum1 <= sum2 ? R1 : R2;
@@ -752,7 +782,7 @@ export class RealMediaPipeAnalyzer {
             emit('attention', {
                 type: 'attention',
                 message: '자연스럽게 시선을 움직여보세요',
-                level: 'good',
+                level: 'warning',
                 confidence: (metrics.attention + metrics.eyeContact) / 2,
                 landmarks,
                 metrics: {
@@ -764,7 +794,31 @@ export class RealMediaPipeAnalyzer {
             return;
         }
 
-        // 기본 피드백 - 모든 조건에 해당하지 않을 때
+        // 지표 수집 상태 확인 - 얼굴 감지가 제대로 되고 있는지 체크
+        const isFaceDetected =
+            metrics.confidence > 0.1 || metrics.attention > 0.1 || metrics.engagement > 0.1;
+        const hasValidMetrics =
+            metrics.confidence > 0 && metrics.attention > 0 && metrics.engagement > 0;
+
+        // 얼굴이 제대로 감지되지 않거나 지표가 너무 낮은 경우 위치 조정 안내
+        if (!isFaceDetected || !hasValidMetrics) {
+            emit('posture', {
+                type: 'posture',
+                message:
+                    '화면에 얼굴이 잘 보이도록 위치를 조정해주세요. 카메라를 정면으로 향하고 적절한 거리를 유지해주세요',
+                level: 'bad',
+                confidence: 0.5,
+                landmarks,
+                metrics: {
+                    faceDetection: isFaceDetected,
+                    validMetrics: hasValidMetrics,
+                    positionAdjustment: 'needed',
+                },
+            });
+            return;
+        }
+
+        // 기본 피드백 - 모든 조건에 해당하지 않을 때 (얼굴이 정상적으로 감지된 경우)
         const randomMessages = [
             '좋은 자세를 유지하고 있습니다',
             '자연스러운 표정이 좋습니다',
