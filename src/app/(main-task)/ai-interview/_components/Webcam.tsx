@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { createPortal } from 'react-dom';
+import { usePathname } from 'next/navigation';
 import { RealMediaPipeAnalyzer, VisualAggregatePayload } from './RealMediaPipeAnalyzer';
 
 interface IWebcam {
@@ -22,6 +23,7 @@ export const Webcam = forwardRef<WebcamHandle, IWebcam>(function Webcam(
     { css, onDetection, onAggregate, width = 384, height = 216, overlayGuide = false },
     ref,
 ) {
+    const pathname = usePathname();
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isStreaming, setIsStreaming] = useState(false);
@@ -30,6 +32,9 @@ export const Webcam = forwardRef<WebcamHandle, IWebcam>(function Webcam(
     const [blurColor, setBlurColor] = useState<'warning' | 'bad' | null>(null);
     const mediaPipeAnalyzerRef = useRef<RealMediaPipeAnalyzer | null>(null);
     const isInitializedRef = useRef(false);
+
+    // 설정 페이지인지 확인
+    const isSettingPage = pathname?.includes('/ai-interview/setting');
 
     // 1) onDetection을 ref로 보관 → 부모가 함수를 바꿔도 초기화 트리거 안 됨
     const onDetectionRef = useRef<IWebcam['onDetection']>(onDetection);
@@ -43,8 +48,8 @@ export const Webcam = forwardRef<WebcamHandle, IWebcam>(function Webcam(
         setDetectionData(detection);
         onDetectionRef.current?.(detection);
 
-        // warning 또는 bad 레벨일 때 blur 효과 표시
-        if (detection.level === 'warning' || detection.level === 'bad') {
+        // 설정 페이지가 아닐 때만 blur 효과 표시
+        if (!isSettingPage && (detection.level === 'warning' || detection.level === 'bad')) {
             setBlurColor(detection.level);
             setShowBlurEffect(true);
 
@@ -261,8 +266,9 @@ export const Webcam = forwardRef<WebcamHandle, IWebcam>(function Webcam(
                 )}
             </div>
 
-            {/* Viewport 전체에 고정된 blur 효과 - Portal로 body에 직접 렌더링 */}
-            {showBlurEffect &&
+            {/* Viewport 전체에 고정된 blur 효과 - Portal로 body에 직접 렌더링 (설정 페이지에서는 비활성화) */}
+            {!isSettingPage &&
+                showBlurEffect &&
                 blurColor &&
                 typeof window !== 'undefined' &&
                 createPortal(
