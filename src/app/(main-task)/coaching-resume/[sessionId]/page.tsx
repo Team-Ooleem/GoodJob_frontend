@@ -26,6 +26,7 @@ export default function CoachingResumePage() {
     const { sessionId } = useParams<{ sessionId: string }>();
     const router = useRouter();
     const sessionStarted = useSessionStore((s) => s.sessionStarted);
+    const resetSession = useSessionStore((s) => s.resetSession);
     const setRole = useSessionStore((s) => s.setRole);
     const setMentorName = useSessionStore((s) => s.setMentorName);
     const setMenteeName = useSessionStore((s) => s.setMenteeName);
@@ -82,7 +83,13 @@ export default function CoachingResumePage() {
     return (
         <>
             <SocketProvider />
-            <CanvasHeader title={canvasData?.name || '코칭 세션'} onExit={() => router.back()} />
+            <CanvasHeader
+                title={canvasData?.name || '코칭 세션'}
+                onExit={() => {
+                    resetSession();
+                    router.back();
+                }}
+            />
             <FabricToolbar />
             <FabricCanvas
                 mentorName={canvasData?.mentor?.name}

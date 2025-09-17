@@ -23,12 +23,7 @@ type MediaDevice = {
 export function WaitingRoom() {
     const router = useRouter();
     const {
-        mentorReady,
-        menteeReady,
-        setMentorReady,
-        setMenteeReady,
         startSession,
-        role,
         mentorName,
         menteeName,
     } = useSessionStore();
@@ -128,38 +123,8 @@ export function WaitingRoom() {
         setCamOn(next);
     };
 
-    // useSessionStore에서 역할 정보 가져오기
-    const userRole = role;
-    const isUserReady = userRole === 'mentor' ? mentorReady : menteeReady;
-    const otherUserReady = userRole === 'mentor' ? menteeReady : mentorReady;
-    const otherUserRole = userRole === 'mentor' ? '멘티' : '멘토';
-
-    const toggleReady = () => {
-        if (userRole === 'mentor') {
-            setMentorReady(!mentorReady);
-        } else {
-            setMenteeReady(!menteeReady);
-        }
-    };
-
-    const getButtonText = () => {
-        if (isUserReady) {
-            if (otherUserReady) {
-                return '지금 참여하기';
-            } else {
-                return `준비 취소하기 (${otherUserRole} 대기 중)`;
-            }
-        } else {
-            return '준비 완료';
-        }
-    };
-
-    const handleButtonClick = () => {
-        if (isUserReady && otherUserReady) {
-            startSession();
-        } else {
-            toggleReady();
-        }
+    const handleJoinSession = () => {
+        startSession();
     };
 
     return (
@@ -339,8 +304,8 @@ export function WaitingRoom() {
                                 </Card>
                             </div>
 
-                            <Button size='lg' className='w-full' onClick={handleButtonClick}>
-                                {getButtonText()}
+                            <Button size='lg' className='w-full' onClick={handleJoinSession}>
+                                세션 참석하기
                             </Button>
                         </div>
                     </div>
