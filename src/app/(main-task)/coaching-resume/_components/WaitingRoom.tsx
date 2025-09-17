@@ -23,8 +23,16 @@ type MediaDevice = {
 
 export function WaitingRoom() {
     const router = useRouter();
-    const { mentorReady, menteeReady, setMentorReady, setMenteeReady, startSession } =
-        useSessionStore();
+    const {
+        mentorReady,
+        menteeReady,
+        setMentorReady,
+        setMenteeReady,
+        startSession,
+        role,
+        mentorName,
+        menteeName
+    } = useSessionStore();
 
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const [stream, setStream] = useState<MediaStream | null>(null);
@@ -121,8 +129,8 @@ export function WaitingRoom() {
         setCamOn(next);
     };
 
-    // 현재 사용자가 멘토인지 멘티인지 결정 (실제로는 props나 context에서 가져와야 함)
-    const userRole = 'mentee'; // 임시로 멘티로 설정
+    // useSessionStore에서 역할 정보 가져오기
+    const userRole = role;
     const isUserReady = userRole === 'mentor' ? mentorReady : menteeReady;
     const otherUserReady = userRole === 'mentor' ? menteeReady : mentorReady;
     const otherUserRole = userRole === 'mentor' ? '멘티' : '멘토';
@@ -264,7 +272,7 @@ export function WaitingRoom() {
                                             <User className='h-6 w-6 text-primary' />
                                         </div>
                                         <div className='flex-1 space-y-1'>
-                                            <p className='font-medium'>김코치</p>
+                                            <p className='font-medium'>{mentorName || '멘토'}</p>
                                             <p className='text-sm text-muted-foreground'>멘토</p>
                                         </div>
                                     </CardContent>
@@ -291,7 +299,7 @@ export function WaitingRoom() {
                                             <User className='h-6 w-6 text-primary' />
                                         </div>
                                         <div className='flex-1 space-y-1'>
-                                            <p className='font-medium'>이멘티</p>
+                                            <p className='font-medium'>{menteeName || '멘티'}</p>
                                             <p className='text-sm text-muted-foreground'>멘티</p>
                                         </div>
                                     </CardContent>
