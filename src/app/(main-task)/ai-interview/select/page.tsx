@@ -11,7 +11,7 @@ import { Video, CheckCircle, Loader2, AlertTriangle, CheckCircle2 } from 'lucide
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useResumeUpload } from './_hooks/useResumeUpload';
 import { api } from '@/apis/api';
-import { jobPostApi } from './_apis/job-post-api';
+import { jobPostApi, type JobPostSummary } from './_apis/job-post-api';
 
 export default function AiInterviewSelectPage() {
     const [jobPostUrl, setJobPostUrl] = useState('');
@@ -22,14 +22,18 @@ export default function AiInterviewSelectPage() {
     const [jobVerifyState, setJobVerifyState] = useState<'idle' | 'verifying' | 'success' | 'fail'>(
         'idle',
     );
-    const [jobMeta, setJobMeta] = useState<{
-        title?: string;
-        company?: string;
-        source?: string;
-        url?: string;
-        content?: string;
-        ts?: number;
-    } | null>(null);
+    const [jobMeta, setJobMeta] = useState<
+        {
+            title?: string;
+            company?: string;
+            source?: string;
+            url?: string;
+            content?: string;
+            summary?: string;
+            summaryJson?: JobPostSummary;
+            ts?: number;
+        } | null
+    >(null);
     const [jobVerifyNotice, setJobVerifyNotice] = useState<'none' | 'success' | 'failed'>('none');
     const [urlError, setUrlError] = useState<string | null>(null);
     const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
@@ -89,6 +93,7 @@ export default function AiInterviewSelectPage() {
                             source: result.source,
                             // 서버에서 생성한 요약을 그대로 저장 (세션 캐시와 일관)
                             summary: result.summary,
+                            summaryJson: result.summaryJson,
                             content: undefined,
                             ts: Date.now(),
                         };
