@@ -5,16 +5,187 @@ import { useUserStore } from '@/stores/user-store';
 import { useCanvasStore } from '../_stores';
 import { VoiceRecorderState } from '@/apis/recoding-api';
 
-const CHUNK_DURATION = 300000; // 300초마다 청크 생성
+const CHUNK_DURATION = 60000;
 let chunkIndex = 0;
-let totalChunks = 0; // ✅ 이 줄 추가
+let totalChunks = 0;
 
-// 전역 상태 관리
+// 🆕 WavRecorder 클래스 추가
+class WavRecorder {
+    private audioCtx: AudioContext | null = null;
+    private stream: MediaStream | null = null;
+    private source: MediaStreamAudioSourceNode | null = null;
+    private processor: ScriptProcessorNode | null = null;
+    private buffers: Float32Array[] = [];
+    private recording = false;
+    private stopped = false;
+    private chunkCallback: ((blob: Blob) => void) | null = null;
+    private chunkTimer: NodeJS.Timeout | null = null;
+
+    setChunkCallback(callback: (blob: Blob) => void) {
+        this.chunkCallback = callback;
+    }
+
+    async start() {
+        if (this.recording) return;
+
+        // WebRTC 스트림 또는 마이크 스트림 사용
+        const { localStream, remoteStream } = globalState.webrtcStreams;
+
+        if (localStream || remoteStream) {
+            // WebRTC 스트림 결합
+            this.stream = new MediaStream();
+            if (localStream) {
+                localStream.getAudioTracks().forEach((track) => this.stream!.addTrack(track));
+            }
+            if (remoteStream) {
+                remoteStream.getAudioTracks().forEach((track) => this.stream!.addTrack(track));
+            }
+
+            if (this.stream.getAudioTracks().length === 0) {
+                // fallback to mic
+                this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            }
+        } else {
+            // 직접 마이크 사용
+            this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        }
+
+        this.audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({
+            sampleRate: 16000, // Google Speech API 권장값
+        });
+
+        this.source = this.audioCtx.createMediaStreamSource(this.stream);
+        this.processor = this.audioCtx.createScriptProcessor(4096, 1, 1);
+        this.source.connect(this.processor);
+        this.processor.connect(this.audioCtx.destination);
+        this.buffers = [];
+        this.recording = true;
+        this.stopped = false;
+
+        this.processor.onaudioprocess = (e) => {
+            if (!this.recording) return;
+            const ch0 = e.inputBuffer.getChannelData(0);
+            this.buffers.push(new Float32Array(ch0));
+        };
+
+        // 청크 타이머 시작 (60초마다)
+        this.startChunkTimer();
+    }
+
+    private startChunkTimer() {
+        this.chunkTimer = setInterval(() => {
+            if (this.recording && this.chunkCallback && this.buffers.length > 0) {
+                const chunkWav = this.createChunk();
+                this.chunkCallback(chunkWav);
+                // 청크 생성 후 버퍼 일부 클리어 (메모리 관리)
+                this.buffers = this.buffers.slice(-1000); // 마지막 1000개만 유지
+            }
+        }, CHUNK_DURATION);
+    }
+
+    private createChunk(): Blob {
+        const sr = this.audioCtx?.sampleRate || 16000;
+        const samples = this.merge([...this.buffers]); // 복사본 사용
+        return this.encodeWAV(samples, sr);
+    }
+
+    async stop(): Promise<Blob> {
+        if (this.stopped) {
+            return this.encodeWAV(new Float32Array(0), this.audioCtx?.sampleRate || 16000);
+        }
+
+        this.stopped = true;
+        this.recording = false;
+
+        // 청크 타이머 정리
+        if (this.chunkTimer) {
+            clearInterval(this.chunkTimer);
+            this.chunkTimer = null;
+        }
+
+        // 정리 작업
+        try {
+            if (this.processor) this.processor.onaudioprocess = null;
+            if (this.processor) this.processor.disconnect();
+            if (this.source) this.source.disconnect();
+
+            // WebRTC 스트림이 아닌 경우에만 트랙 중지
+            const { localStream, remoteStream } = globalState.webrtcStreams;
+            const isWebRTCStream = this.stream === localStream || this.stream === remoteStream;
+
+            if (!isWebRTCStream && this.stream) {
+                this.stream.getTracks().forEach((track) => track.stop());
+            }
+        } catch {}
+
+        const sr = this.audioCtx?.sampleRate || 16000;
+        const samples = this.merge(this.buffers);
+        const wav = this.encodeWAV(samples, sr);
+
+        try {
+            if (this.audioCtx && this.audioCtx.state !== 'closed') await this.audioCtx.close();
+        } catch {}
+
+        // 초기화
+        this.audioCtx = null;
+        this.stream = null;
+        this.source = null;
+        this.processor = null;
+        this.buffers = [];
+        this.chunkCallback = null;
+
+        return wav;
+    }
+
+    private merge(chunks: Float32Array[]) {
+        const total = chunks.reduce((a, b) => a + b.length, 0);
+        const out = new Float32Array(total);
+        let off = 0;
+        for (const c of chunks) {
+            out.set(c, off);
+            off += c.length;
+        }
+        return out;
+    }
+
+    private encodeWAV(samples: Float32Array, sampleRate: number) {
+        const buffer = new ArrayBuffer(44 + samples.length * 2);
+        const view = new DataView(buffer);
+        const writeString = (off: number, str: string) => {
+            for (let i = 0; i < str.length; i++) view.setUint8(off + i, str.charCodeAt(i));
+        };
+        const floatTo16 = (off: number, input: Float32Array) => {
+            for (let i = 0; i < input.length; i++, off += 2) {
+                let s = Math.max(-1, Math.min(1, input[i]));
+                s = s < 0 ? s * 0x8000 : s * 0x7fff;
+                view.setInt16(off, s, true);
+            }
+        };
+        writeString(0, 'RIFF');
+        view.setUint32(4, 36 + samples.length * 2, true);
+        writeString(8, 'WAVE');
+        writeString(12, 'fmt ');
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, 1, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * 2, true);
+        view.setUint16(32, 2, true);
+        view.setUint16(34, 16, true);
+        writeString(36, 'data');
+        view.setUint32(40, samples.length * 2, true);
+        floatTo16(44, samples);
+        return new Blob([view], { type: 'audio/wav' });
+    }
+}
+
+// 전역 상태 관리 (WavRecorder 추가)
 const globalState: VoiceRecorderState = {
     mediaRecorder: null,
     audioChunks: [],
     stream: null,
-    canvasIdx: 'resume-room',
+    canvasIdx: '',
+    wavRecorder: new WavRecorder(), // 🆕 추가
     webrtcStreams: {
         localStream: null,
         remoteStream: null,
@@ -52,8 +223,6 @@ const logOnce = (
 // 캐시된 함수들
 const memoizedFunctions = {
     getCanvasParticipants: null as ((canvasId: string) => Promise<any>) | null,
-    createRecordingStream: null as (() => Promise<MediaStream>) | null,
-    selectAudioFormat: null as (() => { selectedType: string; mimeType: string }) | null,
     calculateDuration: null as ((audioBlob: Blob, mimeType: string) => Promise<number>) | null,
 };
 
@@ -86,88 +255,16 @@ const getCanvasParticipants = async (canvasId: string) => {
     return memoizedFunctions.getCanvasParticipants(canvasId);
 };
 
-/**스트림 생성 함수 */
-const createRecordingStream = async (): Promise<MediaStream> => {
-    if (!memoizedFunctions.createRecordingStream) {
-        memoizedFunctions.createRecordingStream = async (): Promise<MediaStream> => {
-            const { localStream, remoteStream } = globalState.webrtcStreams;
-
-            if (localStream || remoteStream) {
-                logOnce('streamCreated', '️ WebRTC 스트림으로 녹음 시작');
-
-                const combinedStream = new MediaStream();
-
-                if (localStream) {
-                    const localAudioTracks = localStream.getAudioTracks();
-                    localAudioTracks.forEach((track) => combinedStream.addTrack(track));
-                }
-
-                if (remoteStream) {
-                    const remoteAudioTracks = remoteStream.getAudioTracks();
-                    remoteAudioTracks.forEach((track) => combinedStream.addTrack(track));
-                }
-
-                if (combinedStream.getAudioTracks().length === 0) {
-                    logOnce(
-                        'fallbackWarning',
-                        'WebRTC 스트림에 오디오 트랙이 없습니다. 마이크로 fallback',
-                        'warn',
-                    );
-                    return await navigator.mediaDevices.getUserMedia({ audio: true });
-                }
-
-                return combinedStream;
-            } else {
-                logOnce('directMic', '🎙️ 마이크로 직접 녹음 시작');
-                return await navigator.mediaDevices.getUserMedia({ audio: true });
-            }
-        };
-    }
-    return memoizedFunctions.createRecordingStream();
-};
-
-/** 오디오 포맷 선택 함수 */
-const selectAudioFormat = () => {
-    if (!memoizedFunctions.selectAudioFormat) {
-        memoizedFunctions.selectAudioFormat = () => {
-            let selectedType = 'audio/mp4';
-            let mimeType = 'audio/mp4';
-
-            if (!MediaRecorder.isTypeSupported('audio/mp4')) {
-                if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-                    selectedType = 'audio/webm;codecs=opus';
-                    mimeType = 'audio/webm';
-                } else {
-                    selectedType = 'audio/webm';
-                    mimeType = 'audio/webm';
-                }
-            }
-
-            logOnce('formatSelected', `선택된 오디오 포맷: ${selectedType}`);
-            return { selectedType, mimeType };
-        };
-    }
-    return memoizedFunctions.selectAudioFormat();
-};
-
-/** Duration 계산 함수 */
+/** Duration 계산 함수 (WAV 전용) */
 const calculateDuration = async (audioBlob: Blob, mimeType: string): Promise<number> => {
     if (!memoizedFunctions.calculateDuration) {
         memoizedFunctions.calculateDuration = async (
             audioBlob: Blob,
             mimeType: string,
         ): Promise<number> => {
+            // WAV의 경우 더 정확한 계산
             const blobSizeKB = audioBlob.size / 1024;
-            let duration: number;
-
-            // 기본 추정값
-            if (mimeType === 'audio/mp4') {
-                duration = Math.max(3, Math.min(30, blobSizeKB * 0.08));
-            } else if (mimeType === 'audio/mp3') {
-                duration = Math.max(3, Math.min(30, blobSizeKB * 0.08));
-            } else {
-                duration = Math.max(3, Math.min(30, blobSizeKB * 0.1));
-            }
+            let duration = Math.max(3, Math.min(60, blobSizeKB * 0.12)); // WAV는 더 큰 용량
 
             // 정확한 duration 계산 시도
             try {
@@ -175,7 +272,14 @@ const calculateDuration = async (audioBlob: Blob, mimeType: string): Promise<num
                 const url = URL.createObjectURL(audioBlob);
 
                 await new Promise<void>((resolve) => {
+                    const timeoutId = setTimeout(() => {
+                        URL.revokeObjectURL(url);
+                        logOnce('durationTimeout', 'Duration 계산 타임아웃, 추정값 사용', 'warn');
+                        resolve();
+                    }, 3000);
+
                     audio.addEventListener('loadedmetadata', () => {
+                        clearTimeout(timeoutId);
                         URL.revokeObjectURL(url);
                         if (audio.duration && isFinite(audio.duration)) {
                             duration = audio.duration;
@@ -185,6 +289,7 @@ const calculateDuration = async (audioBlob: Blob, mimeType: string): Promise<num
                     });
 
                     audio.addEventListener('error', () => {
+                        clearTimeout(timeoutId);
                         URL.revokeObjectURL(url);
                         logOnce('durationFailed', 'Audio duration 계산 실패, 추정값 사용', 'warn');
                         resolve();
@@ -202,13 +307,18 @@ const calculateDuration = async (audioBlob: Blob, mimeType: string): Promise<num
     return memoizedFunctions.calculateDuration(audioBlob, mimeType);
 };
 
+// 🔧 간소화된 STT 처리 함수 (WAV 변환 제거)
 const processSTTChunk = async (
     audioBlob: Blob,
-    mimeType: string,
+    mimeType: string, // 항상 'audio/wav'
     currentChunkIndex: number,
     isFinal: boolean,
 ) => {
     try {
+        console.log(
+            `🔍 청크 ${currentChunkIndex} 처리 시작 - 크기: ${audioBlob.size} bytes, 형식: ${mimeType}`,
+        );
+
         // Canvas 참여자 정보 가져오기
         const participants = await getCanvasParticipants(globalState.canvasIdx);
 
@@ -217,150 +327,82 @@ const processSTTChunk = async (
 
         if (!participants || participants.length < 2) {
             logOnce('participantsError', 'Canvas 참여자 조회 실패, 기본값 사용', 'warn');
-            mentorIdx = 1;
-            menteeIdx = 2;
+            mentorIdx = 5;
+            menteeIdx = 10;
         } else {
-            const currentUser = useUserStore.getState().user;
+            const mentor = participants.find((p: any) => p.mentor_idx && p.is_approved === 1);
+            const mentee = participants.find((p: any) => !p.mentor_idx || p.is_approved !== 1);
 
-            if (currentUser && currentUser.idx) {
-                menteeIdx = currentUser.idx;
-                const mentor = participants.find((p: any) => p.user_id !== currentUser.idx);
-                mentorIdx = mentor ? mentor.user_id : participants[0].user_id;
+            if (mentor && mentee) {
+                mentorIdx = mentor.user_id;
+                menteeIdx = mentee.user_id;
             } else {
                 mentorIdx = participants[0].user_id;
                 menteeIdx = participants[1].user_id;
             }
         }
 
-        // Base64 변환
+        // Base64 변환 (WAV 직접 사용)
         const base64Data = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => {
                 const result = reader.result as string;
-                resolve(result.split(',')[1]);
+                const base64 = result.split(',')[1];
+                resolve(base64);
             };
             reader.onerror = reject;
             reader.readAsDataURL(audioBlob);
         });
 
+        // 크기 검증
+        if (base64Data.length === 0 && !isFinal) {
+            logOnce(`chunk${currentChunkIndex}Empty`, `청크 ${currentChunkIndex} Base64 비어있음`);
+            return;
+        }
+
         // Duration 계산
         const duration = await calculateDuration(audioBlob, mimeType);
 
+        // 정확한 시간 계산
+        const chunkStartTime = currentChunkIndex * duration;
+        const chunkEndTime = (currentChunkIndex + 1) * duration;
+
         const requestData = {
             audioData: base64Data,
-            mimeType: mimeType,
+            mimeType: mimeType, // 항상 'audio/wav'
             canvasId: globalState.canvasIdx,
             mentorIdx: mentorIdx,
             menteeIdx: menteeIdx,
-            isFinalChunk: isFinal, // ✅ 실제 최종 청크 여부
-            chunkIndex: currentChunkIndex, // ✅ 실제 청크 인덱스
-            totalChunks: isFinal ? totalChunks : -1, // ✅ 최종 청크일 때만 총 청크 수
+            isFinalChunk: isFinal,
+            chunkIndex: currentChunkIndex,
+            totalChunks: isFinal ? totalChunks : -1,
             duration: duration,
-            isNewRecordingSession: currentChunkIndex === 0, // ✅ 첫 번째 청크
+            isNewRecordingSession: currentChunkIndex === 0,
             usePynoteDiarization: true,
+            processInBackground: true,
+            ensureTimeSync: true,
+            useExistingTimeValidation: true,
+            chunkStartTime: chunkStartTime,
+            chunkEndTime: chunkEndTime,
         };
 
-        logOnce(`sttChunk${currentChunkIndex}`, `🎵 청크 ${currentChunkIndex} STT 처리 시작`);
-        await axios.post(`${API_BASE_URL}/stt/transcribe-with-context`, requestData);
-        logOnce(
-            `sttChunk${currentChunkIndex}Complete`,
-            `✅ 청크 ${currentChunkIndex} STT 처리 완료`,
-        );
+        // 백그라운드에서 비동기 처리
+        axios
+            .post(`${API_BASE_URL}/stt/transcribe-with-context`, requestData)
+            .catch((error) => console.error(`청크 ${currentChunkIndex} 처리 실패:`, error));
+
+        console.log(`✅ 청크 ${currentChunkIndex} WAV 직접 처리 완료`);
     } catch (err) {
         logOnce(
             `sttChunk${currentChunkIndex}Failed`,
-            `❌ 청크 ${currentChunkIndex} STT 처리 실패`,
+            `❌ 청크 ${currentChunkIndex} 처리 실패`,
             'error',
         );
     }
 };
 
-/**STT 처리 함수 */
-const processSTT = async (audioBlob: Blob, mimeType: string) => {
-    try {
-        // Canvas 참여자 정보 가져오기
-        const participants = await getCanvasParticipants(globalState.canvasIdx);
-
-        let mentorIdx: number;
-        let menteeIdx: number;
-
-        if (!participants || participants.length < 2) {
-            logOnce('participantsError', 'Canvas 참여자 조회 실패, 기본값 사용', 'warn');
-            mentorIdx = 1;
-            menteeIdx = 2;
-        } else {
-            const currentUser = useUserStore.getState().user;
-
-            if (currentUser && currentUser.idx) {
-                menteeIdx = currentUser.idx;
-                const mentor = participants.find((p: any) => p.user_id !== currentUser.idx);
-                mentorIdx = mentor ? mentor.user_id : participants[0].user_id;
-            } else {
-                mentorIdx = participants[0].user_id;
-                menteeIdx = participants[1].user_id;
-            }
-        }
-
-        // Base64 변환
-        const base64Data = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-                const result = reader.result as string;
-                resolve(result.split(',')[1]);
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(audioBlob);
-        });
-
-        // Duration 계산
-        const duration = await calculateDuration(audioBlob, mimeType);
-
-        const requestData = {
-            audioData: base64Data,
-            mimeType: mimeType,
-            canvasId: globalState.canvasIdx,
-            mentorIdx: mentorIdx,
-            menteeIdx: menteeIdx,
-            isFinalChunk: true,
-            chunkIndex: 0,
-            totalChunks: 1,
-            duration: duration,
-            usePynoteDiarization: true,
-        };
-
-        logOnce('sttProcessed', '🎵 녹음 완료 - STT 처리 시작');
-        await axios.post(`${API_BASE_URL}/stt/transcribe-with-context`, requestData);
-        logOnce('sttCompleted', '✅ STT 처리 완료');
-    } catch (err) {
-        logOnce('sttFailed', 'STT 또는 DB 처리 실패', 'error');
-    }
-};
-
-/**스트림 정리 함수 */
-const cleanupStream = () => {
-    if (globalState.stream) {
-        // WebRTC 스트림이 아닌 경우에만 트랙 중지
-        const { localStream, remoteStream } = globalState.webrtcStreams;
-        const isWebRTCStream =
-            globalState.stream === localStream || globalState.stream === remoteStream;
-
-        if (!isWebRTCStream) {
-            globalState.stream.getTracks().forEach((track) => track.stop());
-        }
-        globalState.stream = null;
-    }
-
-    globalState.mediaRecorder = null;
-    globalState.audioChunks = [];
-
-    // ✅ 청크 카운터 초기화
-    chunkIndex = 0;
-    totalChunks = 0;
-};
-
-/**녹음 시작 함수 */
+/**녹음 시작 함수 (WavRecorder 사용) */
 export const startRecording = async () => {
-    // Canvas Store의 상태를 확인 (단일 소스)
     const canvasStore = useCanvasStore.getState();
     if (canvasStore.isRecording) {
         logOnce('alreadyRecording', '이미 녹음 중입니다.');
@@ -368,71 +410,54 @@ export const startRecording = async () => {
     }
 
     try {
-        const stream = await createRecordingStream();
-        const { selectedType, mimeType } = selectAudioFormat();
+        // WavRecorder 콜백 설정
+        globalState.wavRecorder.setChunkCallback(async (wavBlob: Blob) => {
+            console.log(`🎵 청크 ${chunkIndex} 생성됨 - 크기: ${wavBlob.size} bytes`);
+            await processSTTChunk(wavBlob, 'audio/wav', chunkIndex, false);
+            chunkIndex++;
+        });
 
-        globalState.stream = stream;
-        globalState.mediaRecorder = new MediaRecorder(stream, { mimeType: selectedType });
-        globalState.audioChunks = [];
+        await globalState.wavRecorder.start();
 
-        // ✅ 청크 카운터 초기화
+        // 청크 카운터 초기화
         chunkIndex = 0;
         totalChunks = 0;
-
         canvasStore.setRecording(true);
 
-        // ✅ 청크별 실시간 STT 처리
-        globalState.mediaRecorder.ondataavailable = async (event) => {
-            if (event.data.size > 0) {
-                globalState.audioChunks.push(event.data);
-
-                // ✅ 청크별 즉시 STT 처리
-                await processSTTChunk(event.data, mimeType, chunkIndex, false);
-                chunkIndex++;
-            }
-        };
-
-        // ✅ 최종 청크 처리
-        globalState.mediaRecorder.onstop = async () => {
-            logOnce('recordingStopped', '��️ 녹음 중지됨 - 최종 청크 처리 시작');
-
-            // ✅ 최종 청크 처리
-            if (globalState.audioChunks.length > 0) {
-                const finalBlob = new Blob(globalState.audioChunks, { type: selectedType });
-                await processSTTChunk(finalBlob, mimeType, chunkIndex, true);
-            }
-
-            totalChunks = chunkIndex + 1;
-            const canvasStore = useCanvasStore.getState();
-            canvasStore.setRecording(false);
-
-            cleanupStream();
-        };
-
-        // ✅ 60초마다 청크 생성
-        globalState.mediaRecorder.start(CHUNK_DURATION);
-        logOnce('recordingStarted', '🎙️ 60초 청크 분할 녹음 시작됨');
+        logOnce('recordingStarted', '🎙️ WAV 직접 녹음 시작됨 (16000Hz)');
     } catch (err) {
         logOnce('micAccessFailed', '마이크 접근 실패', 'error');
-        cleanupStream();
+        canvasStore.setRecording(false);
     }
 };
 
-/**녹음 상태 확인 함수 */
-export const stopRecording = () => {
-    if (globalState.mediaRecorder?.state === 'recording') {
-        globalState.mediaRecorder.stop();
-        // onstop 이벤트에서 상태 업데이트됨
-    } else {
-        // 즉시 상태 업데이트
-        const canvasStore = useCanvasStore.getState();
+/**녹음 중지 함수 (WavRecorder 사용) */
+export const stopRecording = async () => {
+    const canvasStore = useCanvasStore.getState();
+
+    try {
+        // 최종 WAV 생성
+        const finalWav = await globalState.wavRecorder.stop();
+
+        // 최종 청크 처리
+        console.log(`🎵 최종 청크 ${chunkIndex} 생성됨 - 크기: ${finalWav.size} bytes`);
+        await processSTTChunk(finalWav, 'audio/wav', chunkIndex, true);
+        totalChunks = chunkIndex + 1;
+
         canvasStore.setRecording(false);
-        cleanupStream();
+
+        // 청크 카운터 초기화
+        chunkIndex = 0;
+        totalChunks = 0;
+
+        logOnce('recordingStopped', '️ WAV 녹음 중지됨');
+    } catch (err) {
+        console.error('녹음 중지 실패:', err);
+        canvasStore.setRecording(false);
     }
 };
 
 export const isRecording = () => {
-    // Canvas Store의 상태를 반환 (단일 소스)
     const canvasStore = useCanvasStore.getState();
     return canvasStore.isRecording;
 };

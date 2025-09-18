@@ -26,6 +26,9 @@ interface AudioState {
     autoPlay: boolean;
     loopMode: 'none' | 'session' | 'segment';
 
+    // �� seekToTime 추가
+    seekToTime: number | null;
+
     // 액션들
     setCurrentSession: (session: ChatSession | null) => void;
     setCurrentSegment: (segment: SpeakerSegment | null) => void;
@@ -35,6 +38,9 @@ interface AudioState {
     setIsPlaying: (playing: boolean) => void;
     setIsReady: (ready: boolean) => void;
     setIsFullSessionMode: (mode: boolean) => void;
+
+    // �� setSeekToTime 추가
+    setSeekToTime: (time: number | null) => void;
 
     // 세션 관리
     addToRecentSessions: (session: ChatSession) => void;
@@ -77,6 +83,9 @@ export const useAudioStore = create<AudioState>()(
             autoPlay: false,
             loopMode: 'none',
 
+            // 🎯 seekToTime 초기 상태
+            seekToTime: null,
+
             // 기본 액션들
             setCurrentSession: (session) => set({ currentSession: session }),
             setCurrentSegment: (segment) => set({ currentSegment: segment }),
@@ -86,6 +95,9 @@ export const useAudioStore = create<AudioState>()(
             setIsPlaying: (playing) => set({ isPlaying: playing }),
             setIsReady: (ready) => set({ isReady: ready }),
             setIsFullSessionMode: (mode) => set({ isFullSessionMode: mode }),
+
+            // 🎯 setSeekToTime 액션
+            setSeekToTime: (time) => set({ seekToTime: time }),
 
             // 세션 관리
             addToRecentSessions: (session) => {
@@ -127,10 +139,12 @@ export const useAudioStore = create<AudioState>()(
                     isPlaying: false,
                     isReady: false,
                     isFullSessionMode: false,
+                    seekToTime: null, // 🎯 reset 시 seekToTime도 초기화
                 }),
 
-            // 오디오 준비 (음성메모 선택 시)
+            // 🎯 오디오 준비 (음성메모 선택 시) - 무한 루프 방지
             prepareAudio: (session) => {
+                // 🚨 addToRecentSessions 호출 제거 - 무한 루프 방지
                 set({
                     currentSession: session,
                     isFullSessionMode: true,
@@ -140,7 +154,6 @@ export const useAudioStore = create<AudioState>()(
                     isPlaying: false,
                     isReady: true,
                 });
-                get().addToRecentSessions(session);
             },
 
             // 세그먼트 재생 (STT 타임라인 클릭 시)

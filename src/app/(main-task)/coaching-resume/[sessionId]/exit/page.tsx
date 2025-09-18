@@ -3,7 +3,7 @@
 
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { FabricCanvas, SocketProvider } from '../../_components';
+import { FabricCanvas } from '../../_components';
 import AudioPlayer from '../../_components/AudioPlayer';
 
 export default function ExitPage() {
@@ -12,7 +12,7 @@ export default function ExitPage() {
     return (
         <div className='w-full h-screen overflow-hidden relative'>
             {/* 캔버스만 상단에 배치 */}
-            <div className='absolute top-5 left-5 w-96 h-64 bg-white rounded-lg shadow-lg border z-10'>
+            <div className='absolute top-5 left-5 w-96 h-64 z-10'>
                 <FabricCanvas />
             </div>
 
@@ -23,7 +23,14 @@ export default function ExitPage() {
 
             {/* 나가기 버튼 */}
             <div className='absolute top-5 right-4 z-[10]'>
-                <Button onClick={() => router.push('/coaching-resume')}>완전히 나가기</Button>
+                <Button
+                    variant='ghost'
+                    size='icon'
+                    onClick={() => router.push('/coaching-resume')}
+                    className='text-muted-foreground hover:text-foreground font-bold'
+                >
+                    ×
+                </Button>
             </div>
         </div>
     );

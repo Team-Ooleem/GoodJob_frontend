@@ -1,4 +1,3 @@
-// src/app/(main-task)/coaching-resume/_hooks/useAudioPlayer.ts
 'use client';
 import { useEffect, useRef, useCallback } from 'react';
 import { useAudioStore } from '../_stores/useAudioStore';
@@ -14,6 +13,8 @@ export function useAudioPlayer() {
         currentTime,
         duration,
         isPlaying,
+        setSeekToTime,
+        seekToTime,
         isReady,
         isFullSessionMode,
         volume,
@@ -29,6 +30,9 @@ export function useAudioPlayer() {
         playSegment,
         playFullSession,
         reset,
+        setCurrentSession,
+        setVolume,
+        recentSessions,
     } = useAudioStore();
 
     // 오디오 엘리먼트 설정
@@ -43,10 +47,14 @@ export function useAudioPlayer() {
     const safePlay = useCallback(
         async (audio: HTMLAudioElement) => {
             try {
+                // 이미 재생 중이면 일시정지하지 않고 그대로 재생
                 if (!audio.paused) {
-                    audio.pause();
-                    await new Promise((resolve) => setTimeout(resolve, 50));
+                    // 이미 재생 중이므로 그대로 두고 상태만 업데이트
+                    setIsPlaying(true);
+                    return;
                 }
+
+                // 정지 상태에서만 재생 시작
                 await audio.play();
                 setIsPlaying(true);
             } catch (error) {
@@ -82,38 +90,55 @@ export function useAudioPlayer() {
         reset();
     }, [reset]);
 
-    // 세그먼트 클릭으로 해당 시간으로 이동하여 재생
-    const handleSegmentClick = useCallback(
-        (segment: any, session?: any) => {
-            if (!session || !audioRef.current) return;
+    // 시간 이동 (진행바 클릭, 10초 앞/뒤)
+    const seekTo = useCallback(
+        (time: number) => {
+            if (!audioRef.current) return;
 
-            // 해당 세그먼트의 startTime으로 이동
-            audioRef.current.currentTime = segment.startTime;
-
-            // 현재 세그먼트 설정
-            setCurrentSegment(segment);
-            setPlayingSegment(segment);
-
-            // 자동 재생
-            audioRef.current
-                .play()
-                .then(() => {
-                    // 재생 성공 시 상태 업데이트는 handleTimeUpdate에서 처리
-                })
-                .catch((error) => {
-                    console.error('Audio play error:', error);
-                });
+            const clampedTime = Math.max(0, Math.min(duration, time));
+            audioRef.current.currentTime = clampedTime;
+            setCurrentTime(clampedTime);
         },
-        [setCurrentSegment, setPlayingSegment],
+        [duration, setCurrentTime],
     );
 
-    // 시간 업데이트 (세그먼트별 자동 정지 포함)
+    // 세그먼트 클릭으로 해당 시간으로 이동 (게이지 바 클릭과 동일한 방식)
+    const handleSegmentClick = useCallback(
+        (segment: any, session?: any) => {
+            if (!session) return;
+
+            console.log('🎯 handleSegmentClick called:', { segment, session });
+
+            // 게이지 바 클릭과 동일하게 시간 이동만 수행
+            if (audioRef.current && duration > 0) {
+                console.log('🎯 Audio element found, seeking to:', segment.startTime);
+
+                // handleProgressClick과 완전히 동일한 로직
+                const newTime = segment.startTime;
+                const clampedTime = Math.max(0, Math.min(duration, newTime));
+                audioRef.current.currentTime = clampedTime;
+                setCurrentTime(clampedTime);
+
+                // 재생 상태는 유지 (게이지 바 클릭과 동일)
+                // safePlay 호출하지 않음!
+            } else {
+                console.log('🎯 No audio element or duration, updating state only');
+                setCurrentTime(segment.startTime);
+            }
+        },
+        [duration, setCurrentTime],
+    );
+
+    // 시간 업데이트 (세그먼트별 자동 정지 포함) - 물 흐르듯 부드러운 애니메이션
     const handleTimeUpdate = useCallback(
         (e: React.SyntheticEvent<HTMLAudioElement>) => {
             const audio = e.currentTarget;
             const time = audio.currentTime;
 
-            setCurrentTime(time);
+            // 🎯 requestAnimationFrame을 사용하여 부드러운 업데이트
+            requestAnimationFrame(() => {
+                setCurrentTime(time);
+            });
 
             // 세그먼트 모드에서 현재 세그먼트가 끝나면 자동 정지
             if (!isFullSessionMode && currentSegment) {
@@ -163,18 +188,6 @@ export function useAudioPlayer() {
         }
     }, [setDuration, setIsReady]);
 
-    // 시간 이동 (진행바 클릭, 10초 앞/뒤)
-    const seekTo = useCallback(
-        (time: number) => {
-            if (!audioRef.current) return;
-
-            const clampedTime = Math.max(0, Math.min(duration, time));
-            audioRef.current.currentTime = clampedTime;
-            setCurrentTime(clampedTime);
-        },
-        [duration, setCurrentTime],
-    );
-
     // 오디오 소스 생성
     const getAudioSources = useCallback((audioUrl: string) => {
         if (!audioUrl) return [];
@@ -204,6 +217,10 @@ export function useAudioPlayer() {
         isReady,
         isFullSessionMode,
         audioRef,
+        volume,
+        recentSessions,
+        setSeekToTime,
+        seekToTime,
 
         // 함수들
         prepareAudio,
@@ -221,24 +238,12 @@ export function useAudioPlayer() {
         setDuration,
         handleSegmentClick,
 
-        // 스토어 액션들 (중복 제거)
-        setCurrentSession: useAudioStore.getState().setCurrentSession,
-        setCurrentSegment: useAudioStore.getState().setCurrentSegment,
-        setPlayingSegment: useAudioStore.getState().setPlayingSegment,
-        setIsPlaying: useAudioStore.getState().setIsPlaying,
-        setIsReady: useAudioStore.getState().setIsReady,
-        setIsFullSessionMode: useAudioStore.getState().setIsFullSessionMode,
-        addToRecentSessions: useAudioStore.getState().addToRecentSessions,
-        addToFavorites: useAudioStore.getState().addToFavorites,
-        removeFromFavorites: useAudioStore.getState().removeFromFavorites,
-        setVolume: useAudioStore.getState().setVolume,
-        setPlaybackRate: useAudioStore.getState().setPlaybackRate,
-        setAutoPlay: useAudioStore.getState().setAutoPlay,
-        setLoopMode: useAudioStore.getState().setLoopMode,
-
-        // 스토어 상태들
-        volume: useAudioStore.getState().volume,
-        recentSessions: useAudioStore.getState().recentSessions,
+        // 추가 함수들
+        setCurrentSession,
+        setCurrentSegment,
+        setPlayingSegment,
+        setVolume,
+        setIsPlaying,
     };
 }
 
