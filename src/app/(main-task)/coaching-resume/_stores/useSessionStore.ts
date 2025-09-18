@@ -6,13 +6,14 @@ interface SessionState {
     sessionStarted: boolean;
     mentorName: string;
     menteeName: string;
+    role: 'mentor' | 'mentee';
     setMentorReady: (ready: boolean) => void;
     setMenteeReady: (ready: boolean) => void;
     startSession: () => void;
     resetSession: () => void;
     setMentorName: (name: string) => void;
     setMenteeName: (name: string) => void;
-    role: 'mentor' | 'mentee';
+    setRole: (role: 'mentor' | 'mentee') => void;
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
@@ -50,4 +51,5 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
     setMentorName: (name) => set({ mentorName: name }),
     setMenteeName: (name) => set({ menteeName: name }),
+    setRole: (role) => set({ role }),
 }));

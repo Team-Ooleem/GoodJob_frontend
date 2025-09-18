@@ -1,10 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import {
     Select,
     SelectContent,
@@ -13,7 +12,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { Mic, MicOff, Video, VideoOff, ChevronDown, User, ChevronLeft } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, User, ChevronLeft } from 'lucide-react';
 import { useSessionStore } from '../_stores';
 
 type MediaDevice = {
@@ -21,10 +20,20 @@ type MediaDevice = {
     label: string;
 };
 
-export function WaitingRoom() {
+type Props = {
+    canvasData?: {
+        scheduled_at?: string;
+        [key: string]: any;
+    };
+};
+
+export function WaitingRoom({ canvasData }: Props) {
     const router = useRouter();
-    const { mentorReady, menteeReady, setMentorReady, setMenteeReady, startSession } =
-        useSessionStore();
+    const {
+        startSession,
+        mentorName,
+        menteeName,
+    } = useSessionStore();
 
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const [stream, setStream] = useState<MediaStream | null>(null);
@@ -121,38 +130,31 @@ export function WaitingRoom() {
         setCamOn(next);
     };
 
-    // 현재 사용자가 멘토인지 멘티인지 결정 (실제로는 props나 context에서 가져와야 함)
-    const userRole = 'mentee'; // 임시로 멘티로 설정
-    const isUserReady = userRole === 'mentor' ? mentorReady : menteeReady;
-    const otherUserReady = userRole === 'mentor' ? menteeReady : mentorReady;
-    const otherUserRole = userRole === 'mentor' ? '멘티' : '멘토';
-
-    const toggleReady = () => {
-        if (userRole === 'mentor') {
-            setMentorReady(!mentorReady);
-        } else {
-            setMenteeReady(!menteeReady);
+    // 세션 예약 시간 확인
+    const isSessionAvailable = () => {
+        if (!canvasData?.scheduled_at) {
+            return true; // 예약 시간이 없으면 참석 가능
         }
+
+        const scheduledTime = new Date(canvasData.scheduled_at);
+        const now = new Date();
+
+        return now >= scheduledTime;
     };
 
-    const getButtonText = () => {
-        if (isUserReady) {
-            if (otherUserReady) {
-                return '지금 참여하기';
-            } else {
-                return `준비 취소하기 (${otherUserRole} 대기 중)`;
-            }
-        } else {
-            return '준비 완료';
-        }
-    };
-
-    const handleButtonClick = () => {
-        if (isUserReady && otherUserReady) {
+    const handleJoinSession = () => {
+        if (isSessionAvailable()) {
             startSession();
-        } else {
-            toggleReady();
         }
+    };
+
+    const getJoinButtonText = () => {
+        if (!isSessionAvailable()) {
+            const scheduledTime = new Date(canvasData!.scheduled_at!);
+            const formattedTime = scheduledTime.toLocaleString('ko-KR');
+            return `세션 시작 예정 시간: ${formattedTime}`;
+        }
+        return '세션 참석하기';
     };
 
     return (
@@ -168,7 +170,7 @@ export function WaitingRoom() {
 
             <div className='w-full h-full flex justify-center items-center px-40 gap-12'>
                 {/* Left: Preview */}
-                <div className='flex-2'>
+                <div className='flex-1'>
                     <div className='w-full'>
                         <Card className='relative overflow-hidden rounded-2xl aspect-video bg-muted max-w-2xl mx-auto'>
                             <video
@@ -253,67 +255,92 @@ export function WaitingRoom() {
                 {/* Right: Participants + CTA */}
                 <div className='flex-1 flex justify-center items-center flex-col'>
                     <div className='w-full space-y-6'>
-                        <div className='space-y-4 lg:pr-30'>
-                            <h2 className='text-2xl font-semibold'>참석자 목록</h2>
+                        <div className='space-y-6'>
+                            <div className='space-y-4'>
+                                <h2 className='text-lg font-semibold'>참석자 정보</h2>
 
-                            {/* Mentor Card */}
-                            <div className='flex gap-2 sm:flex-col'>
-                                <Card className='flex-1 p-0'>
-                                    <CardContent className='flex items-center space-x-4 p-4'>
-                                        <div className='w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center'>
-                                            <User className='h-6 w-6 text-primary' />
+                                {/* Participants Info */}
+                                <Card className='p-0'>
+                                    <CardContent className='p-6 space-y-4'>
+                                        <div className='flex items-center space-x-4'>
+                                            <div className='w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-950 flex items-center justify-center'>
+                                                <User className='h-6 w-6 text-blue-600 dark:text-blue-400' />
+                                            </div>
+                                            <div>
+                                                <p className='font-medium text-lg'>
+                                                    {mentorName || '멘토'}
+                                                </p>
+                                                <p className='text-sm text-muted-foreground'>
+                                                    멘토
+                                                </p>
+                                            </div>
                                         </div>
-                                        <div className='flex-1 space-y-1'>
-                                            <p className='font-medium'>김코치</p>
-                                            <p className='text-sm text-muted-foreground'>멘토</p>
+
+                                        <div className='flex items-center space-x-4'>
+                                            <div className='w-12 h-12 rounded-full bg-green-100 dark:bg-green-950 flex items-center justify-center'>
+                                                <User className='h-6 w-6 text-green-600 dark:text-green-400' />
+                                            </div>
+                                            <div>
+                                                <p className='font-medium text-lg'>
+                                                    {menteeName || '멘티'}
+                                                </p>
+                                                <p className='text-sm text-muted-foreground'>
+                                                    멘티
+                                                </p>
+                                            </div>
                                         </div>
                                     </CardContent>
-                                    <CardFooter
-                                        className={`p-3 rounded-b-lg ${mentorReady ? 'bg-green-50 dark:bg-green-950' : 'bg-gray-50 dark:bg-gray-950'}`}
-                                    >
-                                        <Badge
-                                            variant={mentorReady ? 'secondary' : 'outline'}
-                                            className={
-                                                mentorReady
-                                                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-                                                    : 'border-gray-200 text-gray-600 dark:border-gray-700 dark:text-gray-400'
-                                            }
-                                        >
-                                            {mentorReady ? '준비됨' : '대기중'}
-                                        </Badge>
-                                    </CardFooter>
-                                </Card>
-
-                                {/* Mentee Card */}
-                                <Card className='flex-1  p-0'>
-                                    <CardContent className='flex items-center space-x-4 p-4'>
-                                        <div className='w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center'>
-                                            <User className='h-6 w-6 text-primary' />
-                                        </div>
-                                        <div className='flex-1 space-y-1'>
-                                            <p className='font-medium'>이멘티</p>
-                                            <p className='text-sm text-muted-foreground'>멘티</p>
-                                        </div>
-                                    </CardContent>
-                                    <CardFooter
-                                        className={`p-3 rounded-b-lg ${menteeReady ? 'bg-green-50 dark:bg-green-950' : 'bg-gray-50 dark:bg-gray-950'}`}
-                                    >
-                                        <Badge
-                                            variant={menteeReady ? 'secondary' : 'outline'}
-                                            className={
-                                                menteeReady
-                                                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-                                                    : 'border-gray-200 text-gray-600 dark:border-gray-700 dark:text-gray-400'
-                                            }
-                                        >
-                                            {menteeReady ? '준비됨' : '대기중'}
-                                        </Badge>
-                                    </CardFooter>
                                 </Card>
                             </div>
 
-                            <Button size='lg' className='w-full' onClick={handleButtonClick}>
-                                {getButtonText()}
+                            {/* Session Guidelines */}
+                            <div className='space-y-4'>
+                                <h3 className='text-lg font-semibold'>세션 이용 안내</h3>
+                                <Card className='p-0'>
+                                    <CardContent className='p-6 space-y-4 text-sm text-muted-foreground'>
+                                        <div className='space-y-2'>
+                                            <h4 className='font-medium text-foreground'>
+                                                📋 세션 진행 방식
+                                            </h4>
+                                            <ul className='space-y-1 ml-4'>
+                                                <li>• 화면 공유를 통해 이력서를 함께 검토합니다</li>
+                                                <li>
+                                                    • 실시간으로 피드백과 수정사항을 확인할 수
+                                                    있습니다
+                                                </li>
+                                                <li>• 세션 내용은 자동으로 녹화됩니다</li>
+                                            </ul>
+                                        </div>
+
+                                        <div className='space-y-2'>
+                                            <h4 className='font-medium text-foreground'>
+                                                ✅ 이용 수칙
+                                            </h4>
+                                            <ul className='space-y-1 ml-4'>
+                                                <li>
+                                                    • 원활한 소통을 위해 마이크와 카메라를
+                                                    준비해주세요
+                                                </li>
+                                                <li>
+                                                    • 상호 존중하며 건설적인 피드백을 주고받아주세요
+                                                </li>
+                                                <li>
+                                                    • 개인정보 보호를 위해 민감한 정보 공유에
+                                                    주의해주세요
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </div>
+
+                            <Button
+                                size='lg'
+                                className='w-full'
+                                onClick={handleJoinSession}
+                                disabled={!isSessionAvailable()}
+                            >
+                                {getJoinButtonText()}
                             </Button>
                         </div>
                     </div>
