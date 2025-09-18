@@ -62,17 +62,20 @@ export function useCollaborativeCanvas(room: string) {
     useEffect(() => {
         if (!canvas || !socket) return;
 
-        // --- Socket 연결 ---
         socket.on('connect', () => {
             console.log('Socket connected, joining room:', room);
             socket.emit('joinCanvas', room);
         });
 
-        // --- Y.Doc ---
+        if (socket.connected) {
+            console.log('Socket already connected, joining room immediately:', room);
+            socket.emit('joinCanvas', room);
+        }
+
         const ydoc = new Y.Doc();
         const yObjects = ydoc.getMap<any>('objects');
 
-        // 스냅샷 기반 undo/redo 헬퍼 함수들
+        // --- Undo/Redo 스냅샷 관리 ---
         const saveSnapshot = () => {
             const snapshot = Array.from(yObjects.entries());
             canvasSnapshotsRef.current = canvasSnapshotsRef.current.slice(
@@ -81,27 +84,9 @@ export function useCollaborativeCanvas(room: string) {
             );
             canvasSnapshotsRef.current.push(snapshot);
             currentSnapshotIndexRef.current++;
-
-            // 최대 50개 스냅샷만 유지
             if (canvasSnapshotsRef.current.length > 50) {
                 canvasSnapshotsRef.current.shift();
                 currentSnapshotIndexRef.current--;
-            }
-        };
-
-        const performUndo = async () => {
-            if (currentSnapshotIndexRef.current > 0) {
-                currentSnapshotIndexRef.current--;
-                const snapshot = canvasSnapshotsRef.current[currentSnapshotIndexRef.current];
-                await restoreSnapshot(snapshot);
-            }
-        };
-
-        const performRedo = async () => {
-            if (currentSnapshotIndexRef.current < canvasSnapshotsRef.current.length - 1) {
-                currentSnapshotIndexRef.current++;
-                const snapshot = canvasSnapshotsRef.current[currentSnapshotIndexRef.current];
-                await restoreSnapshot(snapshot);
             }
         };
 
@@ -122,22 +107,34 @@ export function useCollaborativeCanvas(room: string) {
             }
         };
 
-        // 초기 스냅샷 저장
-        saveSnapshot();
+        const performUndo = async () => {
+            if (currentSnapshotIndexRef.current > 0) {
+                currentSnapshotIndexRef.current--;
+                const snapshot = canvasSnapshotsRef.current[currentSnapshotIndexRef.current];
+                await restoreSnapshot(snapshot);
+            }
+        };
 
-        // 글로벌 참조 설정
+        const performRedo = async () => {
+            if (currentSnapshotIndexRef.current < canvasSnapshotsRef.current.length - 1) {
+                currentSnapshotIndexRef.current++;
+                const snapshot = canvasSnapshotsRef.current[currentSnapshotIndexRef.current];
+                await restoreSnapshot(snapshot);
+            }
+        };
+
+        saveSnapshot();
         (window as any).__collaborativeUndo = performUndo;
         (window as any).__collaborativeRedo = performRedo;
         (window as any).__currentRoom = room;
 
-        // 로컬 → 서버
+        // --- Yjs 이벤트 ---
         const onLocalYUpdate = (u8: Uint8Array, origin: any) => {
             if (origin === 'remote') return;
             socket.emit('sync', { room, update: Array.from(u8) });
         };
         ydoc.on('update', onLocalYUpdate);
 
-        // 원격 → 로컬
         const applyRemoteUpdate = async (u8: Uint8Array) => {
             isApplyingRemoteRef.current = true;
             try {
@@ -155,9 +152,7 @@ export function useCollaborativeCanvas(room: string) {
             applyRemoteUpdate(toU8(payload));
         });
 
-        // ----------------------------
-        // Y.js → Canvas 동기화
-        // ----------------------------
+        // --- Y.js → Fabric ---
         const syncFromY = async () => {
             const existing = new Map<string, FabricObject>();
             canvas.getObjects().forEach((obj) => {
@@ -166,28 +161,21 @@ export function useCollaborativeCanvas(room: string) {
             });
 
             for (const [id, data] of yObjects.entries()) {
+                const [obj] = (await enlivenObjects([data])) as FabricObject[];
+                obj.id = id;
+
                 if (existing.has(id)) {
-                    // update
-                    existing.get(id)!.set(data);
-                    existing.get(id)!.setCoords();
+                    canvas.remove(existing.get(id)!);
                     existing.delete(id);
-                } else {
-                    // create
-                    const [obj] = (await enlivenObjects([data])) as FabricObject[];
-                    obj.id = id;
-                    canvas.add(obj);
                 }
+                canvas.add(obj);
             }
 
-            // remove leftover
             existing.forEach((obj) => canvas.remove(obj));
-
             canvas.requestRenderAll();
         };
 
-        // ----------------------------
-        // Canvas → Y.js 동기화
-        // ----------------------------
+        // --- Fabric → Y.js ---
         const syncToY = () => {
             if (isApplyingRemoteRef.current) return;
             if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
@@ -198,7 +186,6 @@ export function useCollaborativeCanvas(room: string) {
                     canvas.getObjects().forEach((obj) => {
                         if (obj instanceof fabric.ActiveSelection) return;
                         const fo = obj as FabricObject;
-                        // 실시간 드로잉 path는 Y.js 동기화에서 제외
                         if ((fo as any).__isRealTimePath) return;
 
                         const id = ensureId(fo);
@@ -208,13 +195,11 @@ export function useCollaborativeCanvas(room: string) {
                         yObjects.set(id, data);
                     });
 
-                    // 삭제 처리
                     Array.from(yObjects.keys()).forEach((id) => {
                         if (!ids.has(id)) yObjects.delete(id);
                     });
                 });
 
-                // 스냅샷 저장 (변경이 있을 때만)
                 setTimeout(() => {
                     if (!isApplyingRemoteRef.current) {
                         saveSnapshot();
@@ -223,9 +208,7 @@ export function useCollaborativeCanvas(room: string) {
             }, 30);
         };
 
-        // ----------------------------
-        // FreeDrawing 실시간 스트리밍
-        // ----------------------------
+        // --- FreeDrawing ---
         const handleMouseDown = () => {
             if (!canvas.isDrawingMode) return;
             isDrawingRef.current = true;
@@ -241,7 +224,6 @@ export function useCollaborativeCanvas(room: string) {
             if (!canvas.isDrawingMode || !isDrawingRef.current) return;
             const brush = canvas.freeDrawingBrush as any;
             if (!brush || !brush._points) return;
-
             const points = brush._points.map((p: any) => [p.x, p.y]);
             socket.emit('drawing:progress', {
                 room,
@@ -258,7 +240,6 @@ export function useCollaborativeCanvas(room: string) {
                 room,
                 id: currentPathIdRef.current,
             });
-            // 실시간 드로잉은 이미 처리되었으므로 syncToY 호출하지 않음
             currentPathIdRef.current = null;
         };
 
@@ -266,7 +247,6 @@ export function useCollaborativeCanvas(room: string) {
         canvas.on('mouse:move', handleMouseMove);
         canvas.on('mouse:up', handleMouseUp);
 
-        // --- 원격 수신 (그려지는 중)
         socket.on('drawing:start', ({ id, brush }) => {
             const { color, width, type } = brush as BrushConfig;
             const path = new fabric.Path('', {
@@ -276,7 +256,7 @@ export function useCollaborativeCanvas(room: string) {
                 selectable: false,
             }) as FabricObject;
             path.id = id;
-            (path as any).__isRealTimePath = true; // 실시간 드로잉 마킹
+            (path as any).__isRealTimePath = true;
             canvas.add(path);
         });
 
@@ -303,41 +283,26 @@ export function useCollaborativeCanvas(room: string) {
                 selectable: false,
             }) as FabricObject;
             newPath.id = id;
-            (newPath as any).__isRealTimePath = true; // 실시간 드로잉 마킹
-
+            (newPath as any).__isRealTimePath = true;
             canvas.add(newPath);
             canvas.requestRenderAll();
         });
 
         socket.on('drawing:end', ({ id }) => {
             const obj = canvas.getObjects().find((o) => (o as FabricObject).id === id);
-            if (obj) {
-                ensureId(obj as FabricObject);
-                // 실시간 드로잉은 이미 Y.js에서 관리되므로 syncToY 호출하지 않음
-            }
+            if (obj) ensureId(obj as FabricObject);
         });
 
-        // --- Undo/Redo 이벤트 ---
-        socket.on('canvas:undo', () => {
-            performUndo();
-        });
+        socket.on('canvas:undo', () => performUndo());
+        socket.on('canvas:redo', () => performRedo());
 
-        socket.on('canvas:redo', () => {
-            performRedo();
-        });
-
-        // ----------------------------
-        // Fabric 이벤트 → 로컬 변경만 syncToY
-        // ----------------------------
         const onObjectAdded = (e: any) => {
             const obj = e.target as FabricObject;
-            // 실시간 드로잉이나 원격 동기화에서 온 것이면 무시
             if (obj.id && (isDrawingRef.current || isApplyingRemoteRef.current)) return;
             syncToY();
         };
 
-        const onPathCreated = (e: any) => {
-            // 실시간 드로잉 중이면 syncToY 호출하지 않음 (이미 handleMouseUp에서 처리)
+        const onPathCreated = () => {
             if (isDrawingRef.current) return;
             syncToY();
         };
@@ -350,10 +315,8 @@ export function useCollaborativeCanvas(room: string) {
         canvas.on('object:rotating', () => syncToY());
         canvas.on('object:scaling', () => syncToY());
 
-        // --- cleanup ---
         return () => {
             if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
-
             canvas.off('object:added', onObjectAdded);
             canvas.off('object:modified');
             canvas.off('object:removed');
@@ -361,7 +324,6 @@ export function useCollaborativeCanvas(room: string) {
             canvas.off('object:moving');
             canvas.off('object:rotating');
             canvas.off('object:scaling');
-
             canvas.off('mouse:down', handleMouseDown);
             canvas.off('mouse:move', handleMouseMove);
             canvas.off('mouse:up', handleMouseUp);
@@ -377,14 +339,10 @@ export function useCollaborativeCanvas(room: string) {
             ydoc.off('update', onLocalYUpdate);
             ydoc.destroy();
 
-            // 글로벌 참조 정리
             delete (window as any).__collaborativeUndo;
             delete (window as any).__collaborativeRedo;
-            if ((window as any).__currentRoom === room) {
-                delete (window as any).__currentRoom;
-            }
+            if ((window as any).__currentRoom === room) delete (window as any).__currentRoom;
 
-            // 참조 정리
             canvasSnapshotsRef.current = [];
             currentSnapshotIndexRef.current = -1;
             undoManagerRef.current = null;

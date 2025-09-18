@@ -19,3 +19,4 @@ export * from './useAudioMetadata';
 export * from './useSessionData';
 export * from './useDragPosition';
 export * from './useRecordingSync';
+export * from './useCoachingResumeCanvas';
