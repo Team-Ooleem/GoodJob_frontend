@@ -44,7 +44,6 @@ export default function AiInterviewSelectPage() {
         isUploading,
         isParsing,
         uploadError,
-        parseError,
     } = useResumeUpload();
 
     const handleFileUpload = async (file: File) => {
@@ -612,16 +611,6 @@ export default function AiInterviewSelectPage() {
                                     return '면접 환경 체크하기';
                                 })()}
                             </Button>
-                            {/* <div className='mt-4'>
-                            <Button
-                                variant='outline'
-                                onClick={() => router.push('/ai-interview/reports')}
-                                className='flex items-center gap-2'
-                            >
-                                <FileSearch className='w-4 h-4' />
-                                리포트 목록 보기
-                            </Button>
-                        </div> */}
                         </div>
                     </CardContent>
                 </Card>
