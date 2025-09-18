@@ -27,10 +27,7 @@ function normalizeProduct(raw: any): MentoringProduct {
         title: raw?.title ?? raw?.name ?? '',
         content: raw?.content ?? raw?.description ?? raw?.markdown ?? raw?.body ?? '',
         categoryName:
-            raw?.category?.name ??
-            raw?.category_name ??
-            raw?.categoryName ??
-            raw?.job_category,
+            raw?.category?.name ?? raw?.category_name ?? raw?.categoryName ?? raw?.job_category,
         tags: raw?.tags ?? raw?.hash_tags ?? undefined,
         price: raw?.price ?? raw?.cost ?? 0,
         ratingAverage:
@@ -56,6 +53,7 @@ function normalizeProduct(raw: any): MentoringProduct {
 }
 
 export interface MentoringSlot {
+    regular_slots_idx: number;
     day_of_week: number;
     hour_slot: number;
     time_range: string;
@@ -71,7 +69,9 @@ export async function getMentoringProduct(productIdx: number | string): Promise<
     return normalizeProduct(response.data);
 }
 
-export async function getMentoringProductSlots(productIdx: number | string): Promise<MentoringProductSlots> {
+export async function getMentoringProductSlots(
+    productIdx: number | string,
+): Promise<MentoringProductSlots> {
     const response = await api.get(`/mentoring-products/${productIdx}/regular-slots`);
     return response.data;
 }

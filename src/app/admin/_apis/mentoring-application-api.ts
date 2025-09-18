@@ -247,6 +247,23 @@ export const approveApplication = (id: number) =>
 export const rejectApplication = (id: number, reason: string) =>
     updateApplication(id, { application_status: 'rejected', rejection_reason: reason });
 
+/** 현재 사용자의 멘토 idx 조회 */
+export async function fetchMyMentorIdx(): Promise<{
+    mentor_idx: number | null;
+    is_mentor: boolean;
+}> {
+    const res = await fetch(`${BASE_URL}/mentoring-applications/my/mentor-idx`, {
+        credentials: 'include',
+    });
+
+    if (!res.ok) {
+        const msg = await safeText(res);
+        throw new Error(`멘토 idx 조회 실패 (${res.status}) ${msg}`);
+    }
+
+    return res.json();
+}
+
 /** 에러 메시지 보강용 */
 async function safeText(res: Response) {
     try {

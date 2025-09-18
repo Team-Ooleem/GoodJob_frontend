@@ -17,7 +17,6 @@ interface UserProfileSectionProps {
 export function UserProfileSection({ userId, currentUserId }: UserProfileSectionProps) {
     // 사용자 프로필 데이터 조회
     const { data: userProfile, isLoading, error } = useUserProfile(userId);
-    console.log(userProfile);
 
     // 팔로우 관련 뮤테이션
     const { toggleFollow } = useFollowMutations(currentUserId);

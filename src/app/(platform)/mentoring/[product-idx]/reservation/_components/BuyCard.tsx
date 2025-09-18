@@ -12,10 +12,19 @@ type Props = {
     productIdx?: string;
     selectedDate?: Date;
     selectedSlot?: string | null;
+    selectedRegularSlotsIdx?: number | null;
     mentorName?: string;
 };
 
-export function BuyCard({ price, productTitle, productIdx, selectedDate, selectedSlot, mentorName }: Props) {
+export function BuyCard({
+    price,
+    productTitle,
+    productIdx,
+    selectedDate,
+    selectedSlot,
+    selectedRegularSlotsIdx,
+    mentorName,
+}: Props) {
     const router = useRouter();
 
     const handlePayment = async () => {
@@ -32,8 +41,6 @@ export function BuyCard({ price, productTitle, productIdx, selectedDate, selecte
                 payMethod: 'CARD',
             });
 
-            console.log(response);
-
             if (response?.paymentId && productIdx) {
                 const reservationData = {
                     paymentId: response.paymentId,
@@ -41,7 +48,8 @@ export function BuyCard({ price, productTitle, productIdx, selectedDate, selecte
                     mentorName,
                     selectedDate: selectedDate?.toISOString(),
                     selectedSlot,
-                    price
+                    selectedRegularSlotsIdx,
+                    price,
                 };
 
                 const searchParams = new URLSearchParams();
@@ -51,7 +59,9 @@ export function BuyCard({ price, productTitle, productIdx, selectedDate, selecte
                     }
                 });
 
-                router.push(`/mentoring/${productIdx}/reservation/success?${searchParams.toString()}`);
+                router.push(
+                    `/mentoring/${productIdx}/reservation/success?${searchParams.toString()}`,
+                );
             }
         } catch (error) {
             console.error('Payment request failed:', error);

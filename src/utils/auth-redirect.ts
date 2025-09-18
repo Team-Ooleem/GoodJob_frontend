@@ -22,7 +22,6 @@ export const handleAuthRedirect = async (maxRetries = 3, baseDelay = 500): Promi
             retryCount++;
 
             if (retryCount <= maxRetries) {
-                console.log(`인증 확인 재시도 ${retryCount}/${maxRetries}`);
                 return attemptAuth();
             }
 

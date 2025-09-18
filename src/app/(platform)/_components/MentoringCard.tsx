@@ -55,7 +55,7 @@ export const MentoringCard = ({ mentoring }: MentoringCardProps) => {
                         1시간 &#41;
                     </span>
                     <Link href={`/mentoring/${mentoring?.product_idx || ''}`}>
-                        <Button className='px-6 font-semibold text-sm bg-foreground text-background hover:bg-foreground/90 cursor-pointer'>
+                        <Button className='px-6 font-semibold text-sm cursor-pointer'>
                             멘토링 신청하기
                         </Button>
                     </Link>

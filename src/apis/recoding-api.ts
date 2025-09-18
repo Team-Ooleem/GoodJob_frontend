@@ -107,7 +107,7 @@ export interface VoiceRecorderState {
     mediaRecorder: MediaRecorder | null;
     audioChunks: Blob[];
     stream: MediaStream | null;
-    canvasIdx: string;
+    canvasId: string;
     wavRecorder?: any; // 🆕 추가
     webrtcStreams: {
         localStream: MediaStream | null;

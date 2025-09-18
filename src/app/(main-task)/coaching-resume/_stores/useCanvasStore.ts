@@ -61,6 +61,12 @@ type CanvasStoreState = {
     sendRecordingStatus?: (isRecording: boolean) => void;
     setSendRecordingStatus: (fn: (isRecording: boolean) => void) => void;
 
+    // WebRTC functions
+    webRTCToggleMic?: () => void;
+    webRTCToggleCamera?: () => void;
+    setWebRTCToggleMic: (fn: () => void) => void;
+    setWebRTCToggleCamera: (fn: () => void) => void;
+
     // objects
     deleteActiveObject: () => void;
     clearAllObjects: () => void;
@@ -73,6 +79,10 @@ type CanvasStoreState = {
     addHistory: (poppedObject: fabric.Object) => void;
     undo: () => void;
     redo: () => void;
+
+    // 변경 발생 알림 콜백
+    onChange?: () => void;
+    setOnChange: (fn: () => void) => void;
 };
 
 type DrawingBrush = fabric.PencilBrush | fabric.SprayBrush;
@@ -97,6 +107,8 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     socket: null,
 
     setSendRecordingStatus: (fn) => set({ sendRecordingStatus: fn }),
+    setWebRTCToggleMic: (fn) => set({ webRTCToggleMic: fn }),
+    setWebRTCToggleCamera: (fn) => set({ webRTCToggleCamera: fn }),
 
     setSocket: (socket) => set({ socket }),
 
@@ -132,15 +144,30 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
         }),
 
     // media toggles
-    toggleMic: () => set((state) => ({ isMicEnabled: !state.isMicEnabled })),
-    toggleCam: () => set((state) => ({ isCamEnabled: !state.isCamEnabled })),
+    toggleMic: () => {
+        const currentState = get();
+        if (currentState.webRTCToggleMic) {
+            currentState.webRTCToggleMic();
+        } else {
+            // fallback: just toggle the state
+            set((state) => ({ isMicEnabled: !state.isMicEnabled }));
+        }
+    },
+    toggleCam: () => {
+        const currentState = get();
+        if (currentState.webRTCToggleCamera) {
+            currentState.webRTCToggleCamera();
+        } else {
+            // fallback: just toggle the state
+            set((state) => ({ isCamEnabled: !state.isCamEnabled }));
+        }
+    },
     setMicEnabled: (enabled: boolean) => set({ isMicEnabled: enabled }),
     setCamEnabled: (enabled: boolean) => set({ isCamEnabled: enabled }),
 
     // �� toggleRecording: 실제 녹음 로직 + 상태 토글
     toggleRecording: () => {
         const currentState = get();
-        const socket = currentState.socket;
         if (currentState.isRecording) {
             // 🆕 상태 변경을 stopRecording 함수 내부에서 처리하도록 수정
             stopRecording();
@@ -331,28 +358,30 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
         })),
 
     undo: () => {
-        const canvas = get().canvasInstance;
-        if (canvas) {
-            if (canvas._objects.length > 0) {
-                const poppedObject = canvas._objects.pop() as fabric.Object;
-                get().addHistory(poppedObject);
-                canvas.renderAll();
-            }
+        const socket = get().socket;
+        const undoFn = (window as any).__collaborativeUndo;
+
+        if (socket && undoFn) {
+            // 로컬 실행
+            undoFn();
+            // 소켓을 통해 undo 작업을 브로드캐스트
+            socket.emit('canvas:undo', { room: (window as any).__currentRoom });
         }
     },
 
     redo: () => {
-        const canvas = get().canvasInstance;
-        const history = get().history;
-        if (canvas && history) {
-            if (history.length > 0) {
-                set({ isLocked: true });
-                canvas.add(history[history.length - 1]);
-                const newHistory = history.slice(0, -1);
-                set({ history: newHistory });
-            }
+        const socket = get().socket;
+        const redoFn = (window as any).__collaborativeRedo;
+
+        if (socket && redoFn) {
+            // 로컬 실행
+            redoFn();
+            // 소켓을 통해 redo 작업을 브로드캐스트
+            socket.emit('canvas:redo', { room: (window as any).__currentRoom });
         }
     },
+
+    setOnChange: (fn) => set({ onChange: fn }),
 }));
 
 function ensureFreeDrawingBrush(canvas: fabric.Canvas, brushConfig: BrushConfig) {
@@ -374,7 +403,7 @@ function ensureFreeDrawingBrush(canvas: fabric.Canvas, brushConfig: BrushConfig)
 
     // 형광펜 전용 옵션
     if (type === 'highlighter') {
-        brush.width = width * 2; // 더 두껍게
+        brush.width = width * 1.2; // 더 두껍게
         brush.color = 'rgba(255, 255, 0, 0.3)'; // 형광펜 색상
     }
 }

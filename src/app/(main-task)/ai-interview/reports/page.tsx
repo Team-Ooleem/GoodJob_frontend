@@ -18,6 +18,7 @@ import { TrophyOutlined, FileSearchOutlined, ReloadOutlined } from '@ant-design/
 import { api } from '@/apis/api';
 import { useRouter } from 'next/navigation';
 import InterviewReport from '../_components/InterviewReport';
+import type { InterviewAnalysisResult } from '@/types/report';
 
 type ReportListItem = {
     session_id: string;
@@ -26,26 +27,7 @@ type ReportListItem = {
     created_at: string;
 };
 
-interface InterviewAnalysisResult {
-    overall_score: number;
-    detailed_scores: {
-        completeness: number;
-        specificity: number;
-        logic: number;
-        impression: number;
-    };
-    strengths: string[];
-    improvements: string[];
-    detailed_feedback: {
-        [key: string]: {
-            score: number;
-            feedback: string;
-            question?: string;
-        };
-    };
-    overall_evaluation: string;
-    recommendations: string[];
-}
+// Report type is imported from shared types
 
 // 영상/음성 지표 타입 정의
 interface AudioAnalysisData {
@@ -260,12 +242,16 @@ export default function ReportsPage() {
                             ...(s.averages || {}),
                         };
                         const perQ = Array.isArray(s.questionScores)
-                            ? (s.questionScores as Array<any>).map((q: any, idx: number) => ({
-                                  questionNumber: (q.index as number) ?? idx + 1,
-                                  question: `질문 ${((q.index as number) ?? idx) + 1}`,
-                                  normalized_score: typeof q.score === 'number' ? q.score : undefined,
-                                  calibrationApplied: !!q.calibrationApplied,
-                              }))
+                            ? (s.questionScores as Array<any>).map((q: any, idx: number) => {
+                                  const qNum = Number(q?.questionId);
+                                  const questionNumber = Number.isFinite(qNum) && qNum > 0 ? qNum : idx + 1;
+                                  return {
+                                      questionNumber,
+                                      question: `질문 ${questionNumber}`,
+                                      normalized_score: typeof q.score === 'number' ? q.score : undefined,
+                                      calibrationApplied: !!q.calibrationApplied,
+                                  };
+                              })
                             : [];
                         setSelectedAudioData({ overall: audioOverall, perQuestion: perQ });
                     }

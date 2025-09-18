@@ -1,4 +1,7 @@
+'use client';
+
 import Link from 'next/link';
+import { useEffect, useState, useRef } from 'react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import {
@@ -20,6 +23,11 @@ import {
     InfoCircledIcon,
     PersonIcon,
 } from '@radix-ui/react-icons';
+import { useAuth } from '@/hooks/use-auth';
+import {
+    createMentoringApplication,
+    CreateApplicationDto,
+} from '../../../_apis/mentoring-applications.api';
 
 type Props = {
     params: { 'product-idx': string };
@@ -28,15 +36,109 @@ type Props = {
 
 export default function ReservationSuccessPage({ params, searchParams }: Props) {
     const productId = params['product-idx'];
+    const { user } = useAuth();
 
     const paymentId = searchParams.paymentId as string;
     const productTitle = searchParams.productTitle as string;
     const mentorName = searchParams.mentorName as string;
     const selectedDateString = searchParams.selectedDate as string;
     const selectedSlot = searchParams.selectedSlot as string;
+    const selectedRegularSlotsIdx = searchParams.selectedRegularSlotsIdx
+        ? parseInt(searchParams.selectedRegularSlotsIdx as string)
+        : undefined;
     const price = searchParams.price ? parseInt(searchParams.price as string) : undefined;
 
     const selectedDate = selectedDateString ? new Date(selectedDateString) : null;
+
+    // API 호출 상태 관리
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submitError, setSubmitError] = useState<string | null>(null);
+    const [applicationId, setApplicationId] = useState<number | null>(null);
+    const [isApplicationSubmitted, setIsApplicationSubmitted] = useState(false);
+
+    // 중복 호출 방지를 위한 ref
+    const hasSubmitted = useRef(false);
+
+    // 멘토링 예약 신청 API 호출 (한 번만 실행)
+    useEffect(() => {
+        const submitApplication = async () => {
+            // 이미 신청이 완료되었거나 필요한 데이터가 없으면 리턴
+            if (
+                hasSubmitted.current ||
+                isApplicationSubmitted ||
+                isSubmitting ||
+                !user?.idx ||
+                !selectedDate ||
+                !selectedSlot ||
+                !selectedRegularSlotsIdx ||
+                !price ||
+                !paymentId
+            ) {
+                console.log('API 호출 스킵 - 조건 불만족:', {
+                    hasSubmitted: hasSubmitted.current,
+                    isApplicationSubmitted,
+                    isSubmitting,
+                    userIdx: user?.idx,
+                    selectedDate,
+                    selectedSlot,
+                    selectedRegularSlotsIdx,
+                    price,
+                    paymentId,
+                });
+                return;
+            }
+
+            console.log('멘토링 신청 시작 - 중복 방지 체크');
+            hasSubmitted.current = true;
+
+            setIsSubmitting(true);
+            setSubmitError(null);
+
+            try {
+                console.log('selectedSlot 원본 값:', selectedSlot);
+                console.log('selectedRegularSlotsIdx 값:', selectedRegularSlotsIdx);
+
+                const applicationData: CreateApplicationDto = {
+                    mentee_idx: user.idx,
+                    regular_slots_idx: selectedRegularSlotsIdx,
+                    booked_date: format(selectedDate, 'yyyy-MM-dd'),
+                    message_to_mentor: '멘토링 신청합니다.',
+                    payment: {
+                        amount: price,
+                        transaction_id: paymentId,
+                        status: 'completed',
+                    },
+                };
+
+                console.log('멘토링 신청 데이터:', applicationData);
+                console.log('API 엔드포인트:', `/mentoring-products/${productId}/applications`);
+
+                const response = await createMentoringApplication(productId, applicationData);
+                console.log('멘토링 신청 성공:', response);
+
+                setApplicationId(response.application_id);
+                setIsApplicationSubmitted(true);
+            } catch (error: any) {
+                console.error('멘토링 신청 실패:', error);
+                console.error('에러 상세:', {
+                    message: error?.message,
+                    status: error?.response?.status,
+                    data: error?.response?.data,
+                    config: error?.config,
+                });
+
+                const errorMessage =
+                    error?.response?.data?.message ||
+                    error?.message ||
+                    '멘토링 신청 중 오류가 발생했습니다. 고객센터로 문의해 주세요.';
+                setSubmitError(errorMessage);
+            } finally {
+                setIsSubmitting(false);
+            }
+        };
+
+        submitApplication();
+    }, []); // 빈 의존성 배열로 한 번만 실행
 
     return (
         <main className='w-full px-4 py-12 bg-muted/30'>
@@ -51,14 +153,35 @@ export default function ReservationSuccessPage({ params, searchParams }: Props) 
                     </CardHeader>
 
                     <CardContent className='space-y-8'>
-                        <Alert>
-                            <InfoCircledIcon className='h-4 w-4' />
-                            <AlertTitle>멘토 승인 대기</AlertTitle>
-                            <AlertDescription>
-                                결제 완료 후 24시간 내에 멘토의 승인이 있을 예정이에요. 승인 시
-                                알림으로 안내드릴게요.
-                            </AlertDescription>
-                        </Alert>
+                        {/* API 호출 상태에 따른 알림 */}
+                        {isSubmitting && (
+                            <Alert>
+                                <InfoCircledIcon className='h-4 w-4' />
+                                <AlertTitle>멘토링 신청 처리 중</AlertTitle>
+                                <AlertDescription>
+                                    멘토링 예약을 신청하고 있습니다. 잠시만 기다려 주세요.
+                                </AlertDescription>
+                            </Alert>
+                        )}
+
+                        {submitError && (
+                            <Alert variant='destructive'>
+                                <InfoCircledIcon className='h-4 w-4' />
+                                <AlertTitle>신청 처리 오류</AlertTitle>
+                                <AlertDescription>{submitError}</AlertDescription>
+                            </Alert>
+                        )}
+
+                        {isApplicationSubmitted && !submitError && (
+                            <Alert>
+                                <InfoCircledIcon className='h-4 w-4' />
+                                <AlertTitle>멘토 승인 대기</AlertTitle>
+                                <AlertDescription>
+                                    결제 완료 후 24시간 내에 멘토의 승인이 있을 예정이에요. 승인 시
+                                    알림으로 안내드릴게요.
+                                </AlertDescription>
+                            </Alert>
+                        )}
 
                         <div className='grid grid-cols-1 gap-4 rounded-lg border bg-card p-4'>
                             <div className='flex items-center gap-3'>
@@ -85,7 +208,10 @@ export default function ReservationSuccessPage({ params, searchParams }: Props) 
                                     <div>
                                         <p className='text-sm text-muted-foreground'>예약 일정</p>
                                         <p className='font-medium'>
-                                            {format(selectedDate, 'yyyy년 M월 d일 (E)', { locale: ko })} {selectedSlot.split('-')[1]}:00
+                                            {format(selectedDate, 'yyyy년 M월 d일 (E)', {
+                                                locale: ko,
+                                            })}{' '}
+                                            {selectedSlot.split('-')[1]}:00
                                         </p>
                                     </div>
                                 </div>
@@ -114,16 +240,20 @@ export default function ReservationSuccessPage({ params, searchParams }: Props) 
                                 </div>
                                 <div>
                                     <p className='text-sm text-muted-foreground'>예약 번호</p>
-                                    <p className='font-mono text-sm'>#{paymentId || `${productId}-SUCCESS`}</p>
+                                    <p className='font-mono text-sm'>
+                                        {applicationId
+                                            ? `#${applicationId}`
+                                            : `#${paymentId || `${productId}-SUCCESS`}`}
+                                    </p>
                                 </div>
                                 <div>
                                     <p className='text-sm text-muted-foreground'>결제 금액</p>
                                     <p className='font-medium'>
                                         {typeof price === 'number'
                                             ? new Intl.NumberFormat('ko-KR', {
-                                                style: 'currency',
-                                                currency: 'KRW',
-                                            }).format(price)
+                                                  style: 'currency',
+                                                  currency: 'KRW',
+                                              }).format(price)
                                             : '확인 가능'}
                                     </p>
                                 </div>

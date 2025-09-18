@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import MentoringLandingContent from './_components/MentoringLandingContentt';
+import MentoringLandingContent from './_components/MentoringLandingContent';
 
 export const metadata: Metadata = {
     title: '멘토링 - GoodJob',

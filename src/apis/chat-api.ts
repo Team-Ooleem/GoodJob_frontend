@@ -49,24 +49,9 @@ export const sendMessage = async (
     receiverId: number,
     content: string,
 ): Promise<{ messageId: number; conversationId: number }> => {
-    console.log('🔥 [API] sendMessage API 호출:', {
-        senderId,
-        receiverId,
-        content,
-        timestamp: new Date().toISOString(),
-        url: `${CHAT_BASE_URL}/messages`,
-    });
-
     const response = await api.post<ChatApiResponse>(`${CHAT_BASE_URL}/messages`, {
         receiver_id: receiverId,
         content,
-    });
-
-    console.log('📥 [API] sendMessage API 응답:', {
-        success: response.data.success,
-        messageId: response.data.message_id,
-        conversationId: response.data.conversation_id,
-        message: response.data.message,
     });
 
     if (!response.data.success) {
@@ -78,7 +63,6 @@ export const sendMessage = async (
         conversationId: response.data.conversation_id || 0,
     };
 
-    console.log('✅ [API] sendMessage API 완료:', result);
     return result;
 };
 

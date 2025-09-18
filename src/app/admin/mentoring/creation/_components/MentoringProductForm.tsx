@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { MarkdownEditor } from '@/components/MarkdownEditor';
 import {
     Select,
     SelectContent,
@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { X, Plus } from 'lucide-react';
+import TimeTable from './TimeTable';
 import {
     CreateMentoringProductRequest,
     TimeSlot,
@@ -34,7 +34,7 @@ const mentoringProductSchema = z.object({
     description: z
         .string()
         .min(1, '상품 설명을 입력해주세요')
-        .max(1000, '설명은 1000자 이하로 입력해주세요'),
+        .max(2000, '설명은 2000자 이하로 입력해주세요'),
     price: z.number().min(0, '가격은 0원 이상이어야 합니다'),
     slots: z
         .array(
@@ -54,20 +54,7 @@ interface MentoringProductFormProps {
     isLoading?: boolean;
 }
 
-const DAYS_OF_WEEK = [
-    { value: 1, label: '월요일' },
-    { value: 2, label: '화요일' },
-    { value: 3, label: '수요일' },
-    { value: 4, label: '목요일' },
-    { value: 5, label: '금요일' },
-    { value: 6, label: '토요일' },
-    { value: 7, label: '일요일' },
-];
-
-const HOUR_SLOTS = Array.from({ length: 24 }, (_, i) => ({
-    value: i,
-    label: `${i.toString().padStart(2, '0')}:00`,
-}));
+// DAYS_OF_WEEK와 HOUR_SLOTS는 TimeTable 컴포넌트로 이동
 
 export default function MentoringProductForm({
     jobCategories,
@@ -93,28 +80,16 @@ export default function MentoringProductForm({
         },
     });
 
-    const addTimeSlot = () => {
-        setTimeSlots([...timeSlots, { day_of_week: 1, hour_slot: 9 }]);
-    };
-
-    const removeTimeSlot = (index: number) => {
-        const newSlots = timeSlots.filter((_, i) => i !== index);
-        setTimeSlots(newSlots);
-        setValue('slots', newSlots);
-    };
-
-    const updateTimeSlot = (index: number, field: keyof TimeSlot, value: number) => {
-        const newSlots = [...timeSlots];
-        newSlots[index] = { ...newSlots[index], [field]: value };
-        setTimeSlots(newSlots);
-        setValue('slots', newSlots);
+    const handleTimeSlotsChange = (newTimeSlots: TimeSlot[]) => {
+        setTimeSlots(newTimeSlots);
+        setValue('slots', newTimeSlots);
     };
 
     const onFormSubmit = (data: MentoringProductFormData) => {
-        // mentor_idx를 기본값으로 설정 (예: 1 또는 관리자 ID)
+        // mentor_idx는 상위 컴포넌트에서 설정됨
         const submitData: CreateMentoringProductRequest = {
             ...data,
-            mentor_idx: 1, // 기본 멘토 ID 또는 관리자 ID
+            mentor_idx: 0, // 상위 컴포넌트에서 실제 값으로 덮어씌워짐
         };
         onSubmit(submitData);
     };
@@ -141,15 +116,22 @@ export default function MentoringProductForm({
 
                     <div className='space-y-2'>
                         <Label htmlFor='description'>상품 설명</Label>
-                        <Textarea
-                            id='description'
-                            {...register('description')}
-                            placeholder='멘토링의 내용과 특징을 자세히 설명해주세요'
-                            rows={4}
+                        <MarkdownEditor
+                            value={watch('description')}
+                            onChange={(value) => setValue('description', value || '')}
+                            placeholder='멘토링의 내용과 특징을 마크다운으로 자세히 설명해주세요'
+                            height={300}
+                            dataColorMode='auto'
+                            preview='live'
+                            visibleDragbar={false}
                         />
                         {errors.description && (
                             <p className='text-sm text-red-500'>{errors.description.message}</p>
                         )}
+                        <p className='text-xs text-muted-foreground'>
+                            마크다운 문법을 사용하여 작성해주세요. (예: **굵은글씨**, *기울임*,
+                            `코드` 등)
+                        </p>
                     </div>
 
                     <div className='space-y-2'>
@@ -189,101 +171,9 @@ export default function MentoringProductForm({
             </Card>
 
             {/* 시간대 설정 */}
-            <Card className='shadow-sm'>
-                <CardHeader className='pb-4'>
-                    <CardTitle className='text-xl'>가능한 시간대 설정</CardTitle>
-                </CardHeader>
-                <CardContent className='space-y-4'>
-                    <div className='space-y-2'>
-                        <div className='flex items-center justify-between'>
-                            <Label>시간대 목록</Label>
-                            <Button
-                                type='button'
-                                variant='outline'
-                                size='sm'
-                                onClick={addTimeSlot}
-                                className='flex items-center gap-2'
-                            >
-                                <Plus className='h-4 w-4' />
-                                시간대 추가
-                            </Button>
-                        </div>
+            <TimeTable timeSlots={timeSlots} onTimeSlotsChange={handleTimeSlotsChange} />
 
-                        {timeSlots.length === 0 ? (
-                            <p className='text-sm text-gray-500'>시간대를 추가해주세요</p>
-                        ) : (
-                            <div className='space-y-2'>
-                                {timeSlots.map((slot, index) => (
-                                    <div
-                                        key={index}
-                                        className='flex items-center gap-2 p-3 border rounded-lg'
-                                    >
-                                        <Select
-                                            value={slot.day_of_week.toString()}
-                                            onValueChange={(value) =>
-                                                updateTimeSlot(
-                                                    index,
-                                                    'day_of_week',
-                                                    parseInt(value),
-                                                )
-                                            }
-                                        >
-                                            <SelectTrigger className='w-32'>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {DAYS_OF_WEEK.map((day) => (
-                                                    <SelectItem
-                                                        key={day.value}
-                                                        value={day.value.toString()}
-                                                    >
-                                                        {day.label}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-
-                                        <Select
-                                            value={slot.hour_slot.toString()}
-                                            onValueChange={(value) =>
-                                                updateTimeSlot(index, 'hour_slot', parseInt(value))
-                                            }
-                                        >
-                                            <SelectTrigger className='w-24'>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {HOUR_SLOTS.map((hour) => (
-                                                    <SelectItem
-                                                        key={hour.value}
-                                                        value={hour.value.toString()}
-                                                    >
-                                                        {hour.label}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-
-                                        <Button
-                                            type='button'
-                                            variant='ghost'
-                                            size='sm'
-                                            onClick={() => removeTimeSlot(index)}
-                                            className='text-red-500 hover:text-red-700'
-                                        >
-                                            <X className='h-4 w-4' />
-                                        </Button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
-                        {errors.slots && (
-                            <p className='text-sm text-red-500'>{errors.slots.message}</p>
-                        )}
-                    </div>
-                </CardContent>
-            </Card>
+            {errors.slots && <p className='text-sm text-red-500'>{errors.slots.message}</p>}
 
             {/* 제출 버튼 */}
             <div className='flex justify-end space-x-4 pt-6'>

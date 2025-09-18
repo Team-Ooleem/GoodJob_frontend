@@ -88,6 +88,36 @@ export interface CoachingResumeResultWithDetails extends CoachingResumeSession {
     evaluation_criteria?: CoachingResumeEvaluationCriteria[];
 }
 
+// 새로운 API 구조를 위한 인터페이스
+export interface MentoringApplication {
+    application_id: number;
+    product_idx: number;
+    product_title: string;
+    booked_date: string;
+    application_status: 'approved' | 'pending' | 'rejected';
+    mentee: {
+        user_idx: number;
+        name: string;
+        profile_img: string;
+    };
+    mentor: {
+        mentor_idx: number;
+        name: string;
+        business_name: string;
+        job_category: string;
+    };
+}
+
+export interface MentoringApplicationResponse {
+    applications: MentoringApplication[];
+    page_info: {
+        page: number;
+        limit: number;
+        total: number;
+        has_next: boolean;
+    };
+}
+
 export const mockAiInterviewResults: AiInterviewResult[] = [
     {
         id: '1',

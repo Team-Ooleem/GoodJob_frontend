@@ -12,14 +12,6 @@ export default function PlatformPage() {
     // 모든 페이지의 상품들을 하나의 배열로 합치기
     const allProducts = data?.pages?.flatMap((page) => page?.products || []) ?? [];
 
-    console.log('🏠 페이지 데이터:', {
-        allProducts: allProducts?.length,
-        hasNextPage,
-        isFetchingNextPage,
-        isLoading,
-        error,
-    });
-
     if (isLoading) {
         return (
             <div className='min-h-screen bg-gradient-to-br from-background dark:from-slate-900 dark:to-slate-800 flex items-center justify-center'>
@@ -96,12 +88,12 @@ export default function PlatformPage() {
                                                 멘토 지원하기
                                             </Button>
                                         </Link>
-                                        <Link href='/ai-interview' target='_blank'>
+                                        <Link href='/mentoring/landing'>
                                             <Button
                                                 variant='outline'
                                                 className='flex items-center gap-2 px-6 py-3 border-sky-300 dark:border-sky-600 text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/20 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300'
                                             >
-                                                AI 면접 체험
+                                                멘토링 신청하기
                                             </Button>
                                         </Link>
                                     </div>
