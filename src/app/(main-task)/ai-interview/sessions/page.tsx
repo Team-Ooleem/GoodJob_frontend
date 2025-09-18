@@ -27,6 +27,11 @@ export default function AiInterviewSessionsPage() {
     // 준비 상태 관리
     const [isReady, setIsReady] = useState(false);
     const [showReadyModal, setShowReadyModal] = useState(true);
+    // 인사 멘트 TTS 제어
+    const [introPlayed, setIntroPlayed] = useState(false);
+    const [introDone, setIntroDone] = useState(false);
+    const [firstQuestionSpoken, setFirstQuestionSpoken] = useState(false);
+    const [greetingText, setGreetingText] = useState<string | null>(null);
 
     // 커스텀 훅 사용
     const questionManager = useQuestionManager();
@@ -49,7 +54,7 @@ export default function AiInterviewSessionsPage() {
         webcamRef,
     });
 
-    // 질문 초기화 (개발모드 StrictMode 중복 실행 방지 가드)
+    // 질문 초기화 (개발모드 StrictMode 중복 실행 방지 가드) + 인사 멘트 준비
     const initAskedRef = useRef(false);
     useEffect(() => {
         const initializeFirstQuestion = async () => {
@@ -75,25 +80,78 @@ export default function AiInterviewSessionsPage() {
 
         if (!initAskedRef.current) {
             initAskedRef.current = true;
+            // 선택 페이지에서 저장된 채용공고 메타를 읽어 인사 멘트 구성
+            try {
+                const raw = sessionStorage.getItem('jobPostMeta');
+                if (raw) {
+                    const meta = JSON.parse(raw) as any;
+                    const company: string | undefined = meta?.summaryJson?.company || meta?.company;
+                    const jobTitle: string | undefined = meta?.summaryJson?.jobTitle;
+                    if (company && jobTitle) {
+                        setGreetingText(
+                            `안녕하십니까, 이번 ${company.toLowerCase()}의 ${jobTitle} 직무 채용에 지원해 주셔서 감사합니다. 긴장하지 마시고, 차분하게 면접에 임해 주시면 좋겠습니다. 그러면, 시작하겠습니다.`,
+                        );
+                    } else {
+                        setGreetingText(
+                            '안녕하십니까, 이번 채용에 지원해 주셔서 감사합니다. 긴장하지 마시고, 차분하게 면접에 임해 주시면 좋겠습니다. 그러면, 시작하겠습니다.',
+                        );
+                    }
+                } else {
+                    setGreetingText(
+                        '안녕하십니까, 이번 채용에 지원해 주셔서 감사합니다. 긴장하지 마시고, 차분하게 면접에 임해 주시면 좋겠습니다. 그러면, 시작하겠습니다.',
+                    );
+                }
+            } catch {
+                setGreetingText(
+                    '안녕하십니까, 이번 채용에 지원해 주셔서 감사합니다. 긴장하지 마시고, 차분하게 면접에 임해 주시면 좋겠습니다. 그러면, 시작하겠습니다.',
+                );
+            }
             initializeFirstQuestion();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // 준비 완료 시 TTS 시작
+    // 준비 완료 시: 인사 멘트 → 첫 질문 순서로 TTS 수행
     useEffect(() => {
-        if (isReady && questionManager.hasCurrentQuestion && questionManager.questionText) {
+        if (!isReady) return;
+
+        // 1) 인사 멘트 미재생이면 먼저 재생
+        if (!introPlayed) {
+            if (greetingText && greetingText.trim()) {
+                ttsManager.speakQuestion(greetingText, 'intro', () => {
+                    setIntroDone(true);
+                });
+            } else {
+                setIntroDone(true);
+            }
+            setIntroPlayed(true);
+            return;
+        }
+
+        // 2) 인사 멘트 완료 후 첫 질문 재생 (한 번만)
+        if (
+            introDone &&
+            !firstQuestionSpoken &&
+            questionManager.hasCurrentQuestion &&
+            questionManager.questionText
+        ) {
             ttsManager.speakQuestion(
                 questionManager.questionText,
                 questionManager.questionId,
                 () => {
-                    // TTS 완료 후 시작 버튼 표시
                     interviewSession.handleTTSComplete();
                 },
             );
+            setFirstQuestionSpoken(true);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isReady, questionManager.hasCurrentQuestion, questionManager.questionText]);
+    }, [
+        isReady,
+        introPlayed,
+        introDone,
+        questionManager.hasCurrentQuestion,
+        questionManager.questionText,
+    ]);
 
     const handleStartInterview = () => {
         setIsReady(true);

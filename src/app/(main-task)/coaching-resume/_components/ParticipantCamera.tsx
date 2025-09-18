@@ -11,6 +11,7 @@ type Props = {
 };
 
 export function ParticipantCamera({ mentorName, menteeName }: Props) {
+    const { sessionId } = useParams<{ sessionId: string }>();
     const {
         localStream,
         remoteStream,
@@ -21,7 +22,12 @@ export function ParticipantCamera({ mentorName, menteeName }: Props) {
         isRemoteMuted,
         isRemoteCameraOff,
         isConnected,
-    } = useWebRTC('resume-room');
+    } = useWebRTC(sessionId);
+
+    useEffect(() => {
+        if (!sessionId) return;
+        joinRoom(sessionId);
+    }, [joinRoom, sessionId]);
 
     return (
         <div className='absolute top-5 right-5 z-40'>

@@ -2,7 +2,14 @@
 'use client';
 
 import { Card, Alert, Tag, Divider } from 'antd';
-import { formatNumber } from '../_utils/data-processing';
+
+// 유틸리티 함수
+const formatNumber = (value: any, digits: number = 3) => {
+    if (value == null || Number.isNaN(Number(value))) return '-';
+    const num = Number(value);
+    if (!Number.isFinite(num)) return '-';
+    return Number(num.toFixed(digits));
+};
 
 interface CalibrationComparisonProps {
     calibration: any | null;

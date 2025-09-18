@@ -12,7 +12,7 @@ interface CoachingResumeResultCardProps {
 }
 
 export default function CoachingResumeResultCard({ application }: CoachingResumeResultCardProps) {
-    // 현재 시간과 세션 예정 시간 비교
+    console.log(application);
     const sessionDate = new Date(application.booked_date);
     const now = new Date();
     const isUpcoming = sessionDate > now;
@@ -33,7 +33,7 @@ export default function CoachingResumeResultCard({ application }: CoachingResume
     };
 
     return (
-        <Link href={`/coaching-resume/${application.application_id}`}>
+        <Link href={`/coaching-resume/${application.canvas_id}`}>
             <Card className='hover:shadow-md transition-shadow overflow-hidden'>
                 {/* Thumbnail */}
                 <div className='w-full h-32 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center relative'>
