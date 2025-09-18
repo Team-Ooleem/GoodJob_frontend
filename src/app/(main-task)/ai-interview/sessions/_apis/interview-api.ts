@@ -51,7 +51,11 @@ export class InterviewAPI {
         }
 
         const jobPostUrl = sessionStorage.getItem('jobPostUrl') || undefined;
-        const payload: any = {};
+        const sessionId =
+            typeof window !== 'undefined'
+                ? localStorage.getItem('aiInterviewSessionId') || undefined
+                : undefined;
+        const payload: any = sessionId ? { sessionId } : {};
         if (selectedResumeId) payload.resumeFileId = selectedResumeId;
         else payload.resumeSummary = resumeSummary;
         if (jobPostUrl) payload.jobPostUrl = jobPostUrl;
@@ -65,9 +69,13 @@ export class InterviewAPI {
      * 후속 질문을 생성합니다
      */
     static async fetchFollowup(original: QuestionDto, answer: string): Promise<QuestionDto> {
+        const sessionId =
+            typeof window !== 'undefined'
+                ? localStorage.getItem('aiInterviewSessionId') || undefined
+                : undefined;
         const res = await api.post(
             `ai/followups`,
-            { originalQuestion: original, answer },
+            { originalQuestion: original, answer, ...(sessionId ? { sessionId } : {}) },
             { timeout: 60000 },
         );
         const data = res.data as {
