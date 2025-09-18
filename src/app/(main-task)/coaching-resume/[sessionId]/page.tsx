@@ -33,7 +33,6 @@ export default function CoachingResumePage() {
     const [showAccessDeniedAlert, setShowAccessDeniedAlert] = useState(true);
 
     const { data: canvasData, isError, isLoading } = useCoachingResumeCanvas(sessionId);
-    console.log('@@@', canvasData);
 
     useEffect(() => {
         if (canvasData) {
