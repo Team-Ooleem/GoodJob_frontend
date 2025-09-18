@@ -89,7 +89,7 @@ export default function AiInterviewSessionsPage() {
                     const jobTitle: string | undefined = meta?.summaryJson?.jobTitle;
                     if (company && jobTitle) {
                         setGreetingText(
-                            `안녕하십니까, 이번 ${company}의 ${jobTitle} 직무 채용에 지원해 주셔서 감사합니다. 긴장하지 마시고, 차분하게 면접에 임해 주시면 좋겠습니다. 그러면, 시작하겠습니다.`,
+                            `안녕하십니까, 이번 ${company.toLowerCase()}의 ${jobTitle} 직무 채용에 지원해 주셔서 감사합니다. 긴장하지 마시고, 차분하게 면접에 임해 주시면 좋겠습니다. 그러면, 시작하겠습니다.`,
                         );
                     } else {
                         setGreetingText(
