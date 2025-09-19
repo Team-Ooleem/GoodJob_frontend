@@ -6,14 +6,12 @@ import { Card, Alert } from 'antd';
 import { Spin, Space, Button } from 'antd';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { Trophy } from 'lucide-react';
 import { api } from '@/apis/api';
+import { useAuth } from '@/hooks/use-auth';
 
 // 분리된 컴포넌트들 import
 import {
     OverallScoreCard,
-    DetailedScoresCard,
-    ExpressionIndicesCard,
     TextAnalysisCard,
     AudioVisualAnalysisCard,
     QuestionFeedbackCard,
@@ -29,6 +27,7 @@ const getOverallScore = async (sessionId: string) => {
 
 export default function InterviewReport() {
     const [sessionId, setSessionId] = useState<string | null>(null);
+    const { user } = useAuth();
 
     // 클라이언트 사이드에서만 실행
     useEffect(() => {
@@ -67,7 +66,7 @@ export default function InterviewReport() {
     // 로딩 상태
     if (isLoading) {
         return (
-            <div className='min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center'>
+            <div className='min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center'>
                 <div className='text-center'>
                     <Spin size='large' />
                     <div className='mt-4 text-lg text-gray-600'>면접 결과를 불러오는 중...</div>
@@ -77,9 +76,9 @@ export default function InterviewReport() {
     }
 
     // 에러 상태
-    if (error || !overallData) {
+    if (error) {
         return (
-            <div className='min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center'>
+            <div className='min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center'>
                 <Card className='max-w-md mx-auto'>
                     <Alert
                         message='결과 로드 실패'
@@ -105,31 +104,15 @@ export default function InterviewReport() {
 
     return (
         <div className='interview-report'>
-            {/* 헤더 */}
-            <div className='text-center mb-8'>
-                <h1 className='text-5xl font-bold text-gray-800 mb-4 flex items-center justify-center gap-3'>
-                    <Trophy className='text-yellow-500' />
-                    AI 모의면접 결과 리포트
-                </h1>
-                <div className='text-sm text-gray-500 mb-4'>
-                    <div>세션 ID: {sessionId || 'unknown'}</div>
-                    <div>면접 일시: {new Date().toLocaleString('ko-KR')}</div>
-                </div>
-            </div>
-
-            {/* 전체 점수 카드 */}
+            {/* 통합된 전체 점수 카드 (세부 점수 + 표현 지수 포함) */}
             <OverallScoreCard
                 analysisResult={{
-                    overall_score: overallData.overallScore,
+                    overall_score: overallData?.overallScore,
                     detailed_scores: { content30: 0, context30: 0, expression40: 0 },
                 }}
+                userName={user?.name || '응시자'}
+                sessionId={sessionId || 'unknown'}
             />
-
-            {/* 세부 점수 (내용/맥락/표현 = 30/30/40) */}
-            <DetailedScoresCard sessionId={sessionId || 'unknown'} />
-
-            {/* 표현 지수 */}
-            <ExpressionIndicesCard sessionId={sessionId || 'unknown'} />
 
             {/* 텍스트 분석 요약 */}
             <TextAnalysisCard sessionId={sessionId || 'unknown'} />

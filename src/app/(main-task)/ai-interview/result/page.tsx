@@ -8,8 +8,8 @@ import Link from 'next/link';
 
 export default function AiInterviewResultPage() {
     return (
-        <div className='min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8'>
-            <div className='container mx-auto px-4'>
+        <div className='min-h-screen  bg-gradient-to-br from-gray-50 to-gray-100 py-8'>
+            <div className='container w-7xl mx-auto px-4'>
                 {/* 리포트 - sessionId는 컴포넌트 내부에서 자동으로 결정됨 */}
                 <InterviewReport />
 

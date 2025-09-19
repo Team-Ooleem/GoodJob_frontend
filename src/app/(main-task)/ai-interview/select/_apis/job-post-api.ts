@@ -1,5 +1,15 @@
 import { api } from '@/apis/api';
 
+// 백엔드의 구조화 요약 타입과 일치시킴
+export type JobPostSummary = {
+    jobTitle?: string;
+    company?: string;
+    responsibilities?: string[];
+    mustRequirements?: string[];
+    preferred?: string[];
+    keywords?: string[];
+};
+
 export type JobExtractOk = {
     ok: true;
     url: string;
@@ -8,6 +18,7 @@ export type JobExtractOk = {
     company?: string;
     content: string;
     summary?: string;
+    summaryJson?: JobPostSummary;
     imagesTried?: string[];
     meta?: Record<string, string>;
 };
