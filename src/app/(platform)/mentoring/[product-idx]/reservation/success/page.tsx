@@ -47,6 +47,7 @@ export default function ReservationSuccessPage({ params, searchParams }: Props) 
         ? parseInt(searchParams.selectedRegularSlotsIdx as string)
         : undefined;
     const price = searchParams.price ? parseInt(searchParams.price as string) : undefined;
+    const messageToMentor = searchParams.messageToMentor as string;
 
     const selectedDate = selectedDateString ? new Date(selectedDateString) : null;
 
@@ -102,7 +103,7 @@ export default function ReservationSuccessPage({ params, searchParams }: Props) 
                     mentee_idx: user.idx,
                     regular_slots_idx: selectedRegularSlotsIdx,
                     booked_date: format(selectedDate, 'yyyy-MM-dd'),
-                    message_to_mentor: '멘토링 신청합니다.',
+                    message_to_mentor: messageToMentor || '멘토링 신청합니다.',
                     payment: {
                         amount: price,
                         transaction_id: paymentId,
