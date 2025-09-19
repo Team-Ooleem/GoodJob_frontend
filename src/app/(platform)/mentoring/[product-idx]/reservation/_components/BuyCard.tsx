@@ -17,6 +17,7 @@ type Props = {
     selectedSlot?: string | null;
     selectedRegularSlotsIdx?: number | null;
     mentorName?: string;
+    messageToMentor?: string;
 };
 
 export function BuyCard({
@@ -27,6 +28,7 @@ export function BuyCard({
     selectedSlot,
     selectedRegularSlotsIdx,
     mentorName,
+    messageToMentor,
 }: Props) {
     const router = useRouter();
     const [paymentError, setPaymentError] = useState<string | null>(null);
@@ -66,6 +68,7 @@ export function BuyCard({
                     selectedSlot,
                     selectedRegularSlotsIdx,
                     price,
+                    messageToMentor,
                 };
 
                 const searchParams = new URLSearchParams();
