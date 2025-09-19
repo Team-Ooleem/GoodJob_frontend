@@ -9,31 +9,32 @@ interface MentoringCardProps {
 
 export const MentoringCard = ({ mentoring }: MentoringCardProps) => {
     return (
-        <div className='w-full rounded-[7px] border bg-background hover:shadow-lg hover:-translate-y-1 transition-all duration-300'>
-            <div className='p-4'>
-                {/* 멘토 프로필 섹션 */}
-                <div className='flex justify-start items-center gap-4 mb-4'>
-                    <Avatar className='w-16 h-16'>
-                        <AvatarImage src={mentoring?.mentor?.profile_img} />
-                        <AvatarFallback>
-                            {mentoring?.mentor?.nickname?.slice(0, 2) || '??'}
-                        </AvatarFallback>
-                    </Avatar>
+        <div className='w-full flex flex-col justify-between aspect-[115/100] rounded-[7px] p-4 border bg-background shadow-lg hover:-translate-y-1 transition-all duration-300'>
+            {/* 멘토 프로필 섹션 */}
+            <div>
+                {/* 멘토링 제목 */}
+                <h3 className='font-semibold text-lg leading-relaxed text-foreground line-clamp-2'>
+                    {mentoring?.title || '제목이 없습니다.'}
+                </h3>
+                <div className='flex justify-start items-start gap-4'>
                     <div className='py-2 flex-1'>
-                        <p className='text-lg font-bold mb-1'>
+                        <p className='text-m font-bold mb-1'>
                             {mentoring?.mentor?.nickname || '알 수 없는 멘토'}
                         </p>
                         <p className='text-sm text-muted-foreground line-clamp-2 leading-relaxed'>
                             {mentoring?.mentor?.profile || '프로필 정보가 없습니다.'}
                         </p>
                     </div>
+                    <Avatar className='w-16 h-16'>
+                        <AvatarImage src={mentoring?.mentor?.profile_img} />
+                        <AvatarFallback>
+                            {mentoring?.mentor?.nickname?.slice(0, 2) || '??'}
+                        </AvatarFallback>
+                    </Avatar>
                 </div>
+            </div>
 
-                {/* 멘토링 제목 */}
-                <h3 className='font-semibold text-sm leading-relaxed text-foreground line-clamp-2 mb-4'>
-                    {mentoring?.title || '제목이 없습니다.'}
-                </h3>
-
+            <div>
                 {/* 통계 섹션 */}
                 <div className='flex justify-center items-center py-3 bg-muted rounded-[7px] mb-4'>
                     <div className='text-center flex-1'>
@@ -51,8 +52,7 @@ export const MentoringCard = ({ mentoring }: MentoringCardProps) => {
                 {/* 가격 및 신청 버튼 */}
                 <div className='flex items-center justify-between'>
                     <span className='text-l font-semibold text-foreground'>
-                        ₩{mentoring?.price ? Number(mentoring.price).toLocaleString() : '0'} &#40;
-                        1시간 &#41;
+                        ₩{mentoring?.price ? Number(mentoring.price).toLocaleString() : '0'}
                     </span>
                     <Link href={`/mentoring/${mentoring?.product_idx || ''}`}>
                         <Button className='px-6 font-semibold text-sm cursor-pointer'>
