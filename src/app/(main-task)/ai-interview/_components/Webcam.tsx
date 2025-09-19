@@ -29,7 +29,7 @@ export const Webcam = forwardRef<WebcamHandle, IWebcam>(function Webcam(
     const [isStreaming, setIsStreaming] = useState(false);
     const [detectionData, setDetectionData] = useState<any>(null);
     const [showBlurEffect, setShowBlurEffect] = useState(false);
-    const [blurColor, setBlurColor] = useState<'warning' | 'bad' | null>(null);
+    const [blurColor, setBlurColor] = useState<'warning' | 'critical' | null>(null);
     const mediaPipeAnalyzerRef = useRef<RealMediaPipeAnalyzer | null>(null);
     const isInitializedRef = useRef(false);
 
@@ -49,7 +49,7 @@ export const Webcam = forwardRef<WebcamHandle, IWebcam>(function Webcam(
         onDetectionRef.current?.(detection);
 
         // 설정 페이지가 아닐 때만 blur 효과 표시
-        if (!isSettingPage && (detection.level === 'warning' || detection.level === 'bad')) {
+        if (!isSettingPage && (detection.level === 'warning' || detection.level === 'critical')) {
             setBlurColor(detection.level);
             setShowBlurEffect(true);
 
@@ -178,15 +178,15 @@ export const Webcam = forwardRef<WebcamHandle, IWebcam>(function Webcam(
                 {detectionData && !overlayGuide && (
                     <div className='absolute bottom-2 left-2 right-2 z-10'>
                         <div
-                            className={`px-3 py-2 rounded-lg text-sm font-medium ${
-                                detectionData.level === 'excellent'
-                                    ? 'bg-blue-500 text-white'
-                                    : detectionData.level === 'good'
-                                      ? 'bg-green-500 text-white'
-                                      : detectionData.level === 'bad'
-                                        ? 'bg-red-500 text-white'
-                                        : 'bg-yellow-500 text-black'
-                            }`}
+                                className={`px-3 py-2 rounded-lg text-sm font-medium ${
+                                    detectionData.level === 'excellent'
+                                        ? 'bg-blue-500 text-white'
+                                        : detectionData.level === 'good'
+                                          ? 'bg-green-500 text-white'
+                                          : detectionData.level === 'critical'
+                                            ? 'bg-red-500 text-white'
+                                            : 'bg-yellow-500 text-black'
+                                }`}
                         >
                             <div className='flex items-center gap-2'>
                                 <span className='text-xs'>
