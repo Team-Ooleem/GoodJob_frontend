@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useCanvasStore } from '../_stores';
 import { useVoiceDetection } from './useVoiceDetection';
-import { setCanvasIdx, setWebRTCStreams, startRecording, stopRecording } from './useVoiceRecorder';
+import { setCanvasId, setWebRTCStreams, startRecording, stopRecording } from './useVoiceRecorder';
 
 export interface UseWebRTC {
     localStream: MediaStream | null;
@@ -100,9 +100,7 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
                     );
                 } else if (data.type === 'cameraStatus') {
                     setIsRemoteCameraOff(data.isCameraOff);
-                    console.log(
-                        `📹 상대방 카메라 상태: ${data.isCameraOff ? '꺼짐' : '켜짐'}`,
-                    );
+                    console.log(`📹 상대방 카메라 상태: ${data.isCameraOff ? '꺼짐' : '켜짐'}`);
                 }
             } catch (error) {
                 if (!logFlags.current.messageParseError) {
@@ -194,9 +192,7 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
                         );
                     } else if (data.type === 'cameraStatus') {
                         setIsRemoteCameraOff(data.isCameraOff);
-                        console.log(
-                            `📹 상대방 카메라 상태: ${data.isCameraOff ? '꺼짐' : '켜짐'}`,
-                        );
+                        console.log(`📹 상대방 카메라 상태: ${data.isCameraOff ? '꺼짐' : '켜짐'}`);
                     }
                 } catch (error) {
                     if (!logFlags.current.messageParseError) {
@@ -402,7 +398,7 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
             if (!socket) return;
 
             //세션 진입시 바로 녹음 시작
-            setCanvasIdx(roomId);
+            setCanvasId(roomId);
             const canvasStore = useCanvasStore.getState();
             if (!canvasStore.isRecording) {
                 canvasStore.toggleRecording(); // 자동 녹음 시작
@@ -499,9 +495,7 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
         setIsCameraOff(!next);
         sendCameraStatus(!next);
 
-        console.log(
-            `📹 카메라 ${next ? '켜짐' : '꺼짐'}, 상태 전송: isCameraOff=${!next}`,
-        );
+        console.log(`📹 카메라 ${next ? '켜짐' : '꺼짐'}, 상태 전송: isCameraOff=${!next}`);
     }, [localStream, sendCameraStatus]);
 
     // 🆕 WebRTC toggle 함수들을 캔버스 스토어에 등록

@@ -15,6 +15,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { X } from 'lucide-react';
+import { stopRecording } from '../_hooks/useVoiceRecorder';
 
 interface CanvasHeaderProps {
     title: string;
@@ -25,8 +26,9 @@ export function CanvasHeader({ title, onExit }: CanvasHeaderProps) {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const router = useRouter();
 
-    const handleExit = () => {
+    const handleExit = async () => {
         if (onExit) {
+            await stopRecording();
             onExit();
         } else {
             router.back();
