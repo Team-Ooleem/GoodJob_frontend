@@ -33,7 +33,7 @@ export default function CoachingResumeResultSection({
                         <Edit3 className='h-6 w-6 text-green-600' />
                     </div>
                     <div>
-                        <h3 className='text-xl font-semibold'>이력서 코칭 결과</h3>
+                        <h3 className='text-xl font-semibold'>이력서 코칭 내역</h3>
                         <p className='text-sm text-muted-foreground'>
                             전문가의 이력서 코칭 결과를 확인하세요
                         </p>
