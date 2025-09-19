@@ -17,3 +17,4 @@ export const canvasApi = {
         return res.data as CanvasImageUploadResponse;
     },
 };
+

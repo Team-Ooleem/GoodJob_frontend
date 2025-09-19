@@ -14,7 +14,6 @@ import {
 import { cn } from '@/lib/utils';
 import { Mic, MicOff, Video, VideoOff, User, ChevronLeft } from 'lucide-react';
 import { useSessionStore } from '../_stores';
-import { startRecording } from '../_hooks/useVoiceRecorder';
 
 type MediaDevice = {
     deviceId: string;
