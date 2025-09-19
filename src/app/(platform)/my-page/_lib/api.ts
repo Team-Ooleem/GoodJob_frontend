@@ -1,4 +1,5 @@
 import { MentoringApplicationResponse } from './mock-data';
+import { API_BASE_URL } from '@/constants/config';
 
 interface FetchMentoringApplicationsParams {
     user_idx: number;
@@ -17,7 +18,8 @@ export async function fetchMentoringApplications({
     });
 
     const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/mentoring-applications/my/${user_idx}?${params}`,
+        // `${process.env.NEXT_PUBLIC_API_BASE_URL}/mentoring-applications/my/${user_idx}?${params}`,
+        `${API_BASE_URL}/mentoring-applications/my/${user_idx}?${params}`,
         {
             method: 'GET',
             headers: {
