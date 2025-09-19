@@ -115,6 +115,8 @@ export default function AiInterviewSettingCalibrationCombined() {
     const webcamRef = useRef<WebcamHandle>(null);
     const recRef = useRef<WavRecorder | null>(null);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
+    // 실제 녹음 시작 시각 기록(정확한 duration 계산용)
+    const recStartedAtRef = useRef<number | null>(null);
 
     const [phase, setPhase] = useState<'idle' | 'running' | 'done'>('idle');
     const [timeLeft, setTimeLeft] = useState(15);
@@ -189,6 +191,7 @@ export default function AiInterviewSettingCalibrationCombined() {
             webcamRef.current?.startQuestion('calibration', { text: 'Calibration' });
             recRef.current = new WavRecorder();
             await recRef.current.start();
+            recStartedAtRef.current = Date.now();
         } catch (e: any) {
             setPhase('idle');
             setError(e?.message || '모의면접 준비 실패');
@@ -208,8 +211,6 @@ export default function AiInterviewSettingCalibrationCombined() {
 
     const finishCalibration: () => Promise<void> = async () => {
         try {
-            const startTime = Date.now();
-
             // 영상 집계 데이터 수집
             const vAgg = webcamRef.current?.endQuestion() ?? null;
             if (vAgg) setVisualAgg(vAgg);
@@ -219,9 +220,10 @@ export default function AiInterviewSettingCalibrationCombined() {
             if (recRef.current) {
                 audioBlob = await recRef.current.stop();
             }
-
-            const endTime = Date.now();
-            const durationMs = endTime - startTime;
+            // 실제 녹음 시작~종료까지의 길이를 전달
+            const now = Date.now();
+            const durationMs = Math.max(0, (recStartedAtRef.current ? now - recStartedAtRef.current : 0));
+            recStartedAtRef.current = null;
 
             // 백엔드로 캘리브레이션 데이터 전송
             if (audioBlob || vAgg) {
@@ -235,7 +237,7 @@ export default function AiInterviewSettingCalibrationCombined() {
                     formData.append('visualData', JSON.stringify(vAgg));
                 }
 
-                formData.append('durationMs', durationMs.toString());
+                formData.append('durationMs', Math.round(durationMs).toString());
 
                 if (!sessionId)
                     throw new Error(
