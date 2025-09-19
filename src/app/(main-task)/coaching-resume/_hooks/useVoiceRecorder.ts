@@ -8,7 +8,6 @@ import { WavRecorder } from '@/utils/audio/WavRecorder';
 import { useParams } from 'next/navigation';
 import { useEffect } from 'react';
 
-const CHUNK_DURATION = 300000; // 300초마다 청크 생성
 let chunkIndex = 0;
 let totalChunks = 0; // ✅ 이 줄 추가
 let cumulativeTime = 0;
@@ -18,7 +17,7 @@ const globalState: VoiceRecorderState = {
     mediaRecorder: null,
     audioChunks: [],
     stream: null,
-    canvasId: 'resume-room',
+    canvasId: '',
     wavRecorder: new WavRecorder(),
     webrtcStreams: {
         localStream: null,
@@ -162,6 +161,7 @@ const processSTTChunk = async (
     mimeType: string,
     currentChunkIndex: number,
     isFinal: boolean,
+    isNewSession: boolean = false,
 ) => {
     try {
         // Canvas 참여자 정보 가져오기
@@ -225,7 +225,7 @@ const processSTTChunk = async (
             chunkIndex: currentChunkIndex,
             totalChunks: isFinal ? totalChunks : -1,
             duration: duration,
-            isNewRecordingSession: false, // 🔧 항상 false로 설정 (같은 세션 연속)
+            isNewRecordingSession: isNewSession, // 🔧 동적으로 새 세션 여부 설정
             usePynoteDiarization: true,
             processInBackground: true,
             ensureTimeSync: true,
@@ -270,16 +270,19 @@ export const startRecording = async () => {
 
         // WavRecorder 콜백 설정
         globalState.wavRecorder.setChunkCallback(async (wavBlob: Blob) => {
-            console.log(`🎵 청크 ${chunkIndex} 생성됨 - 크기: ${wavBlob.size} bytes`);
-            await processSTTChunk(wavBlob, 'audio/wav', chunkIndex, false);
+            totalChunks++; // 총 청크 수 증가
+            console.log(`🎵 청크 ${chunkIndex} 생성됨 - 크기: ${wavBlob.size} bytes (총 ${totalChunks}개)`);
+            const isFirstChunk = chunkIndex === 0;
+            await processSTTChunk(wavBlob, 'audio/wav', chunkIndex, false, isFirstChunk);
             chunkIndex++;
         });
 
         await globalState.wavRecorder.webRTCStart();
         console.log('️ WebRTC 스트림으로 녹화 시작');
 
-        // 🔧 한 번만 초기화 (재녹음 시에만)
-        if (chunkIndex === 0) {
+        // 🔧 새 녹음 세션 여부 결정
+        const isNewSession = chunkIndex === 0;
+        if (isNewSession) {
             totalChunks = 0;
             cumulativeTime = 0;
             console.log(`🆕 새 세션으로 초기화 - canvasId: ${globalState.canvasId}`);
@@ -309,19 +312,20 @@ export const stopRecording = async () => {
     try {
         console.log('🎙️ 녹화 종료 시도');
 
-        // WavRecorder로 녹음 중지
+        // WavRecorder로 녹음 중지 (최종 청크는 WavRecorder에서 자동 전송됨)
         await globalState.wavRecorder.webRTCStop();
-        console.log('✅ WebRTC 스트림 녹화 종료');
+        console.log('✅ WebRTC 스트림 녹화 종료 (최종 청크 포함)');
 
-        // 🔧 최종 청크 신호 전송 (중요!)
-        console.log('📤 최종 청크 신호 전송 중...');
+        // 🔧 최종 처리 신호만 전송 (빈 신호로 병합 트리거)
+        console.log('📤 최종 처리 신호 전송 중...');
         await processSTTChunk(
             new Blob([], { type: 'audio/wav' }),
             'audio/wav',
-            chunkIndex,
-            true, // �� isFinal = true
+            totalChunks, // 실제 총 청크 수 사용
+            true, // 🔧 isFinal = true
+            false, // 최종 신호는 새 세션이 아님
         );
-        console.log('✅ 최종 청크 신호 전송 완료');
+        console.log('✅ 최종 처리 신호 전송 완료');
 
         // Canvas Store 상태 업데이트
         canvasStore.setRecording(false);
