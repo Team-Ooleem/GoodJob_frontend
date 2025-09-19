@@ -33,7 +33,6 @@ export default function TextAnalysisCard({
         queryKey: ['text-analysis', sessionId],
         queryFn: async () => {
             const response = await getTextAnalysis(sessionId);
-            console.log(response);
 
             if (response?.success && response?.data) {
                 return response.data;
