@@ -71,19 +71,6 @@ export default function CoachingResumePage() {
         );
     }
 
-    // URL에서 가져온 sessionId를 canvasIdx로 설정
-    useEffect(() => {
-        if (canvasUuid) {
-            setCanvasIdx(canvasUuid);
-        }
-    }, [canvasUuid]);
-
-    useEffect(() => {
-        if (sessionStarted) {
-            console.log('🎙️ 세션 시작됨 - 녹화 시작');
-            startRecording();
-        }
-    }, [sessionStarted]);
     if (!sessionStarted) {
         return (
             <>
@@ -104,7 +91,6 @@ export default function CoachingResumePage() {
                 }}
             />
             <FabricToolbar />
-
             <FabricCanvas
                 mentorName={canvasData?.mentor?.name}
                 menteeName={canvasData?.mentee?.name}

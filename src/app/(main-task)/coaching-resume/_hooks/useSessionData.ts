@@ -52,13 +52,13 @@ export const useSessionData = (canvasIdx: string) => {
                     // messages가 undefined이거나 배열이 아닌 경우를 대비한 안전한 처리
                     const messagesArray = Array.isArray(data.messages) ? data.messages : [];
                     const transformedSessions: ChatSession[] = messagesArray.map(
-                        (session: BackendSessionMessage) =>
+                        (
+                            session: BackendSessionMessage, // 🆕 any → BackendSessionMessage
+                        ) =>
                             transformBackendToFrontend(
                                 session,
                                 userData.mentor.idx,
-                                userData.mentor.name,
                                 userData.mentee.idx,
-                                userData.mentee.name,
                             ),
                     );
 
