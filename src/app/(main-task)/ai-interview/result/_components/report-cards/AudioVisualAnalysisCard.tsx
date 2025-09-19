@@ -4,7 +4,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { api } from '@/apis/api';
 import Image from 'next/image';
 
@@ -17,13 +16,11 @@ interface AudioVisualAnalysisCardProps {
 // API 호출 함수들
 const getAudioMetrics = async (sessionId: string) => {
     const response = await api.get(`/audio-metrics/${sessionId}`);
-    console.log('📊 AudioVisualAnalysisCard - 오디오 메트릭스 API 응답:', response);
     return response.data;
 };
 
 const getVisualMetrics = async (sessionId: string) => {
     const response = await api.post(`/metrics/${sessionId}/finalize`, {});
-    console.log('📊 AudioVisualAnalysisCard - 비주얼 메트릭스 API 응답:', response);
     return response.data;
 };
 
