@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useAuth } from '@/hooks/use-auth';
 import { AiInterviewResultSection, CoachingResumeResultSection } from './_components';
 import { mockAiInterviewResults } from './_lib/mock-data';
 import { useMentoringApplications } from './_hooks/useMentoringApplications';
@@ -9,8 +10,9 @@ export default function MyPage() {
     const [showAllAiInterview, setShowAllAiInterview] = useState(false);
     const [showAllCoachingResume, setShowAllCoachingResume] = useState(false);
 
-    // TODO: 실제 사용자 ID를 가져와야 함 (예: 인증 컨텍스트에서)
-    const user_idx = 1; // 임시 하드코딩
+    // 인증 훅에서 실제 사용자 ID 사용
+    const { user } = useAuth();
+    const user_idx = user?.idx ?? 0;
 
     const { data: mentoringData, isLoading, error } = useMentoringApplications({ user_idx });
     const mentoringApplications = mentoringData?.applications || [];

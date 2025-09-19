@@ -157,7 +157,7 @@ export default function AiInterviewSettingCalibrationCombined() {
         };
     }, [phase]);
 
-    // 초기 세션 생성(항상 신규) + 장치 존재 체크
+    // 장치 존재 체크 + 기존 세션 ID 로드
     useEffect(() => {
         (async () => {
             try {
@@ -168,37 +168,13 @@ export default function AiInterviewSettingCalibrationCombined() {
                 setWebcamOk(false);
                 setMicOk(false);
             }
-            // 세션 ID: 설정 페이지 진입 시마다 항상 신규 발급
+            // Select 페이지에서 생성된 세션 ID를 로드
             try {
-                const prevSid = localStorage.getItem('aiInterviewSessionId');
-                // 이전 세션 산출물(지표/리포트 캐시)은 혼선 방지를 위해 정리
-                try {
-                    const keysToClear = [
-                        'interviewAudioOverallServer',
-                        'interviewAudioPerQuestionServer',
-                        'interviewAudioOverall',
-                        'interviewAudioPerQuestion',
-                        'interviewVisualOverall',
-                        'interviewVisualPerQuestion',
-                        'interviewAnalysis',
-                        'interviewQA',
-                    ];
-                    keysToClear.forEach((k) => localStorage.removeItem(k));
-                } catch {}
-
-                const sid = `sess_${Math.random().toString(36).slice(2, 10)}_${Date.now()}`;
-                localStorage.setItem('aiInterviewSessionId', sid);
-                setSessionId(sid);
-
-                // 인터뷰 세션 보장: finalize를 호출하면 interview_sessions에 INSERT IGNORE 됨
-                try {
-                    await api.post(`/metrics/${sid}/finalize`, {}, { timeout: 10000 });
-                } catch (e) {
-                    // 비어있는 세션 finalize는 실패해도 무방하므로 로그만
-                    console.warn('세션 보장(finalize) 실패 또는 무시 가능:', e);
-                }
+                const sid = localStorage.getItem('aiInterviewSessionId');
+                if (sid) setSessionId(sid);
+                else console.warn('세션 ID가 없습니다. 선택 페이지에서 세션을 생성하세요.');
             } catch (e) {
-                console.warn('세션 ID 초기화 실패:', e);
+                console.warn('세션 ID 로드 실패:', e);
             }
         })();
     }, []);
@@ -283,8 +259,7 @@ export default function AiInterviewSettingCalibrationCombined() {
                         }),
                     );
 
-                    // 세션 ID 저장 (면접에서 사용)
-                    localStorage.setItem('calibrationSessionId', sessionId);
+                    // 별도 calibrationSessionId 저장 불필요: aiInterviewSessionId를 그대로 사용
                 }
             }
 

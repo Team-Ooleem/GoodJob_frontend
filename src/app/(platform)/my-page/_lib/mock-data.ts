@@ -91,6 +91,7 @@ export interface CoachingResumeResultWithDetails extends CoachingResumeSession {
 // 새로운 API 구조를 위한 인터페이스
 export interface MentoringApplication {
     application_id: number;
+    canvas_id: string;
     product_idx: number;
     product_title: string;
     booked_date: string;
