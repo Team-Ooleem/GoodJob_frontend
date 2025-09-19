@@ -15,7 +15,6 @@ import {
     TextAnalysisCard,
     AudioVisualAnalysisCard,
     QuestionFeedbackCard,
-    OverallEvaluationCard,
     SelfIntroScriptCard,
 } from './report-cards';
 
@@ -125,9 +124,6 @@ export default function InterviewReport() {
                 sessionId={sessionId || 'unknown'}
                 qaList={[]} // 서버에서 받아오므로 빈 배열로 설정
             />
-
-            {/* 종합 평가 및 강점/개선사항 */}
-            <OverallEvaluationCard sessionId={sessionId || 'unknown'} />
 
             {/* 1분 자기소개 대본 */}
             <SelfIntroScriptCard sessionId={sessionId || 'unknown'} />
