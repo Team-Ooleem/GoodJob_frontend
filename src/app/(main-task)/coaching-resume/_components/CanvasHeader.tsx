@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -19,11 +19,42 @@ import { X } from 'lucide-react';
 interface CanvasHeaderProps {
     title: string;
     onExit?: () => void;
+    scheduledAt?: string; // ISO string for the scheduled start time
 }
 
-export function CanvasHeader({ title, onExit }: CanvasHeaderProps) {
+export function CanvasHeader({ title, onExit, scheduledAt }: CanvasHeaderProps) {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const router = useRouter();
+    const [remaining, setRemaining] = useState<string>('');
+
+    // Countdown: from scheduledAt time, 60:00 down to 00:00
+    // If before start, show 60:00. If after +60m, show 00:00.
+    useEffect(() => {
+        if (!scheduledAt) {
+            setRemaining('');
+            return;
+        }
+
+        // DB 값(UTC) + 15시간 보정
+        const start = new Date(scheduledAt).getTime() + 15 * 60 * 60 * 1000;
+
+        const total = 60 * 60; // seconds
+
+        const calc = () => {
+            const now = Date.now();
+            const diffSec = Math.floor((now - start) / 1000);
+            let remain = total - diffSec;
+            if (diffSec < 0) remain = total; // before start
+            if (remain < 0) remain = 0; // after end
+            const mm = String(Math.floor(remain / 60)).padStart(2, '0');
+            const ss = String(remain % 60).padStart(2, '0');
+            setRemaining(`${mm}:${ss}`);
+        };
+
+        calc();
+        const id = setInterval(calc, 1000);
+        return () => clearInterval(id);
+    }, [scheduledAt]);
 
     const handleExit = () => {
         if (onExit) {
@@ -39,6 +70,9 @@ export function CanvasHeader({ title, onExit }: CanvasHeaderProps) {
             <div className='w-full h-auto'>
                 <div className='mx-auto max-w-full w-full px-4 md:px-6 h-[60px] flex justify-between items-center'>
                     <h1 className='text-lg font-semibold'>{title}</h1>
+                    <div className='text-base font-mono tabular-nums text-foreground/80'>
+                        {remaining}
+                    </div>
                     <Button
                         variant='ghost'
                         size='icon'
