@@ -8,6 +8,9 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { api } from '@/apis/api';
 import { useAuth } from '@/hooks/use-auth';
+import { useRouter } from 'next/navigation';
+import { InterviewAPI } from '../../sessions/_apis/interview-api';
+import { useRef } from 'react';
 
 // 분리된 컴포넌트들 import
 import {
@@ -27,6 +30,8 @@ const getOverallScore = async (sessionId: string) => {
 export default function InterviewReport() {
     const [sessionId, setSessionId] = useState<string | null>(null);
     const { user } = useAuth();
+    const router = useRouter();
+    const redirectRef = useRef(false);
 
     // 클라이언트 사이드에서만 실행
     useEffect(() => {
@@ -62,6 +67,38 @@ export default function InterviewReport() {
     const isLoading = isReportLoading;
     const error = reportError?.message || null;
 
+    // 기본 접근 가드: 세션이 없거나 서버 상태상 리포트가 없으면 리다이렉트
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        // 세션 자체가 없으면 바로 가드
+        if (!sessionId) {
+            if (!redirectRef.current) {
+                redirectRef.current = true;
+                alert('세션 정보가 없습니다. 이력서 선택 화면으로 이동합니다.');
+                router.replace('/ai-interview/select');
+            }
+            return;
+        }
+        (async () => {
+            try {
+                const st = await InterviewAPI.getSessionStatus(sessionId);
+                if (!st?.ok || !st.exists || !st.hasReport) {
+                    if (!redirectRef.current) {
+                        redirectRef.current = true;
+                        alert('세션이 유효하지 않습니다. 이력서 선택 화면으로 이동합니다.');
+                        router.replace('/ai-interview/select');
+                    }
+                }
+            } catch {
+                if (!redirectRef.current) {
+                    redirectRef.current = true;
+                    alert('세션이 유효하지 않습니다. 이력서 선택 화면으로 이동합니다.');
+                    router.replace('/ai-interview/select');
+                }
+            }
+        })();
+    }, [sessionId, router]);
+
     // 로딩 상태
     if (isLoading) {
         return (
@@ -76,29 +113,8 @@ export default function InterviewReport() {
 
     // 에러 상태
     if (error) {
-        return (
-            <div className='min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center'>
-                <Card className='max-w-md mx-auto'>
-                    <Alert
-                        message='결과 로드 실패'
-                        description={error || '면접 결과를 찾을 수 없습니다.'}
-                        type='error'
-                        showIcon
-                        className='mb-4'
-                    />
-                    <div className='text-center'>
-                        <Space>
-                            <Link href='/ai-interview'>
-                                <Button type='primary'>메인으로 돌아가기</Button>
-                            </Link>
-                            <Link href='/ai-interview/select'>
-                                <Button>다시 면접하기</Button>
-                            </Link>
-                        </Space>
-                    </div>
-                </Card>
-            </div>
-        );
+        // 화면 깜빡임 방지를 위해 빈 상태 반환 (리다이렉트 진행)
+        return null;
     }
 
     return (
