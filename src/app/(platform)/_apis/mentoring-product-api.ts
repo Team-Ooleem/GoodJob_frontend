@@ -5,7 +5,6 @@ export interface Mentor {
     nickname: string;
     profile: string;
     profile_img: string;
-    info: string[];
 }
 
 export interface MentoringProduct {
