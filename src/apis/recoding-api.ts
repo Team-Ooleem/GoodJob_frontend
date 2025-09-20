@@ -11,7 +11,9 @@ export interface ChatSession {
     segments: SpeakerSegment[];
     timestamp: string;
     mentor_idx: number;
+    mentor_name?: string;
     mentee_idx: number;
+    mentee_name?: string;
     segmentIndex: number;
     audioDuration: number;
     audioUrl: string;
@@ -41,7 +43,9 @@ export interface STTWithContextResponse {
 export const transformBackendToFrontend = (
     session: BackendSessionMessage, // 🆕 any → BackendSessionMessage
     mentorIdx: number,
+    mentorName: string,
     menteeIdx: number,
+    menteeName: string,
 ): ChatSession => {
     return {
         sessionIdx: session.messageId,
@@ -56,7 +60,9 @@ export const transformBackendToFrontend = (
             .filter((seg) => seg.startTime >= 0 && seg.endTime > seg.startTime),
         timestamp: session.timestamp,
         mentor_idx: mentorIdx,
+        mentor_name: mentorName,
         mentee_idx: menteeIdx,
+        mentee_name: menteeName,
         segmentIndex: 0, // 기본값
         audioDuration: session.audioDuration || 0,
         audioUrl: session.audioUrl,
@@ -84,7 +90,9 @@ export interface BackendSessionMessage {
     audioUrl: string;
     timestamp: string;
     mentor_idx: number;
+    mentor_name?: string;
     mentee_idx: number;
+    mentee_name?: string;
     segments: Array<{
         speakerTag: number;
         textContent: string;
@@ -98,9 +106,9 @@ export interface BackendSessionMessage {
 export interface VoiceRecorderState {
     mediaRecorder: MediaRecorder | null;
     audioChunks: Blob[];
-    wavRecorder: WavRecorder;
     stream: MediaStream | null;
     canvasId: string;
+    wavRecorder?: any; // 🆕 추가
     webrtcStreams: {
         localStream: MediaStream | null;
         remoteStream: MediaStream | null;
