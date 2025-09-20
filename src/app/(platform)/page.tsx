@@ -88,12 +88,12 @@ export default function PlatformPage() {
                                                 멘토 지원하기
                                             </Button>
                                         </Link>
-                                        <Link href='/mentoring/landing'>
+                                        <Link href='/ai-interview'>
                                             <Button
                                                 variant='outline'
                                                 className='flex items-center gap-2 px-6 py-3 border-sky-300 dark:border-sky-600 text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/20 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300'
                                             >
-                                                멘토링 신청하기
+                                                AI와 면접보기
                                             </Button>
                                         </Link>
                                     </div>
@@ -103,7 +103,7 @@ export default function PlatformPage() {
 
                         {/* 멘토링 카드 섹션 */}
                         <section className='py-16'>
-                            <div className='container'>
+                            <div className='container mx-auto px-4'>
                                 <MentoringProductList
                                     products={allProducts}
                                     hasNextPage={hasNextPage}

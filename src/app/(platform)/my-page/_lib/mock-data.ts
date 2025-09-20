@@ -1,19 +1,3 @@
-export interface AiInterviewResult {
-    id: string;
-    title: string;
-    company: string;
-    position: string;
-    date: string;
-    score: number;
-    duration: number; // minutes
-    status: 'completed' | 'in-progress';
-    feedback: {
-        overall: string;
-        strengths: string[];
-        improvements: string[];
-    };
-}
-
 export interface CoachingResumeResult {
     id: string;
     title: string;
@@ -118,89 +102,6 @@ export interface MentoringApplicationResponse {
         has_next: boolean;
     };
 }
-
-export const mockAiInterviewResults: AiInterviewResult[] = [
-    {
-        id: '1',
-        title: '프론트엔드 개발자 면접',
-        company: '카카오',
-        position: '시니어 프론트엔드 개발자',
-        date: '2024-01-15',
-        score: 85,
-        duration: 30,
-        status: 'completed',
-        feedback: {
-            overall:
-                '전반적으로 좋은 답변을 하셨습니다. 기술적 지식이 탄탄하고 문제 해결 능력이 뛰어납니다.',
-            strengths: ['React/Next.js 숙련도', '문제 해결 능력', '코드 최적화 경험'],
-            improvements: ['시스템 설계 경험', '팀 협업 경험', '성능 최적화'],
-        },
-    },
-    {
-        id: '2',
-        title: '풀스택 개발자 면접',
-        company: '네이버',
-        position: '풀스택 개발자',
-        date: '2024-01-10',
-        score: 78,
-        duration: 45,
-        status: 'completed',
-        feedback: {
-            overall:
-                '백엔드와 프론트엔드 모두에 대한 이해도가 높습니다. 다만 아키텍처 설계 부분에서 보완이 필요합니다.',
-            strengths: ['풀스택 경험', '데이터베이스 설계', 'API 개발'],
-            improvements: ['마이크로서비스 아키텍처', '클라우드 인프라', '보안'],
-        },
-    },
-    {
-        id: '3',
-        title: 'React 개발자 면접',
-        company: '당근마켓',
-        position: 'React 개발자',
-        date: '2024-01-08',
-        score: 92,
-        duration: 35,
-        status: 'completed',
-        feedback: {
-            overall:
-                'React에 대한 깊은 이해와 실무 경험이 뛰어납니다. 성능 최적화에 대한 지식도 탁월합니다.',
-            strengths: ['React 고급 패턴', '성능 최적화', '상태 관리'],
-            improvements: ['테스팅', '접근성', '국제화'],
-        },
-    },
-    {
-        id: '4',
-        title: 'Vue.js 개발자 면접',
-        company: '토스',
-        position: 'Vue.js 개발자',
-        date: '2024-01-05',
-        score: 73,
-        duration: 25,
-        status: 'completed',
-        feedback: {
-            overall:
-                'Vue.js 기본기는 있지만 고급 기능에 대한 이해가 부족합니다. 프로젝트 경험을 더 쌓아보세요.',
-            strengths: ['Vue.js 기본 문법', '컴포넌트 설계', 'Vuex 사용'],
-            improvements: ['Vue 3 Composition API', 'TypeScript', '테스팅'],
-        },
-    },
-    {
-        id: '5',
-        title: 'Node.js 백엔드 면접',
-        company: '라인',
-        position: 'Node.js 백엔드 개발자',
-        date: '2024-01-03',
-        score: 88,
-        duration: 40,
-        status: 'completed',
-        feedback: {
-            overall:
-                'Node.js와 Express에 대한 이해도가 높고, 비동기 처리에 대한 지식이 탁월합니다.',
-            strengths: ['Node.js 성능 최적화', '비동기 처리', 'RESTful API 설계'],
-            improvements: ['마이크로서비스', '데이터베이스 최적화', '보안'],
-        },
-    },
-];
 
 export const mockCoachingResumeResults: CoachingResumeResult[] = [
     {

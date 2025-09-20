@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Video, CheckCircle, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Video, Loader2, FileText } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useResumeUpload } from './_hooks/useResumeUpload';
 import { api } from '@/apis/api';
@@ -396,21 +396,7 @@ export default function AiInterviewSelectPage() {
                                                 className='flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors duration-200'
                                             >
                                                 <div className='flex flex-col items-center justify-center pt-5 pb-6'>
-                                                    <svg
-                                                        className='w-8 h-8 mb-4 text-gray-500'
-                                                        aria-hidden='true'
-                                                        xmlns='http://www.w3.org/2000/svg'
-                                                        fill='none'
-                                                        viewBox='0 0 20 16'
-                                                    >
-                                                        <path
-                                                            stroke='currentColor'
-                                                            strokeLinecap='round'
-                                                            strokeLinejoin='round'
-                                                            strokeWidth='2'
-                                                            d='M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.5c-.376 0-.75.072-1.09.213a5.5 5.5 0 0 0-1.44 10.5A5.5 5.5 0 0 0 7.5 16h6a5.5 5.5 0 0 0 5.5-5.5 5.5 5.5 0 0 0-5.5-5.5H13v3Z'
-                                                        />
-                                                    </svg>
+                                                    <FileText className='w-9 h-9 mb-4 text-gray-500' />
                                                     <p className='mb-2 text-sm text-gray-500'>
                                                         <span className='font-semibold'>
                                                             클릭하여 PDF 파일 선택
