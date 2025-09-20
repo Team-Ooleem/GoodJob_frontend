@@ -47,14 +47,15 @@ export interface FormattedSegment {
     duration: number; // 지속 시간 (초)
     durationText: string; // "7초" 형식
 }
-
 export const formatSTTSegment = (
     segment: SpeakerSegment,
     session: ChatSession,
 ): FormattedSegment => {
     const isMentor = segment.speakerTag === 1;
     const speaker = isMentor ? '멘토' : '멘티';
-    const name = isMentor ? session.mentor_name || '이름없음' : session.mentee_name || '이름없음';
+
+    // 🆕 session에서 직접 이름 가져오기
+    const name = isMentor ? session.mentor_name || '멘토' : session.mentee_name || '멘티';
 
     const absoluteTime = formatAbsoluteTime(session.timestamp, segment.startTime);
     const duration = calculateSegmentDuration(segment.startTime, segment.endTime);

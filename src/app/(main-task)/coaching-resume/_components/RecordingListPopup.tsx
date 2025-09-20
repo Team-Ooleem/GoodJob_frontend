@@ -64,8 +64,8 @@ export function RecordingListPopup() {
             id: `line-${idx + 1}`,
             speaker:
                 seg.speakerTag === 1
-                    ? `[멘토] ${currentSession.mentor_name || '이름없음'}`
-                    : `[멘티] ${currentSession.mentee_name || '이름없음'}`,
+                    ? currentSession.mentor_name || '멘토'
+                    : currentSession.mentee_name || '멘티',
             timeSec: seg.startTime,
             text: seg.textContent,
             segment: seg,

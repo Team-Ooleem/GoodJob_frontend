@@ -21,6 +21,34 @@ function AudioPlayer() {
     const isRecordingListOpen = useCanvasStore((s) => s.isRecordingListOpen);
     const toggleRecordingList = useCanvasStore((s) => s.toggleRecordingList);
 
+    // �� 드래그 상태 관리
+    const [isDragging, setIsDragging] = useState(false);
+
+    // �� 핸들 드래그 시작
+    const handleHandleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+        e.stopPropagation(); // 진행률 바 클릭 이벤트 방지
+        setIsDragging(true);
+    };
+
+    // 🆕 드래그 중
+    const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (!isDragging || !progressRef.current || duration === 0) return;
+        const rect = progressRef.current.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const newTime = (clickX / rect.width) * duration;
+        seekTo(newTime);
+    };
+
+    // �� 드래그 종료
+    const handleMouseUp = () => {
+        setIsDragging(false);
+    };
+
+    // 🆕 마우스가 영역을 벗어날 때 드래그 종료
+    const handleMouseLeave = () => {
+        setIsDragging(false);
+    };
+
     // Canvas Store에서 팝업 상태 관리
     const setRecordingListOpen = useCanvasStore((s) => s.setRecordingListOpen);
 
@@ -219,6 +247,9 @@ function AudioPlayer() {
                         <div className='flex-1 mx-6 relative'>
                             <div
                                 ref={progressRef}
+                                onMouseMove={handleMouseMove}
+                                onMouseUp={handleMouseUp}
+                                onMouseLeave={handleMouseLeave}
                                 className='relative w-full h-2 bg-secondary rounded-full cursor-pointer group overflow-hidden'
                                 onClick={handleProgressClick}
                             >
@@ -285,10 +316,15 @@ function AudioPlayer() {
 
                                 {/* 호버 핸들 - 60fps 부드러운 애니메이션 */}
                                 <div
-                                    className='absolute top-1/2 w-4 h-4 bg-primary rounded-full transform -translate-y-1/2 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 border-2 border-background z-30'
+                                    className={`absolute top-1/2 w-4 h-4 bg-primary rounded-full transform -translate-y-1/2 shadow-lg border-2 border-background z-30 transition-opacity duration-200 ${
+                                        isDragging
+                                            ? 'opacity-100'
+                                            : 'opacity-0 group-hover:opacity-100'
+                                    }`}
                                     style={{
                                         left: `calc(${progressPercentage}% - 8px)`,
                                     }}
+                                    onMouseDown={handleHandleMouseDown}
                                 >
                                     <div className='absolute inset-0 bg-primary/60 rounded-full blur-sm'></div>
                                 </div>
@@ -302,7 +338,7 @@ function AudioPlayer() {
 
                         {/* 볼륨 컨트롤 */}
                         <div className='flex items-center space-x-2'>
-                            <Volume2 className='h-4 w-4 text-muted-foreground' />
+                            <Volume2 className='h-4 w-4 text-primary' />
                             <input
                                 type='range'
                                 min='0'
@@ -310,7 +346,10 @@ function AudioPlayer() {
                                 step='0.1'
                                 value={volume}
                                 onChange={handleVolumeChange}
-                                className='w-16 h-1 bg-secondary rounded-lg appearance-none cursor-pointer'
+                                className='w-16 h-1 bg-secondary rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-background [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-background [&::-moz-range-thumb]:appearance-none'
+                                style={{
+                                    background: `linear-gradient(to right, hsl(var(--primary)) 0%, hsl(var(--primary)) ${volume * 100}%, hsl(var(--secondary)) ${volume * 100}%, hsl(var(--secondary)) 100%)`,
+                                }}
                             />
                         </div>
 
