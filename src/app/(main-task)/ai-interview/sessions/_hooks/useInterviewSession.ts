@@ -500,6 +500,23 @@ export const useInterviewSession = ({
 
     // 세션 이탈 방어
     useEffect(() => {
+        const clearInterviewLocalCaches = () => {
+            try {
+                const keysToClear = [
+                    'interviewAudioOverallServer',
+                    'interviewAudioPerQuestionServer',
+                    'interviewAudioOverall',
+                    'interviewAudioPerQuestion',
+                    'interviewVisualOverall',
+                    'interviewVisualPerQuestion',
+                    'interviewAnalysis',
+                    'interviewQA',
+                ];
+                keysToClear.forEach((k) => localStorage.removeItem(k));
+                localStorage.removeItem('aiInterviewSessionId');
+            } catch {}
+        };
+
         const inProgress = () =>
             !bypassLeaveGuardRef.current &&
             (isRecording || !!currentSession || sessions.length > 0);
@@ -523,6 +540,14 @@ export const useInterviewSession = ({
             );
             if (!ok) {
                 pushDummy();
+            } else {
+                // 사용자가 이동을 승인한 경우, 로컬 세션/캐시 정리
+                const sid = localStorage.getItem('aiInterviewSessionId');
+                if (sid) {
+                    // 서버에도 세션 취소 알림 (unload-safe)
+                    InterviewAPI.cancelSession(sid);
+                }
+                clearInterviewLocalCaches();
             }
         };
 
@@ -542,6 +567,28 @@ export const useInterviewSession = ({
                 clearInterval(timerRef.current);
             }
             ttsManager.cleanup();
+
+            // 면접 완료로 인한 정상 이동이 아닌 경우, 서버/로컬 정리
+            if (!bypassLeaveGuardRef.current) {
+                try {
+                    const sid = localStorage.getItem('aiInterviewSessionId');
+                    if (sid) {
+                        InterviewAPI.cancelSession(sid);
+                    }
+                    const keysToClear = [
+                        'interviewAudioOverallServer',
+                        'interviewAudioPerQuestionServer',
+                        'interviewAudioOverall',
+                        'interviewAudioPerQuestion',
+                        'interviewVisualOverall',
+                        'interviewVisualPerQuestion',
+                        'interviewAnalysis',
+                        'interviewQA',
+                    ];
+                    keysToClear.forEach((k) => localStorage.removeItem(k));
+                    localStorage.removeItem('aiInterviewSessionId');
+                } catch {}
+            }
         };
     }, []);
 
