@@ -22,18 +22,16 @@ export default function AiInterviewSelectPage() {
     const [jobVerifyState, setJobVerifyState] = useState<'idle' | 'verifying' | 'success' | 'fail'>(
         'idle',
     );
-    const [jobMeta, setJobMeta] = useState<
-        {
-            title?: string;
-            company?: string;
-            source?: string;
-            url?: string;
-            content?: string;
-            summary?: string;
-            summaryJson?: JobPostSummary;
-            ts?: number;
-        } | null
-    >(null);
+    const [jobMeta, setJobMeta] = useState<{
+        title?: string;
+        company?: string;
+        source?: string;
+        url?: string;
+        content?: string;
+        summary?: string;
+        summaryJson?: JobPostSummary;
+        ts?: number;
+    } | null>(null);
     const [jobVerifyNotice, setJobVerifyNotice] = useState<'none' | 'success' | 'failed'>('none');
     const [urlError, setUrlError] = useState<string | null>(null);
     const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
@@ -175,6 +173,7 @@ export default function AiInterviewSelectPage() {
                 'interviewVisualPerQuestion',
                 'interviewAnalysis',
                 'interviewQA',
+                'aiInterviewSessionId',
             ];
             keysToClear.forEach((k) => localStorage.removeItem(k));
         } catch {}
