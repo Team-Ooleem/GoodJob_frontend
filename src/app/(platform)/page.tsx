@@ -103,7 +103,7 @@ export default function PlatformPage() {
 
                         {/* 멘토링 카드 섹션 */}
                         <section className='py-16'>
-                            <div className='container'>
+                            <div className='container mx-auto px-4'>
                                 <MentoringProductList
                                     products={allProducts}
                                     hasNextPage={hasNextPage}

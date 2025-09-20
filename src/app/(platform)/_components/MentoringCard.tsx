@@ -9,7 +9,7 @@ interface MentoringCardProps {
 
 export const MentoringCard = ({ mentoring }: MentoringCardProps) => {
     return (
-        <div className='w-full flex flex-col justify-between aspect-[115/100] rounded-[7px] p-4 border bg-background shadow-lg hover:-translate-y-1 transition-all duration-300'>
+        <div className='w-full flex flex-col justify-between aspect-[6/3] sm:aspect-[215/100] md:aspect-[135/100] lg:aspect-[115/100] xl:aspect-[115/100] rounded-[7px] p-4 border bg-background shadow-lg hover:-translate-y-1 transition-all duration-300'>
             {/* 멘토 프로필 섹션 */}
             <div>
                 {/* 멘토링 제목 */}
