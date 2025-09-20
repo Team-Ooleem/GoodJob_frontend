@@ -57,8 +57,10 @@ export const useSessionData = (canvasIdx: string) => {
                         ) =>
                             transformBackendToFrontend(
                                 session,
-                                userData.mentor.idx,
-                                userData.mentee.idx,
+                                userData.mentor.user_id, // idx → user_id로 변경
+                                userData.mentee.user_id, // idx → user_id로 변경
+                                userData.mentor.name,
+                                userData.mentee.name,
                             ),
                     );
 

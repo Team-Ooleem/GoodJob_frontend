@@ -1,105 +1,113 @@
 'use client';
 
 import { List } from 'antd';
-import AudioPlayer from './AudioPlayer';
 import { ChatSession, SpeakerSegment, TranscriptItem } from '@/apis/recoding-api';
+import { formatSTTSegment, FormattedSegment } from '@/utils/stt-segment';
 
 function TranscriptList({
     transcripts,
     playingSegment,
     onPlaySegment,
-    isFullSessionMode = false,
-    audioRef,
-    // AudioPlayer에 필요한 props 추가
-    currentSegment,
-    currentSession,
-    currentTime,
-    duration,
-    isPlaying,
-    onPlayPause,
-    onClose,
+    currentTime, // currentTime 추가
 }: {
     transcripts: TranscriptItem[];
     playingSegment: SpeakerSegment | null;
     onPlaySegment: (segment: SpeakerSegment, session: ChatSession) => void;
-    isFullSessionMode?: boolean;
-    audioRef?: React.RefObject<HTMLAudioElement>;
-    // AudioPlayer props 추가
-    currentSegment: SpeakerSegment | null;
-    currentSession: ChatSession | null;
-    currentTime: number;
-    duration: number;
-    isPlaying: boolean;
-    onPlayPause: () => void;
-    onClose: () => void;
+    currentTime?: number; // currentTime prop 추가
 }) {
     const handleSegmentClick = (line: TranscriptItem) => {
         // 특정 세그먼트 클릭 시 해당 부분으로 이동
         onPlaySegment(line.segment, line.session);
     };
 
+    // STT 세그먼트를 새로운 형식으로 변환
+    const formattedSegments: FormattedSegment[] = transcripts.map((line) =>
+        formatSTTSegment(line.segment, line.session),
+    );
+
     return (
         <div className='flex flex-col h-full min-h-0'>
-            {/* STT 타임라인 리스트 - p-2 패딩 적용 */}
+            {/* STT 타임라인 리스트 - 새로운 형식 적용 */}
             <div className='flex-1 p-2 overflow-auto min-h-0'>
                 <List
                     size='small'
                     itemLayout='vertical'
-                    dataSource={transcripts}
-                    renderItem={(line) => {
+                    dataSource={formattedSegments}
+                    renderItem={(formattedSegment, index) => {
+                        const originalTranscript = transcripts[index];
+
+                        // currentTime을 기준으로 현재 재생 중인 세그먼트 찾기
                         const isCurrentlyPlaying =
-                            playingSegment?.textContent === line.segment.textContent;
+                            currentTime !== undefined &&
+                            currentTime >= originalTranscript.segment.startTime &&
+                            currentTime <= originalTranscript.segment.endTime;
 
                         return (
                             <List.Item
-                                className={`px-2 py-1 cursor-pointer hover:bg-slate-50 rounded transition-all duration-200 ${
-                                    isCurrentlyPlaying ? 'bg-blue-50 border border-blue-200' : ''
+                                className={`px-3 py-2 cursor-pointer hover:bg-accent hover:text-accent-foreground rounded-md transition-colors duration-200 ${
+                                    isCurrentlyPlaying
+                                        ? 'border border-blue-400' // 기존 배경색 유지, 파란색 테두리만
+                                        : 'border border-transparent'
                                 }`}
-                                onClick={() => handleSegmentClick(line)}
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleSegmentClick(originalTranscript);
+                                }}
+                                style={{
+                                    cursor: 'pointer',
+                                    userSelect: 'none',
+                                    pointerEvents: 'auto',
+                                }}
                             >
-                                <div className='flex items-start gap-2 w-full'>
-                                    <div
-                                        className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${
-                                            line.speaker === '멘토'
-                                                ? 'bg-indigo-100 text-indigo-700'
-                                                : 'bg-emerald-100 text-emerald-700'
-                                        }`}
-                                    >
-                                        {line.speaker}
-                                    </div>
-                                    <div className='text-[11px] text-slate-500 mt-0.5'>
-                                        {`${Math.floor(line.timeSec / 60)}:${String(
-                                            line.timeSec % 60,
-                                        ).padStart(2, '0')}`}
-                                    </div>
-                                    {isCurrentlyPlaying && (
-                                        <div className='text-[11px] text-blue-600 font-medium'>
-                                            재생 중
+                                <div
+                                    className='w-full'
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        handleSegmentClick(originalTranscript);
+                                    }}
+                                >
+                                    {/* 🎯 새로운 형식: 멘토 김멘토 오후 09:30분 */}
+                                    <div className='flex items-start gap-2 w-full mb-2'>
+                                        {/* [멘토]만 박스 안에 */}
+                                        <div
+                                            className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
+                                                formattedSegment.speaker === '멘토'
+                                                    ? 'border-transparent bg-primary text-primary-foreground hover:bg-primary/80'
+                                                    : 'border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                                            }`}
+                                        >
+                                            {formattedSegment.speaker}
                                         </div>
-                                    )}
-                                </div>
-                                <div className='mt-1 text-[13px] leading-relaxed text-slate-800'>
-                                    {line.text}
+
+                                        {/* 이름과 시간은 박스 밖으로 */}
+                                        <div className='text-xs text-foreground font-medium'>
+                                            <span className='font-bold'>
+                                                {formattedSegment.name}
+                                            </span>{' '}
+                                            <span className='text-muted-foreground'>
+                                                {formattedSegment.durationText}
+                                            </span>
+                                        </div>
+
+                                        {/* 🎯 재생 중 표시 */}
+                                        {isCurrentlyPlaying && (
+                                            <div className='text-xs text-primary font-medium flex items-center gap-1'>
+                                                <div className='w-2 h-2 bg-primary rounded-full animate-pulse'></div>
+                                                재생 중
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* 🎯 텍스트 내용 */}
+                                    <div className='text-sm leading-relaxed text-foreground mb-1'>
+                                        {formattedSegment.text}
+                                    </div>
                                 </div>
                             </List.Item>
                         );
                     }}
-                />
-            </div>
-
-            {/* AudioPlayer - 바닥에 고정 */}
-            <div className='flex-shrink-0'>
-                <AudioPlayer
-                    playingSegment={playingSegment}
-                    currentSegment={currentSegment}
-                    currentSession={currentSession}
-                    currentTime={currentTime}
-                    duration={duration}
-                    isPlaying={isPlaying}
-                    onPlayPause={onPlayPause}
-                    onClose={onClose}
-                    audioRef={audioRef}
-
                 />
             </div>
         </div>

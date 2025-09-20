@@ -1,3 +1,5 @@
+import { WavRecorder } from '../utils/audio/WavRecorder';
+
 export interface SpeakerSegment {
     speakerTag: number;
     textContent: string;
@@ -12,15 +14,20 @@ export interface ChatSession {
     timestamp: string;
     mentor_idx: number;
     mentee_idx: number;
+    // 🆕 이름 속성 추가
+    mentor_name?: string;
+    mentee_name?: string;
     segmentIndex: number;
     audioDuration: number;
     audioUrl: string;
 }
 
 export interface SessionUser {
-    idx: number;
+    user_id: number; // idx → user_id로 변경
+    cp_role: string; // role 필드 추가
     name: string;
-    email: string;
+    profile_img: string; // profile_img 필드 추가
+    email?: string; // email은 선택사항으로
 }
 
 export interface SessionUserResponse {
@@ -37,11 +44,13 @@ export interface STTWithContextResponse {
     limit?: number;
     hasMore?: boolean;
 }
-
 export const transformBackendToFrontend = (
-    session: BackendSessionMessage, // 🆕 any → BackendSessionMessage
+    session: BackendSessionMessage,
     mentorIdx: number,
     menteeIdx: number,
+    // 🆕 이름 정보 추가
+    mentorName?: string,
+    menteeName?: string,
 ): ChatSession => {
     return {
         sessionIdx: session.messageId,
@@ -57,7 +66,10 @@ export const transformBackendToFrontend = (
         timestamp: session.timestamp,
         mentor_idx: mentorIdx,
         mentee_idx: menteeIdx,
-        segmentIndex: 0, // 기본값
+        // 🆕 이름 정보 추가
+        mentor_name: mentorName,
+        mentee_name: menteeName,
+        segmentIndex: 0,
         audioDuration: session.audioDuration || 0,
         audioUrl: session.audioUrl,
     };
