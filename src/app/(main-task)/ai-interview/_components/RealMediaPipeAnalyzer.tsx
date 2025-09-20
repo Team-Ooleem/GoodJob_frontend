@@ -3,36 +3,32 @@
 interface DetectionResult {
     type: 'posture' | 'eye_contact' | 'smile' | 'gesture' | 'confidence' | 'attention' | 'stress';
     message: string;
-    level: 'good' | 'warning' | 'bad' | 'excellent';
+    level: 'good' | 'warning' | 'critical' | 'excellent';
     confidence: number;
     landmarks: any;
     metrics: any;
 }
 
 type Presence = 'good' | 'average' | 'needs_improvement';
-type LevelAgg = 'ok' | 'info' | 'warning' | 'bad' | 'critical';
+type LevelAgg = 'ok' | 'info' | 'warning' | 'critical';
 
 // 서버에 보낼 문항 집계 페이로드 (Nest의 VisualAggregateDto와 1:1)
 export type VisualAggregatePayload = {
     sample_count: number;
 
     confidence_mean: number | null;
-    confidence_max: number | null;
     smile_mean: number | null;
-    smile_max: number | null;
 
     // 추가 지표(평균)
     eye_contact_mean: number | null; // 0~1
     blink_mean: number | null; // 0~1 (깜빡임 확률 프록시)
     gaze_stability: number | null; // 0~1 (높을수록 안정)
+    gaze_stability_std?: number | null; // 프레임별 안정성의 표준편차
 
     // 요청: 새 지표 포함
     attention_mean?: number | null; // 0~1
-    attention_max?: number | null; // 0~1
     engagement_mean?: number | null; // 0~1
-    engagement_max?: number | null; // 0~1
     nervousness_mean?: number | null; // 0~1 (stress와 동일 지표)
-    nervousness_max?: number | null; // 0~1
 
     presence_good: number;
     presence_average: number;
@@ -41,13 +37,38 @@ export type VisualAggregatePayload = {
     level_ok: number;
     level_info: number;
     level_warning: number;
-    level_bad: number;
     level_critical: number;
 
     // 좌표 평균은 서버 미사용으로 제외(시선 안정성만 내부 계산에 사용)
 
     started_at_ms: number | null;
     ended_at_ms: number | null;
+
+    // 헤드포즈 품질 게이팅용(절대 각도 평균, deg)
+    avg_yaw_deg?: number | null;
+    avg_pitch_deg?: number | null;
+    avg_roll_deg?: number | null;
+    yaw_deg_std?: number | null;
+    pitch_deg_std?: number | null;
+    roll_deg_std?: number | null;
+    in_pose_ratio?: number | null; // |yaw|<=25 & |pitch|<=20
+
+    // 분산(표준편차) 기반 보정에 유용한 지표들
+    eye_contact_std?: number | null;
+    blink_std?: number | null;
+    smile_std?: number | null;
+    attention_std?: number | null;
+    engagement_std?: number | null;
+    nervousness_std?: number | null;
+
+    // 안정성/프레이밍
+    detection_continuity_ratio?: number | null;
+    face_bbox_area_mean?: number | null; // 0~1 추정치
+    face_bbox_area_std?: number | null;
+
+    // 유효 샘플/지속 시간
+    valid_sample_count?: number;
+    calibration_duration_ms?: number | null;
 
     // (선택) 클라이언트 편의를 위한 메타
     _questionId?: string;
@@ -68,6 +89,11 @@ type VisualSampleLite = {
         nervousness?: number; // 0~1 (stress)
         overallPresence?: Presence;
         level?: LevelAgg;
+        // 절대 헤드포즈 각도 (deg)
+        yawDeg?: number;
+        pitchDeg?: number;
+        rollDeg?: number;
+        faceArea?: number; // 0~1 대략적 비율
         landmarks: {
             leftEye?: { x: number; y: number };
             rightEye?: { x: number; y: number };
@@ -103,6 +129,8 @@ export class RealMediaPipeAnalyzer {
     private calib: {
         baselineConfidence?: number | null;
         baselineSmile?: number | null;
+        baselineEyeContact?: number | null;
+        baselineBlink?: number | null;
         presenceGoodCut: number;
         presenceNeedsCut: number;
         confWarnThreshold: number;
@@ -116,6 +144,9 @@ export class RealMediaPipeAnalyzer {
         wPitch?: number;
         yawNormMaxDeg?: number;
         pitchNormMaxDeg?: number;
+        // 캘리브레이션 기반 헤드포즈 중립 오프셋(절대각 기준)
+        yaw0Deg?: number | null;
+        pitch0Deg?: number | null;
     } | null = null;
     // 반복 경고 완화용 쿨다운
     private lastFeedbackType: string | null = null;
@@ -222,12 +253,16 @@ export class RealMediaPipeAnalyzer {
             const raw = localStorage.getItem('aiInterviewCalibration');
             if (!raw) {
                 this.calib = {
+                    baselineEyeContact: null,
+                    baselineBlink: null,
                     presenceGoodCut: 0.6,
                     presenceNeedsCut: 0.4,
                     confWarnThreshold: 0.3,
                     confGoodThreshold: 0.65,
                     attentionWarnThreshold: 0.45,
                     stressWarnThreshold: 0.6,
+                    yaw0Deg: 0,
+                    pitch0Deg: 0,
                 };
                 return;
             }
@@ -236,6 +271,12 @@ export class RealMediaPipeAnalyzer {
             const baselineConfidence =
                 typeof v?.confidence_mean === 'number' ? v.confidence_mean : null;
             const baselineSmile = typeof v?.smile_mean === 'number' ? v.smile_mean : null;
+            const baselineEyeContact =
+                typeof v?.eye_contact_mean === 'number' ? v.eye_contact_mean : null;
+            const baselineBlink = typeof v?.blink_mean === 'number' ? v.blink_mean : null;
+            const yaw0 = typeof (v as any)?.avg_yaw_deg === 'number' ? (v as any).avg_yaw_deg : 0;
+            const pitch0 =
+                typeof (v as any)?.avg_pitch_deg === 'number' ? (v as any).avg_pitch_deg : 0;
 
             const baseConf = baselineConfidence ?? 0.6;
             const confWarn = Math.max(0.25, baseConf - 0.15);
@@ -243,14 +284,21 @@ export class RealMediaPipeAnalyzer {
             const presGood = this.clamp01(0.6 + (baseConf - 0.6) * 0.5);
             const presNeeds = this.clamp01(presGood - 0.2);
 
+            // 주의(attention) 경고 임계치: 개인 눈맞춤/깜빡임 기반으로 조정
+            // 기본: eye_contact 기준으로 0.15 낮춘 값을 warn으로 사용
+            const ecBase = baselineEyeContact ?? 0.6;
+            const attWarn = this.clamp01(ecBase - 0.15);
+
             this.calib = {
                 baselineConfidence,
                 baselineSmile,
+                baselineEyeContact,
+                baselineBlink,
                 presenceGoodCut: presGood,
                 presenceNeedsCut: presNeeds,
                 confWarnThreshold: confWarn,
                 confGoodThreshold: confGood,
-                attentionWarnThreshold: 0.45,
+                attentionWarnThreshold: attWarn,
                 stressWarnThreshold: 0.6,
                 kYaw: 0.6,
                 kPitch: 0.5,
@@ -258,11 +306,15 @@ export class RealMediaPipeAnalyzer {
                 wPitch: 0.4,
                 yawNormMaxDeg: 30,
                 pitchNormMaxDeg: 25,
+                yaw0Deg: Math.max(0, Math.min(45, yaw0)),
+                pitch0Deg: Math.max(0, Math.min(45, pitch0)),
             };
             // console.debug('[Calibration] Loaded visual calibration:', this.calib);
         } catch (e) {
             // console.warn('[Calibration] Failed to load calibration. Using defaults.', e);
             this.calib = {
+                baselineEyeContact: null,
+                baselineBlink: null,
                 presenceGoodCut: 0.6,
                 presenceNeedsCut: 0.4,
                 confWarnThreshold: 0.3,
@@ -275,6 +327,8 @@ export class RealMediaPipeAnalyzer {
                 wPitch: 0.4,
                 yawNormMaxDeg: 30,
                 pitchNormMaxDeg: 25,
+                yaw0Deg: 0,
+                pitch0Deg: 0,
             };
         }
     }
@@ -288,6 +342,8 @@ export class RealMediaPipeAnalyzer {
         this.currentQuestionText = opts?.text;
         this.sampleBuffer = [];
         this.questionStartedAt = Date.now();
+        // 새 문항 시작 시 EMA 상태를 초기화하여 이전 문항의 스무딩 잔상 제거
+        this.prevMetrics = null;
         if (questionId === 'calibration') {
             console.log('[Calibration] 비디오 캘리브레이션 시작');
         }
@@ -379,6 +435,8 @@ export class RealMediaPipeAnalyzer {
         // 지표 스무딩(EMA) 적용
         const mPrev = this.prevMetrics;
         const a = this.smoothAlpha;
+        // EMA는 실시간 피드백(깜빡임/경고 등) 안정화를 위한 용도만으로 사용
+        // 집계(sampleBuffer)는 원시(raw) 지표를 기록해 평균이 왜곡되지 않도록 한다.
         const interviewMetrics = mPrev
             ? {
                   confidence: a * rawMetrics.confidence + (1 - a) * mPrev.confidence,
@@ -403,13 +461,14 @@ export class RealMediaPipeAnalyzer {
             );
         }
 
-        // ▼ 추가: 5초 간격 분석시 **버퍼에 샘플 기록** (문항 진행중일 때만)
+        // ▼ 추가: 1초 간격 분석시 버퍼에 샘플 기록 (문항 진행중일 때만)
         if (this.currentQuestionId) {
             // 존재감(presence): 자신감/집중/긴장완화(1-stress) 가중합
+            // 집계는 원시(raw) 지표로 기록하여 EMA로 인한 평균 왜곡을 방지
             const presenceScore =
-                0.5 * interviewMetrics.confidence +
-                0.3 * interviewMetrics.attention +
-                0.2 * (1 - interviewMetrics.stress);
+                0.5 * rawMetrics.confidence +
+                0.3 * rawMetrics.attention +
+                0.2 * (1 - rawMetrics.stress);
             const goodCut = this.calib?.presenceGoodCut ?? 0.6;
             const needsCut = this.calib?.presenceNeedsCut ?? 0.4;
             const presence: Presence =
@@ -419,23 +478,60 @@ export class RealMediaPipeAnalyzer {
                       ? 'needs_improvement'
                       : 'average';
 
-            // level 매핑: 매우 심각한 상황은 'bad', 높은 스트레스는 'warning'
+            // level 매핑: 매우 심각한 상황은 'critical', 높은 스트레스는 'warning'
             const level: LevelAgg =
                 interviewMetrics.stress > 0.8 || interviewMetrics.confidence < 0.2
-                    ? 'bad'
+                    ? 'critical'
                     : interviewMetrics.stress > (this.calib?.stressWarnThreshold ?? 0.6)
                       ? 'warning'
                       : 'ok';
 
+            // 헤드포즈 각도 추정 (deg, 절대값)
+            const euler = this.extractEulerFromMatrix(headMat);
+            const yawAbs = euler ? Math.abs(euler.yaw) : undefined;
+            const pitchAbs = euler ? Math.abs(euler.pitch) : undefined;
+            const rollAbs = euler ? Math.abs(euler.roll) : undefined;
+
+            // 얼굴 bbox 면적 대략 추정(정규화 좌표 가정)
+            let faceArea: number | undefined = undefined;
+            try {
+                if (Array.isArray(faceLandmarks) && faceLandmarks.length) {
+                    let minX = Infinity,
+                        minY = Infinity,
+                        maxX = -Infinity,
+                        maxY = -Infinity;
+                    for (const p of faceLandmarks) {
+                        const x = typeof p.x === 'number' ? p.x : 0;
+                        const y = typeof p.y === 'number' ? p.y : 0;
+                        if (Number.isFinite(x) && Number.isFinite(y)) {
+                            if (x < minX) minX = x;
+                            if (y < minY) minY = y;
+                            if (x > maxX) maxX = x;
+                            if (y > maxY) maxY = y;
+                        }
+                    }
+                    if (isFinite(minX) && isFinite(minY) && isFinite(maxX) && isFinite(maxY)) {
+                        const w = Math.max(0, Math.min(1, maxX - minX));
+                        const h = Math.max(0, Math.min(1, maxY - minY));
+                        faceArea = Math.max(0, Math.min(1, w * h));
+                    }
+                }
+            } catch {}
+
             const sample: VisualSampleLite = {
                 timestamp: new Date().toISOString(),
                 detection: {
-                    confidenceScore: interviewMetrics.confidence,
-                    smileIntensity: interviewMetrics.smile,
-                    eyeContact: interviewMetrics.eyeContact,
-                    attention: interviewMetrics.attention,
-                    engagement: interviewMetrics.engagement,
-                    nervousness: interviewMetrics.nervousness,
+                    // 원시(raw) 지표 저장
+                    confidenceScore: rawMetrics.confidence,
+                    smileIntensity: rawMetrics.smile,
+                    eyeContact: rawMetrics.eyeContact,
+                    attention: rawMetrics.attention,
+                    engagement: rawMetrics.engagement,
+                    nervousness: rawMetrics.nervousness,
+                    yawDeg: yawAbs,
+                    pitchDeg: pitchAbs,
+                    rollDeg: rollAbs,
+                    faceArea,
                     // 깜빡임 확률: attention 산식에 포함되나, 별도 보관을 위해 rough 추정
                     // calculateInterviewMetrics 내부 blink를 직접 사용하지 않으므로, attention에서 추정 불가.
                     // 여기서는 이전 단계 rawMetrics를 사용하도록 calculateInterviewMetrics를 확장(아래 참조).
@@ -545,8 +641,13 @@ export class RealMediaPipeAnalyzer {
         const pitchEye = (pitchLeft + pitchRight) / 2;
 
         const pose = this.extractEulerFromMatrix(headMat);
-        const yawDeg = Math.abs(pose?.yaw ?? 0);
-        const pitchDeg = Math.abs(pose?.pitch ?? 0);
+        const yawDegRaw = Math.abs(pose?.yaw ?? 0);
+        const pitchDegRaw = Math.abs(pose?.pitch ?? 0);
+        // 캘리브레이션 오프셋(yaw0/pitch0)을 감산하여 개인 중립 자세 기준 편차로 보정
+        const yawBase = Math.max(0, this.calib?.yaw0Deg ?? 0);
+        const pitchBase = Math.max(0, this.calib?.pitch0Deg ?? 0);
+        const yawDeg = Math.max(0, yawDegRaw - yawBase);
+        const pitchDeg = Math.max(0, pitchDegRaw - pitchBase);
         const yawNormMax = this.calib?.yawNormMaxDeg ?? 30;
         const pitchNormMax = this.calib?.pitchNormMaxDeg ?? 25;
         const yawHead = this.clamp01(yawDeg / yawNormMax);
@@ -601,7 +702,7 @@ export class RealMediaPipeAnalyzer {
             emit('stress', {
                 type: 'stress',
                 message: '심각한 긴장 상태입니다. 깊게 숨을 쉬고 마음을 진정시켜보세요',
-                level: 'bad',
+                level: 'critical',
                 confidence: 1 - metrics.stress,
                 landmarks,
                 metrics: {
@@ -806,7 +907,7 @@ export class RealMediaPipeAnalyzer {
                 type: 'posture',
                 message:
                     '화면에 얼굴이 잘 보이도록 위치를 조정해주세요. 카메라를 정면으로 향하고 적절한 거리를 유지해주세요',
-                level: 'bad',
+                level: 'critical',
                 confidence: 0.5,
                 landmarks,
                 metrics: {
@@ -979,7 +1080,6 @@ export class RealMediaPipeAnalyzer {
 
         const mean = (arr: number[]) =>
             arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
-        const maxv = (arr: number[]) => (arr.length ? Math.max(...arr) : null);
         const std = (arr: number[]) => {
             if (arr.length === 0) return null;
             const m = mean(arr)!;
@@ -994,9 +1094,13 @@ export class RealMediaPipeAnalyzer {
         const attentions = toNumArr((s) => s.detection.attention);
         const engagements = toNumArr((s) => s.detection.engagement);
         const nervousnesses = toNumArr((s) => s.detection.nervousness);
+        const yawDegs = toNumArr((s) => s.detection.yawDeg);
+        const pitchDegs = toNumArr((s) => s.detection.pitchDeg);
+        const rollDegs = toNumArr((s) => s.detection.rollDeg);
+        const faceAreas = toNumArr((s) => s.detection.faceArea);
 
         const presence = { good: 0, average: 0, needs_improvement: 0 };
-        const level = { ok: 0, info: 0, warning: 0, bad: 0, critical: 0 as 0 };
+        const level = { ok: 0, info: 0, warning: 0, critical: 0 as 0 };
 
         for (const s of samples) {
             const p = s.detection.overallPresence;
@@ -1015,30 +1119,59 @@ export class RealMediaPipeAnalyzer {
         const motion = Math.sqrt(sx * sx + sy * sy);
         // 0~0.02 구간을 1~0으로 스케일 (영상 좌표 기준 경험값)
         const gazeStability = Math.max(0, Math.min(1, 1 - motion / 0.02));
+        // 프레임별 안정성 값의 표준편차 추정: 각 프레임의 코 좌표가 평균에서 얼마나 떨어지는지로 계산한 후 동일 스케일 적용
+        let gazeStabilityStd: number | null = null;
+        try {
+            if (noseXs.length > 1 && noseYs.length > 1) {
+                const meanX = noseXs.reduce((a, b) => a + b, 0) / noseXs.length;
+                const meanY = noseYs.reduce((a, b) => a + b, 0) / noseYs.length;
+                const perFrameStabilities: number[] = [];
+                for (let i = 0; i < Math.min(noseXs.length, noseYs.length); i++) {
+                    const dx = noseXs[i] - meanX;
+                    const dy = noseYs[i] - meanY;
+                    const disp = Math.sqrt(dx * dx + dy * dy);
+                    const sVal = Math.max(0, Math.min(1, 1 - disp / 0.02));
+                    perFrameStabilities.push(sVal);
+                }
+                gazeStabilityStd = std(perFrameStabilities);
+            }
+        } catch {}
 
         const ts = samples
             .map((s) => Date.parse(s.timestamp))
             .filter((v) => Number.isFinite(v)) as number[];
 
+        const startedAt = ts.length ? Math.min(...ts) : (this.questionStartedAt ?? null);
+        const endedAt = ts.length ? Math.max(...ts) : this.questionStartedAt ? Date.now() : null;
+        const durMs = startedAt && endedAt ? Math.max(0, endedAt - startedAt) : null;
+        const expected = durMs
+            ? Math.max(1, Math.round(durMs / (this.analysisInterval || 1000)))
+            : null;
+        const continuity = expected ? Math.max(0, Math.min(1, n / expected)) : null;
+        const inPoseCount = samples.filter(
+            (s) =>
+                typeof s.detection.yawDeg === 'number' &&
+                typeof s.detection.pitchDeg === 'number' &&
+                s.detection.yawDeg <= 25 &&
+                s.detection.pitchDeg <= 20,
+        ).length;
+        const inPoseRatio = n > 0 ? inPoseCount / n : null;
+
         return {
             sample_count: n,
 
             confidence_mean: mean(confs),
-            confidence_max: maxv(confs),
             smile_mean: mean(smiles),
-            smile_max: maxv(smiles),
 
             eye_contact_mean: mean(eyeContacts),
             blink_mean: mean(blinks),
             gaze_stability: Number.isFinite(gazeStability) ? gazeStability : null,
+            gaze_stability_std: gazeStabilityStd,
 
             // 새 지표(평균/최대)
             attention_mean: mean(attentions),
-            attention_max: maxv(attentions),
             engagement_mean: mean(engagements),
-            engagement_max: maxv(engagements),
             nervousness_mean: mean(nervousnesses),
-            nervousness_max: maxv(nervousnesses),
 
             presence_good: presence.good,
             presence_average: presence.average,
@@ -1047,11 +1180,33 @@ export class RealMediaPipeAnalyzer {
             level_ok: level.ok,
             level_info: level.info,
             level_warning: level.warning,
-            level_bad: level.bad,
             level_critical: level.critical,
 
-            started_at_ms: ts.length ? Math.min(...ts) : (this.questionStartedAt ?? null),
-            ended_at_ms: ts.length ? Math.max(...ts) : this.questionStartedAt ? Date.now() : null,
+            started_at_ms: startedAt,
+            ended_at_ms: endedAt,
+
+            // 헤드포즈 평균(절대각 기준)
+            avg_yaw_deg: mean(yawDegs),
+            avg_pitch_deg: mean(pitchDegs),
+            avg_roll_deg: mean(rollDegs),
+            yaw_deg_std: std(yawDegs),
+            pitch_deg_std: std(pitchDegs),
+            roll_deg_std: std(rollDegs),
+            in_pose_ratio: inPoseRatio,
+
+            eye_contact_std: std(eyeContacts),
+            blink_std: std(blinks),
+            smile_std: std(smiles),
+            attention_std: std(attentions),
+            engagement_std: std(engagements),
+            nervousness_std: std(nervousnesses),
+
+            detection_continuity_ratio: continuity,
+            face_bbox_area_mean: mean(faceAreas),
+            face_bbox_area_std: std(faceAreas),
+
+            valid_sample_count: n,
+            calibration_duration_ms: durMs,
         };
     }
 }

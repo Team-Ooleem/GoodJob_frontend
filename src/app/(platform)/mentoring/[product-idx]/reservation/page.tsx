@@ -23,6 +23,7 @@ export default function ReservationPage({ params }: Props) {
     const [date, setDate] = useState<Date | undefined>(undefined);
     const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
     const [selectedRegularSlotsIdx, setSelectedRegularSlotsIdx] = useState<number | null>(null);
+    const [messageToMentor, setMessageToMentor] = useState<string>('');
 
     if (isLoading || slotsLoading) {
         return (
@@ -122,7 +123,12 @@ export default function ReservationPage({ params }: Props) {
                         <p className='text-xs text-muted-foreground mb-1'>
                             멘토링을 신청한 목적과 멘토링 진행에 도움이 될만한 정보를 작성해 주세요.
                         </p>
-                        <Textarea className='h-36' placeholder='Q. 멘토링 목적이 무엇인가요?' />
+                        <Textarea
+                            className='h-36'
+                            placeholder='Q. 멘토링 목적이 무엇인가요?'
+                            value={messageToMentor}
+                            onChange={(e) => setMessageToMentor(e.target.value)}
+                        />
                     </FormCard>
                     <Alert>
                         <CheckCircle2Icon size={15} />
@@ -142,6 +148,7 @@ export default function ReservationPage({ params }: Props) {
                         selectedSlot={selectedSlot}
                         selectedRegularSlotsIdx={selectedRegularSlotsIdx}
                         mentorName={product?.mentor?.name}
+                        messageToMentor={messageToMentor}
                     />
                     <Alert className='mt-4'>
                         <AlertDescription>

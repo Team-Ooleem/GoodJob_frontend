@@ -6,8 +6,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { api } from '@/apis/api';
-import type { InterviewAnalysisResult } from '@/types/report';
 
 interface QAPair {
     question: string;
@@ -24,6 +24,7 @@ interface QuestionFeedbackCardProps {
 // API 호출 함수
 const getQuestionFeedback = async (sessionId: string) => {
     const response = await api.get(`/report/${sessionId}/question-feedback`);
+    console.log(response);
     return response.data;
 };
 
@@ -34,6 +35,18 @@ export default function QuestionFeedbackCard({
     compact = false,
 }: QuestionFeedbackCardProps) {
     const [showFullFeedback, setShowFullFeedback] = useState(!compact);
+    const [expandedQuestions, setExpandedQuestions] = useState<Set<number>>(new Set());
+
+    // 질문 토글 함수
+    const toggleQuestion = (index: number) => {
+        const newExpanded = new Set(expandedQuestions);
+        if (newExpanded.has(index)) {
+            newExpanded.delete(index);
+        } else {
+            newExpanded.add(index);
+        }
+        setExpandedQuestions(newExpanded);
+    };
 
     // API 호출
     const {
@@ -117,49 +130,73 @@ export default function QuestionFeedbackCard({
             </CardHeader>
             {(!compact || showFullFeedback) && (
                 <CardContent>
-                    <div className='space-y-6'>
-                        {questionFeedback.map((feedback: any, index: number) => (
-                            <div key={index} className='w-full'>
-                                <div className='flex justify-between items-start mb-3'>
-                                    <div className='font-semibold text-lg'>
-                                        Q{index + 1}. 답변 피드백
-                                    </div>
-                                    <Badge
-                                        variant='secondary'
-                                        className='text-sm'
-                                        style={{
-                                            backgroundColor: getSimilarityColor(
-                                                feedback.similarity,
-                                            ),
-                                            color: 'white',
-                                        }}
+                    <div className='space-y-4'>
+                        {questionFeedback.map((feedback: any, index: number) => {
+                            const isExpanded = expandedQuestions.has(index);
+                            return (
+                                <div
+                                    key={index}
+                                    className='border border-gray-200 rounded-lg overflow-hidden'
+                                >
+                                    {/* 질문 헤더 - 클릭 가능 */}
+                                    <div
+                                        className='flex justify-between items-center p-4 cursor-pointer hover:bg-gray-50 transition-colors'
+                                        onClick={() => toggleQuestion(index)}
                                     >
-                                        유사도: {Math.round(feedback.similarity * 100)}% (
-                                        {getSimilarityLevel(feedback.similarity)})
-                                    </Badge>
-                                </div>
-
-                                <div className='bg-gray-50 p-4 rounded-lg mb-3'>
-                                    <p className='text-sm text-gray-600'>
-                                        <strong>답변:</strong> {feedback.answer_span}
-                                    </p>
-                                </div>
-
-                                <div className='bg-blue-50 p-4 rounded-lg mb-3'>
-                                    <p className='text-sm'>
-                                        <strong>AI 피드백:</strong> {feedback.explanation}
-                                    </p>
-                                </div>
-
-                                {feedback.resume_ref && (
-                                    <div className='bg-green-50 p-4 rounded-lg'>
-                                        <p className='text-sm'>
-                                            <strong>이력서 참조:</strong> {feedback.resume_ref}
-                                        </p>
+                                        <div className='flex items-center space-x-3'>
+                                            {isExpanded ? (
+                                                <ChevronDown className='h-4 w-4 text-gray-500' />
+                                            ) : (
+                                                <ChevronRight className='h-4 w-4 text-gray-500' />
+                                            )}
+                                            <div className='font-semibold text-lg'>
+                                                Q{index + 1}. 질문 피드백
+                                            </div>
+                                        </div>
+                                        <Badge
+                                            variant='secondary'
+                                            className='text-sm'
+                                            style={{
+                                                backgroundColor: getSimilarityColor(
+                                                    feedback.similarity,
+                                                ),
+                                                color: 'white',
+                                            }}
+                                        >
+                                            유사도: {Math.round(feedback.similarity * 100)}% (
+                                            {getSimilarityLevel(feedback.similarity)})
+                                        </Badge>
                                     </div>
-                                )}
-                            </div>
-                        ))}
+
+                                    {/* 답변과 피드백 내용 - 펼쳐질 때만 표시 */}
+                                    {isExpanded && (
+                                        <div className='border-t border-gray-200 p-4 space-y-4'>
+                                            <div className='bg-gray-50 p-4 rounded-lg'>
+                                                <p className='text-sm text-gray-600'>
+                                                    <strong>답변:</strong> {feedback.answer_span}
+                                                </p>
+                                            </div>
+
+                                            <div className='bg-blue-50 p-4 rounded-lg'>
+                                                <p className='text-sm'>
+                                                    <strong>AI 피드백:</strong>{' '}
+                                                    {feedback.explanation}
+                                                </p>
+                                            </div>
+
+                                            {feedback.resume_ref && (
+                                                <div className='bg-green-50 p-4 rounded-lg'>
+                                                    <p className='text-sm'>
+                                                        <strong>이력서 참조:</strong>{' '}
+                                                        {feedback.resume_ref}
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
                 </CardContent>
             )}

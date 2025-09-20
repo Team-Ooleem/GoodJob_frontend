@@ -98,8 +98,9 @@ export interface BackendSessionMessage {
 export interface VoiceRecorderState {
     mediaRecorder: MediaRecorder | null;
     audioChunks: Blob[];
+    wavRecorder: WavRecorder;
     stream: MediaStream | null;
-    canvasIdx: string;
+    canvasId: string;
     webrtcStreams: {
         localStream: MediaStream | null;
         remoteStream: MediaStream | null;
