@@ -398,16 +398,27 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
             roomRef.current = roomId;
             if (!socket) return;
 
-            //세션 진입시 바로 녹음 시작
             setCanvasId(roomId);
-            const canvasStore = useCanvasStore.getState();
-            startRecording();
             socket.emit('joinRtc', { room: roomId }, (count: number) => {
                 console.log(` joinRtc: ${roomId}, 현재 인원 ${count}`);
             });
         },
         [socket],
     );
+    /* 두명 연결 완료시 녹화 시작 이벤트 추가 */
+    useEffect(() => {
+        if (!socket) return;
+        socket.on('startRecording', (data) => {
+            console.log('두명 연결 완료시 녹화 시작 이벤트 수신');
+            startRecording();
+        });
+
+        return () => {
+            socket.off('startRecording');
+        };
+    }, [socket]);
+
+    /* 세션 나갈 때 녹음 중지 */
     const leaveRoom = useCallback(() => {
         roomRef.current = null;
         stopRecording();
