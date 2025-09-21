@@ -244,7 +244,10 @@ export default function AiInterviewSettingCalibrationCombined() {
             }
             // 실제 녹음 시작~종료까지의 길이를 전달
             const now = Date.now();
-            const durationMs = Math.max(0, (recStartedAtRef.current ? now - recStartedAtRef.current : 0));
+            const durationMs = Math.max(
+                0,
+                recStartedAtRef.current ? now - recStartedAtRef.current : 0,
+            );
             recStartedAtRef.current = null;
 
             // 백엔드로 캘리브레이션 데이터 전송
@@ -341,7 +344,10 @@ export default function AiInterviewSettingCalibrationCombined() {
                         </CardTitle>
                     </div>
                     <p className='text-gray-600 text-base'>
-                        최적의 면접 환경을 위해 카메라와 마이크를 테스트해주세요.
+                        얼굴을 가이드 선 안에 들어오게 맞추고, 녹화 버튼을 눌러주세요.
+                    </p>
+                    <p className='text-gray-600 text-sm'>
+                        녹화가 시작되면 아래 문장을 소리 내어 읽어주세요.
                     </p>
                 </CardHeader>
 
