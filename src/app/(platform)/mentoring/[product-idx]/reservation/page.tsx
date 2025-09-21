@@ -97,6 +97,7 @@ export default function ReservationPage({ params }: Props) {
                                                     startTime={startTime}
                                                     endTime={endTime}
                                                     selected={selectedSlot === slotKey}
+                                                    isBooked={slot.is_booked}
                                                     onClick={() => {
                                                         setSelectedSlot(slotKey);
                                                         setSelectedRegularSlotsIdx(
