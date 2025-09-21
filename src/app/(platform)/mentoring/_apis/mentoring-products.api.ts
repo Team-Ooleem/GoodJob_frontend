@@ -57,6 +57,7 @@ export interface MentoringSlot {
     day_of_week: number;
     hour_slot: number;
     time_range: string;
+    is_booked: boolean;
 }
 
 export interface MentoringProductSlots {
