@@ -128,20 +128,14 @@ export class WavRecorder {
     }
 
     private startChunkTimer() {
-        let chunkCount = 0;
         this.chunkTimer = setInterval(() => {
             if (this.recording && this.chunkCallback) {
-                chunkCount++;
-                // 60초마다 무조건 실행 - 무음이어도 버퍼 전송
-                const totalSamples = this.buffers.reduce((sum, buf) => sum + buf.length, 0);
+                // 60초 정확히 지났을 때만 청크 생성
                 const chunkWav = this.createChunk();
-                console.log(
-                    `⏰ 청크 ${chunkCount} 전송: ${this.buffers.length}개 버퍼, ${totalSamples}개 샘플, 크기: ${chunkWav.size} bytes (무음 포함)`,
-                );
                 this.chunkCallback(chunkWav);
-                this.buffers = []; // 전체 버퍼 클리어
+                this.buffers = [];
             }
-        }, 60000);
+        }, 60000); // 정확히 60초
     }
 
     private createChunk() {
@@ -159,7 +153,6 @@ export class WavRecorder {
         });
     }
 
-    // 🆕 WebRTC 스트림으로 녹화 시작
     async webRTCStart() {
         if (this.recording) return;
 
@@ -228,11 +221,10 @@ export class WavRecorder {
         }
     }
 
-    // �� WebRTC 스트림 녹화 종료
     async webRTCStop() {
         if (!this.recording) return;
 
-        console.log('️ WebRTC 스트림 녹화 종료');
+        console.log('🎬 WebRTC 스트림 녹화 종료');
 
         this.recording = false;
         this.stopped = true;
@@ -243,19 +235,34 @@ export class WavRecorder {
             this.chunkTimer = null;
         }
 
+        // 🔧 마지막 오디오 데이터 수집 대기
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
         // AudioContext 닫기 전에 마지막 청크 전송
         const currentSampleRate = this.audioCtx?.sampleRate || 44100;
-        if (this.buffers.length > 0 && this.chunkCallback) {
-            const totalSamples = this.buffers.reduce((sum, buf) => sum + buf.length, 0);
-            const durationSeconds = totalSamples / currentSampleRate;
-            console.log(`🔚 녹화 종료 시 마지막 청크 전송: ${this.buffers.length}개 버퍼, ${totalSamples}개 샘플, ${durationSeconds.toFixed(2)}초`);
 
-            const finalChunk = this.createChunk();
-            console.log(`🔚 최종 청크 크기: ${finalChunk.size} bytes`);
-            this.chunkCallback(finalChunk);
+        // 🔧 버퍼가 있거나 강제로 마지막 청크 생성
+        if (this.chunkCallback) {
+            if (this.buffers.length > 0) {
+                const totalSamples = this.buffers.reduce((sum, buf) => sum + buf.length, 0);
+                const durationSeconds = totalSamples / currentSampleRate;
+                console.log(
+                    `🔚 녹화 종료 시 마지막 청크 전송: ${this.buffers.length}개 버퍼, ${totalSamples}개 샘플, ${durationSeconds.toFixed(2)}초`,
+                );
+
+                const finalChunk = this.createChunk();
+                console.log(`🔚 최종 청크 크기: ${finalChunk.size} bytes`);
+                this.chunkCallback(finalChunk);
+            } else {
+                // 🔧 버퍼가 없어도 빈 청크라도 생성해서 전송 (완전성 보장)
+                console.log('🔚 버퍼 없음 - 빈 청크 생성 후 전송');
+                const emptyChunk = this.createChunk(); // 빈 청크 생성
+                this.chunkCallback(emptyChunk);
+            }
+
             this.buffers = []; // 버퍼 클리어
         } else {
-            console.log(`🔚 녹화 종료 시 전송할 버퍼 없음 (buffers: ${this.buffers.length}, callback: ${this.chunkCallback ? '있음' : '없음'})`);
+            console.log('🔚 chunkCallback이 없어서 최종 청크 전송 불가');
         }
 
         // 이제 안전하게 오디오 리소스 정리
@@ -275,10 +282,10 @@ export class WavRecorder {
         if (this.fallbackStream) {
             this.fallbackStream.getTracks().forEach((track) => track.stop());
             this.fallbackStream = null;
-            console.log('️ 로컬 마이크 스트림 정리 완료');
+            console.log('🎬 로컬 마이크 스트림 정리 완료');
         }
 
         // WebRTC 스트림은 정리하지 않음 (다른 곳에서 사용할 수 있음)
-        console.log('️ WebRTC 스트림 녹화 종료 완료');
+        console.log('🎬 WebRTC 스트림 녹화 종료 완료');
     }
 }

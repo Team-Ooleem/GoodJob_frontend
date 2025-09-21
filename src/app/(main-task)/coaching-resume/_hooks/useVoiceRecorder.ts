@@ -257,6 +257,12 @@ export const startRecording = async () => {
     }
 
     try {
+        // ✨ 매번 새 녹음 시작할 때 초기화
+        chunkIndex = 0;
+        totalChunks = 0;
+        cumulativeTime = 0;
+        console.log(`🆕 새 세션으로 초기화 - canvasId: ${globalState.canvasId}`);
+
         // 🆕 WebRTC 스트림 확인
         const { localStream, remoteStream } = globalState.webrtcStreams;
 
@@ -271,24 +277,16 @@ export const startRecording = async () => {
         // WavRecorder 콜백 설정
         globalState.wavRecorder.setChunkCallback(async (wavBlob: Blob) => {
             totalChunks++; // 총 청크 수 증가
-            console.log(`🎵 청크 ${chunkIndex} 생성됨 - 크기: ${wavBlob.size} bytes (총 ${totalChunks}개)`);
+            console.log(
+                `🎵 청크 ${chunkIndex} 생성됨 - 크기: ${wavBlob.size} bytes (총 ${totalChunks}개)`,
+            );
             const isFirstChunk = chunkIndex === 0;
-            await processSTTChunk(wavBlob, 'audio/wav', chunkIndex, false, isFirstChunk);
+            await processSTTChunk(wavBlob, 'audio/wav', chunkIndex, false, true);
             chunkIndex++;
         });
 
         await globalState.wavRecorder.webRTCStart();
         console.log('️ WebRTC 스트림으로 녹화 시작');
-
-        // 🔧 새 녹음 세션 여부 결정
-        const isNewSession = chunkIndex === 0;
-        if (isNewSession) {
-            totalChunks = 0;
-            cumulativeTime = 0;
-            console.log(`🆕 새 세션으로 초기화 - canvasId: ${globalState.canvasId}`);
-        } else {
-            console.log(`🔄 세션 재시작 - chunkIndex: ${chunkIndex}`);
-        }
 
         // Canvas Store 상태 업데이트
         canvasStore.setRecording(true);
@@ -297,7 +295,6 @@ export const startRecording = async () => {
         logOnce('recordingStarted', '🎙️ WAV 직접 녹음 시작됨 (16000Hz)');
     } catch (err) {
         logOnce('micAccessFailed', '마이크 접근 실패', 'error');
-        // recordingStopped 플래그 리셋은 불필요
     }
 };
 
@@ -316,8 +313,10 @@ export const stopRecording = async () => {
         await globalState.wavRecorder.webRTCStop();
         console.log('✅ WebRTC 스트림 녹화 종료 (최종 청크 포함)');
 
-        // 🔧 최종 처리 신호만 전송 (빈 신호로 병합 트리거)
-        console.log('📤 최종 처리 신호 전송 중...');
+        // 🔧 1.5초 대기 후 최종 신호 전송 (마지막 청크 처리 완료 대기)
+        console.log('📤 최종 처리 신호 전송 중... (1.5초 대기)');
+        await new Promise((resolve) => setTimeout(resolve, 10000));
+
         await processSTTChunk(
             new Blob([], { type: 'audio/wav' }),
             'audio/wav',
