@@ -65,7 +65,10 @@ export default function AiInterviewResultCard({ result }: AiInterviewResultCardP
                 )}
 
                 <div className='flex items-center justify-end'>
-                    <Link href={`/my-page/ai-interview-result/${result?.session_id}`}>
+                    <Link
+                        prefetch={true}
+                        href={`/my-page/ai-interview-result/${result?.session_id}`}
+                    >
                         <Button variant='outline' size='sm'>
                             상세보기
                         </Button>
