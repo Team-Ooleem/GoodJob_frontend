@@ -20,10 +20,11 @@ import { stopRecording } from '../_hooks/useVoiceRecorder';
 interface CanvasHeaderProps {
     title: string;
     onExit?: () => void;
-    scheduledAt?: string; // ISO string for the scheduled start time
+    startTime?: string; // ISO string for the session start time
+    endTime?: string; // ISO string for the session end time
 }
 
-export function CanvasHeader({ title, onExit, scheduledAt }: CanvasHeaderProps) {
+export function CanvasHeader({ title, onExit, startTime, endTime }: CanvasHeaderProps) {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const router = useRouter();
     const [remaining, setRemaining] = useState<string>('');
@@ -31,31 +32,33 @@ export function CanvasHeader({ title, onExit, scheduledAt }: CanvasHeaderProps) 
     // Countdown: from scheduledAt time, 60:00 down to 00:00
     // If before start, show 60:00. If after +60m, show 00:00.
     useEffect(() => {
-        if (!scheduledAt) {
-            setRemaining('');
-            return;
-        }
+        if (!endTime) return;
 
-        // DB 값(UTC) + 15시간 보정
-        const start = new Date(scheduledAt).getTime() + 15 * 60 * 60 * 1000;
+        const target = new Date(endTime).getTime();
 
-        const total = 60 * 60; // seconds
-
-        const calc = () => {
+        const update = () => {
             const now = Date.now();
-            const diffSec = Math.floor((now - start) / 1000);
-            let remain = total - diffSec;
-            if (diffSec < 0) remain = total; // before start
-            if (remain < 0) remain = 0; // after end
-            const mm = String(Math.floor(remain / 60)).padStart(2, '0');
-            const ss = String(remain % 60).padStart(2, '0');
-            setRemaining(`${mm}:${ss}`);
+            const diff = target - now;
+
+            if (diff <= 0) {
+                setRemaining('00:00');
+                return;
+            }
+
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+            const hh = String(hours).padStart(2, '0');
+            const mm = String(minutes).padStart(2, '0');
+
+            setRemaining(`${hh}:${mm}`);
         };
 
-        calc();
-        const id = setInterval(calc, 1000);
-        return () => clearInterval(id);
-    }, [scheduledAt]);
+        update(); // 초기 실행
+        const timer = setInterval(update, 60 * 1000); // 1분마다 갱신
+
+        return () => clearInterval(timer);
+    }, [endTime]);
 
     const handleExit = async () => {
         if (onExit) {

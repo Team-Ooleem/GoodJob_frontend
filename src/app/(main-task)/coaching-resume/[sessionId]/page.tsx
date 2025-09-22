@@ -85,7 +85,8 @@ export default function CoachingResumePage() {
             <SocketProvider />
             <CanvasHeader
                 title={canvasData?.name || '코칭 세션'}
-                scheduledAt={canvasData?.scheduled_at}
+                startTime={canvasData?.start_time}
+                endTime={canvasData?.end_time}
                 onExit={() => {
                     resetSession();
                     router.back();
