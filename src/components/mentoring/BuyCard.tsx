@@ -21,8 +21,8 @@ export function BuyCard({ price, productIdx }: Props) {
                 disabled={!productIdx}
             >
                 <Link
+                    prefetch={true}
                     href={productIdx ? `/mentoring/${productIdx}/reservation` : '#'}
-                    prefetch={false}
                 >
                     멘토링 신청하기
                 </Link>

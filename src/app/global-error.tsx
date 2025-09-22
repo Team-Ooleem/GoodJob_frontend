@@ -55,6 +55,7 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
                                         className='flex-1 border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700'
                                     >
                                         <Link
+                                            prefetch={true}
                                             href='/'
                                             className='flex items-center justify-center gap-2'
                                         >

@@ -142,7 +142,7 @@ export default function AdminProductPage() {
                         멘토링 상품을 등록하고 관리할 수 있습니다.
                     </p>
                 </div>
-                <Link href='/admin/mentoring/creation'>
+                <Link prefetch={true} href='/admin/mentoring/creation'>
                     <Button className='flex items-center gap-2'>
                         <Plus className='h-4 w-4' />
                         멘토링 등록

@@ -2,7 +2,13 @@
 
 import { useEffect } from 'react';
 import { useWindowSize } from '@/hooks';
-import { useFabricCanvas, useFabricDotGrid, useZoomPan, useCanvasShortCut } from '../_hooks';
+import {
+    useFabricCanvas,
+    useFabricDotGrid,
+    useZoomPan,
+    useCanvasShortCut,
+    usePdfDrop,
+} from '../_hooks';
 import { useCanvasStore } from '../_stores';
 
 export function DotOnlyCanvas() {
@@ -38,6 +44,8 @@ export function DotOnlyCanvas() {
 
     // 🆕 캔버스 관련 단축키 관리
     useCanvasShortCut();
+
+    usePdfDrop(canvasRef);
 
     return <canvas ref={canvasRef} className='w-full h-full' />;
 }

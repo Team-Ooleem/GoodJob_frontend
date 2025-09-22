@@ -14,7 +14,7 @@ export function HeaderNavigationAnchor({
     target = '_self',
 }: IHeaderNavigationAnchor) {
     return (
-        <Link href={href} className='text-base font-semibold' target={target}>
+        <Link prefetch={true} href={href} className='text-base font-semibold' target={target}>
             {children}
         </Link>
     );

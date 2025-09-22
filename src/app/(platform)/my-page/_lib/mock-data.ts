@@ -80,6 +80,8 @@ export interface MentoringApplication {
     product_title: string;
     booked_date: string;
     application_status: 'approved' | 'pending' | 'rejected';
+    start_time: string;
+    end_time: string;
     mentee: {
         user_idx: number;
         name: string;
@@ -87,7 +89,6 @@ export interface MentoringApplication {
     };
     mentor: {
         mentor_idx: number;
-        name: string;
         business_name: string;
         job_category: string;
     };

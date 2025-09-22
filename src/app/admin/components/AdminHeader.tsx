@@ -7,7 +7,11 @@ export function AdminHeader() {
                 <h1 className='text-lg font-semibold'>관리자 대시보드</h1>
             </div>
             <div className='flex items-center gap-2 pr-5'>
-                <Link href='/' className='text-sm text-muted-foreground hover:text-primary'>
+                <Link
+                    prefetch={true}
+                    href='/'
+                    className='text-sm text-muted-foreground hover:text-primary'
+                >
                     홈
                 </Link>
             </div>

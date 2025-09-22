@@ -133,6 +133,12 @@ export default function QuestionFeedbackCard({
                     <div className='space-y-4'>
                         {questionFeedback.map((feedback: any, index: number) => {
                             const isExpanded = expandedQuestions.has(index);
+                            const links = Array.isArray(feedback?.links) ? feedback.links : [];
+                            const bestSim = links
+                                .slice()
+                                .sort(
+                                    (a: any, b: any) => (b?.similarity ?? 0) - (a?.similarity ?? 0),
+                                )[0]?.similarity;
                             return (
                                 <div
                                     key={index}
@@ -150,47 +156,76 @@ export default function QuestionFeedbackCard({
                                                 <ChevronRight className='h-4 w-4 text-gray-500' />
                                             )}
                                             <div className='font-semibold text-lg'>
-                                                Q{index + 1}. 질문 피드백
+                                                {`Q${index + 1}. ${feedback?.questionText ?? '질문'}`}
                                             </div>
                                         </div>
-                                        <Badge
-                                            variant='secondary'
-                                            className='text-sm'
-                                            style={{
-                                                backgroundColor: getSimilarityColor(
-                                                    feedback.similarity,
-                                                ),
-                                                color: 'white',
-                                            }}
-                                        >
-                                            유사도: {Math.round(feedback.similarity * 100)}% (
-                                            {getSimilarityLevel(feedback.similarity)})
-                                        </Badge>
+                                        {/* {typeof bestSim === 'number' && isFinite(bestSim) ? (
+                                            <Badge
+                                                variant='secondary'
+                                                className='text-sm'
+                                                style={{
+                                                    backgroundColor: getSimilarityColor(bestSim),
+                                                    color: 'white',
+                                                }}
+                                            >
+                                                유사도: {Math.round(bestSim * 100)}% (
+                                                {getSimilarityLevel(bestSim)})
+                                            </Badge>
+                                        ) : (
+                                            <Badge variant='outline' className='text-sm'>근거 없음</Badge>
+                                        )} */}
                                     </div>
 
                                     {/* 답변과 피드백 내용 - 펼쳐질 때만 표시 */}
                                     {isExpanded && (
                                         <div className='border-t border-gray-200 p-4 space-y-4'>
-                                            <div className='bg-gray-50 p-4 rounded-lg'>
-                                                <p className='text-sm text-gray-600'>
-                                                    <strong>답변:</strong> {feedback.answer_span}
-                                                </p>
-                                            </div>
-
-                                            <div className='bg-blue-50 p-4 rounded-lg'>
-                                                <p className='text-sm'>
-                                                    <strong>AI 피드백:</strong>{' '}
-                                                    {feedback.explanation}
-                                                </p>
-                                            </div>
-
-                                            {feedback.resume_ref && (
-                                                <div className='bg-green-50 p-4 rounded-lg'>
-                                                    <p className='text-sm'>
-                                                        <strong>이력서 참조:</strong>{' '}
-                                                        {feedback.resume_ref}
-                                                    </p>
+                                            {links.length === 0 ? (
+                                                <div className='text-sm text-gray-500'>
+                                                    표시할 근거가 없습니다.
                                                 </div>
+                                            ) : (
+                                                links.map((link: any, li: number) => (
+                                                    <div key={li} className='space-y-3'>
+                                                        <div className='bg-gray-50 p-4 rounded-lg'>
+                                                            <p className='text-sm text-gray-600'>
+                                                                <strong>답변:</strong>{' '}
+                                                                {link?.answer_span}
+                                                            </p>
+                                                        </div>
+                                                        {link?.explanation && (
+                                                            <div className='bg-blue-50 p-4 rounded-lg'>
+                                                                <p className='text-sm'>
+                                                                    <strong>AI 피드백:</strong>{' '}
+                                                                    {link.explanation}
+                                                                </p>
+                                                            </div>
+                                                        )}
+                                                        {link?.resume_ref && (
+                                                            <div className='bg-green-50 p-4 rounded-lg'>
+                                                                <p className='text-sm'>
+                                                                    <strong>
+                                                                        이력서 체크포인트:
+                                                                    </strong>{' '}
+                                                                    {link.resume_ref}
+                                                                </p>
+                                                            </div>
+                                                        )}
+                                                        {typeof link?.similarity === 'number' && (
+                                                            <div className='text-xs text-gray-500'>
+                                                                유사도:{' '}
+                                                                {Math.round(link.similarity * 100)}%
+                                                                (
+                                                                {getSimilarityLevel(
+                                                                    link.similarity,
+                                                                )}
+                                                                )
+                                                            </div>
+                                                        )}
+                                                        {li !== links.length - 1 && (
+                                                            <div className='h-px bg-gray-200 my-2' />
+                                                        )}
+                                                    </div>
+                                                ))
                                             )}
                                         </div>
                                     )}

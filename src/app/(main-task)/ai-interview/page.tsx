@@ -59,7 +59,7 @@ export default function AiInterviewPage() {
 
                     {/* CTA 버튼 */}
                     <div className='flex justify-center items-center mb-8'>
-                        <Link href='/ai-interview/select'>
+                        <Link prefetch={true} href='/ai-interview/select'>
                             <Button
                                 size='lg'
                                 className='h-16 px-12 text-xl font-bold bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 border-0 rounded-2xl shadow-2xl text-white'
