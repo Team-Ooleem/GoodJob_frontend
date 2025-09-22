@@ -13,18 +13,26 @@ export interface CreateCoachingCanvasResponse {
     participants: number[];
 }
 
+export interface SessionStatusResponse {
+    isCompleted: boolean;
+    application_status: string;
+    scheduled_at?: string;
+    completed_at?: string;
+}
+
 // ===== API 서비스 클래스 =====
 export class CoachingResumeApi {
     /**
      * 이력서 코칭 캔버스 생성 및 참여자 초대
      */
-    static async createCoachingCanvas(
-        data: CreateCoachingCanvasRequest,
-    ): Promise<CreateCoachingCanvasResponse> {
-        const response = await api.post<CreateCoachingCanvasResponse>(
-            '/coaching-resume/canvas',
-            data,
+    static async checkSessionStatus(canvasId: string): Promise<SessionStatusResponse> {
+        const response = await api.get<SessionStatusResponse>(
+            `/coaching-resume/${canvasId}/status`,
         );
+        return response.data;
+    }
+    static async completeSession(canvasId: string) {
+        const response = await api.patch(`/coaching-resume/${canvasId}/complete`);
         return response.data;
     }
 }
