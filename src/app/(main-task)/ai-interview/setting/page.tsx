@@ -178,24 +178,24 @@ export default function AiInterviewSettingCalibrationCombined() {
             // Select 페이지에서 생성된 세션 ID를 로드
             try {
                 const sid = localStorage.getItem('aiInterviewSessionId');
-                if (!sid) {
-                    console.warn('세션 ID가 없습니다. 선택 페이지에서 세션을 생성하세요.');
-                    alert('세션 정보가 없습니다. 이력서 선택 화면으로 이동합니다.');
-                    router.replace('/ai-interview/select');
-                    return;
-                }
-                // 서버 상태 점검: 삭제되었거나 소유권 검증 실패 시 존재하지 않는 것으로 간주
-                try {
-                    const res = await fetch(`${API_BASE_URL}/ai/${sid}/status`, {
-                        credentials: 'include',
-                    });
-                    const data = await res.json().catch(() => null);
-                    if (!data?.ok || !data?.exists) {
-                        alert('세션이 유효하지 않습니다. 이력서 선택 화면으로 이동합니다.');
-                        router.replace('/ai-interview/select');
-                        return;
-                    }
-                } catch {}
+                // if (!sid) {
+                //     console.warn('세션 ID가 없습니다. 선택 페이지에서 세션을 생성하세요.');
+                //     alert('세션 정보가 없습니다. 이력서 선택 화면으로 이동합니다.');
+                //     router.replace('/ai-interview/select');
+                //     return;
+                // }
+                // // 서버 상태 점검: 삭제되었거나 소유권 검증 실패 시 존재하지 않는 것으로 간주
+                // try {
+                //     const res = await fetch(`${API_BASE_URL}/ai/${sid}/status`, {
+                //         credentials: 'include',
+                //     });
+                //     const data = await res.json().catch(() => null);
+                //     if (!data?.ok || !data?.exists) {
+                //         alert('세션이 유효하지 않습니다. 이력서 선택 화면으로 이동합니다.');
+                //         router.replace('/ai-interview/select');
+                //         return;
+                //     }
+                // } catch {}
                 setSessionId(sid);
             } catch (e) {
                 console.warn('세션 ID 로드 실패:', e);
