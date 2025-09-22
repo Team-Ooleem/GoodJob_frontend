@@ -3,6 +3,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, Video, Mic } from 'lucide-react';
 import { api } from '@/apis/api';
+import { useRouter } from 'next/navigation';
+import { API_BASE_URL } from '@/constants/config';
+import { InterviewAPI } from '../sessions/_apis/interview-api';
 
 import { Webcam, WebcamHandle } from '../_components/Webcam';
 import { VisualAggregatePayload } from '../_components/RealMediaPipeAnalyzer';
@@ -112,9 +115,11 @@ class WavRecorder {
 }
 
 export default function AiInterviewSettingCalibrationCombined() {
+    const router = useRouter();
     const webcamRef = useRef<WebcamHandle>(null);
     const recRef = useRef<WavRecorder | null>(null);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
+    const bypassCancelRef = useRef(false);
     // 실제 녹음 시작 시각 기록(정확한 duration 계산용)
     const recStartedAtRef = useRef<number | null>(null);
 
@@ -173,13 +178,30 @@ export default function AiInterviewSettingCalibrationCombined() {
             // Select 페이지에서 생성된 세션 ID를 로드
             try {
                 const sid = localStorage.getItem('aiInterviewSessionId');
-                if (sid) setSessionId(sid);
-                else console.warn('세션 ID가 없습니다. 선택 페이지에서 세션을 생성하세요.');
+                if (!sid) {
+                    console.warn('세션 ID가 없습니다. 선택 페이지에서 세션을 생성하세요.');
+                    alert('세션 정보가 없습니다. 이력서 선택 화면으로 이동합니다.');
+                    router.replace('/ai-interview/select');
+                    return;
+                }
+                // 서버 상태 점검: 삭제되었거나 소유권 검증 실패 시 존재하지 않는 것으로 간주
+                try {
+                    const res = await fetch(`${API_BASE_URL}/ai/${sid}/status`, {
+                        credentials: 'include',
+                    });
+                    const data = await res.json().catch(() => null);
+                    if (!data?.ok || !data?.exists) {
+                        alert('세션이 유효하지 않습니다. 이력서 선택 화면으로 이동합니다.');
+                        router.replace('/ai-interview/select');
+                        return;
+                    }
+                } catch {}
+                setSessionId(sid);
             } catch (e) {
                 console.warn('세션 ID 로드 실패:', e);
             }
         })();
-    }, []);
+    }, [router]);
 
     const startCalibration: () => Promise<void> = async () => {
         try {
@@ -222,7 +244,10 @@ export default function AiInterviewSettingCalibrationCombined() {
             }
             // 실제 녹음 시작~종료까지의 길이를 전달
             const now = Date.now();
-            const durationMs = Math.max(0, (recStartedAtRef.current ? now - recStartedAtRef.current : 0));
+            const durationMs = Math.max(
+                0,
+                recStartedAtRef.current ? now - recStartedAtRef.current : 0,
+            );
             recStartedAtRef.current = null;
 
             // 백엔드로 캘리브레이션 데이터 전송
@@ -284,9 +309,21 @@ export default function AiInterviewSettingCalibrationCombined() {
     const goToSession: () => void = () => {
         // 캘리브레이션이 완료된 상태에서만 면접 시작 가능
         if (phase === 'done') {
+            bypassCancelRef.current = true;
             window.location.href = '/ai-interview/sessions';
         }
     };
+
+    // 페이지 이탈 시 세션 취소 알림 (세션 ID가 있고 세션 페이지로 넘어가지 않는 케이스)
+    useEffect(() => {
+        return () => {
+            try {
+                if (!bypassCancelRef.current && sessionId) {
+                    InterviewAPI.cancelSession(sessionId);
+                }
+            } catch {}
+        };
+    }, [sessionId]);
 
     return (
         <div className='min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-3 relative overflow-hidden'>
@@ -307,7 +344,10 @@ export default function AiInterviewSettingCalibrationCombined() {
                         </CardTitle>
                     </div>
                     <p className='text-gray-600 text-base'>
-                        최적의 면접 환경을 위해 카메라와 마이크를 테스트해주세요.
+                        얼굴을 가이드 선 안에 들어오게 맞추고, 녹화 버튼을 눌러주세요.
+                    </p>
+                    <p className='text-gray-600 text-sm'>
+                        녹화가 시작되면 아래 문장을 소리 내어 읽어주세요.
                     </p>
                 </CardHeader>
 

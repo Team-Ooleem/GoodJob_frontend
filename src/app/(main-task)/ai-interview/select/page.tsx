@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Video, CheckCircle, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Video, Loader2, FileText } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useResumeUpload } from './_hooks/useResumeUpload';
 import { api } from '@/apis/api';
@@ -22,18 +22,16 @@ export default function AiInterviewSelectPage() {
     const [jobVerifyState, setJobVerifyState] = useState<'idle' | 'verifying' | 'success' | 'fail'>(
         'idle',
     );
-    const [jobMeta, setJobMeta] = useState<
-        {
-            title?: string;
-            company?: string;
-            source?: string;
-            url?: string;
-            content?: string;
-            summary?: string;
-            summaryJson?: JobPostSummary;
-            ts?: number;
-        } | null
-    >(null);
+    const [jobMeta, setJobMeta] = useState<{
+        title?: string;
+        company?: string;
+        source?: string;
+        url?: string;
+        content?: string;
+        summary?: string;
+        summaryJson?: JobPostSummary;
+        ts?: number;
+    } | null>(null);
     const [jobVerifyNotice, setJobVerifyNotice] = useState<'none' | 'success' | 'failed'>('none');
     const [urlError, setUrlError] = useState<string | null>(null);
     const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
@@ -58,6 +56,59 @@ export default function AiInterviewSelectPage() {
         }
     };
 
+    // 채용공고 정보 사전 확인(검증 + 세션 캐시 주입)
+    const verifyJobPost = async () => {
+        const url = jobPostUrl.trim();
+        if (!url) {
+            setUrlError('채용공고 URL을 입력해주세요.');
+            return;
+        }
+        try {
+            new URL(url);
+        } catch {
+            setUrlError('올바른 URL 형식을 입력해주세요.');
+            return;
+        }
+
+        setIsVerifyingJob(true);
+        setJobVerifyState('verifying');
+        setJobVerifyNotice('none');
+        try {
+            const sid =
+                typeof window !== 'undefined'
+                    ? localStorage.getItem('aiInterviewSessionId') || undefined
+                    : undefined;
+            const result = await jobPostApi.extract(url, sid);
+            if (result.ok) {
+                const meta = {
+                    url: result.url,
+                    title: result.title,
+                    company: result.company,
+                    source: result.source,
+                    summary: result.summary,
+                    summaryJson: result.summaryJson,
+                    content: undefined,
+                    ts: Date.now(),
+                };
+                setJobMeta(meta);
+                setJobVerifyState('success');
+                setJobVerifyNotice('success');
+                try {
+                    sessionStorage.setItem('jobPostMeta', JSON.stringify(meta));
+                } catch {}
+            } else {
+                setJobVerifyState('fail');
+                setJobVerifyNotice('failed');
+            }
+        } catch (e) {
+            console.error('채용공고 사전 추출 실패:', e);
+            setJobVerifyState('fail');
+            setJobVerifyNotice('failed');
+        } finally {
+            setIsVerifyingJob(false);
+        }
+    };
+
     const handleStartInterview = async () => {
         // 이력서가 업로드되지 않았으면 면접을 시작할 수 없음
         if (!uploadedFile) {
@@ -68,59 +119,10 @@ export default function AiInterviewSelectPage() {
         // (이전 단계) 중복된 사전 추출 로직 제거됨 – 아래에서 일괄 처리합니다.
 
         try {
-            // 채용공고 URL이 입력된 경우: 형식 검증 + 백엔드 사전 추출
-            if (jobPostUrl.trim()) {
-                try {
-                    new URL(jobPostUrl);
-                } catch {
-                    setUrlError('올바른 URL 형식을 입력해주세요.');
-                    return;
-                }
+            // 검증 성공시에만 채용공고를 반영
+            const isJobVerified = !!(jobPostUrl.trim() && jobVerifyState === 'success' && jobMeta);
 
-                setIsVerifyingJob(true);
-                setJobVerifyState('verifying');
-                try {
-                    const sid =
-                        typeof window !== 'undefined'
-                            ? localStorage.getItem('aiInterviewSessionId') || undefined
-                            : undefined;
-                    const result = await jobPostApi.extract(jobPostUrl.trim(), sid);
-                    if (result.ok) {
-                        const meta = {
-                            url: result.url,
-                            title: result.title,
-                            company: result.company,
-                            source: result.source,
-                            // 서버에서 생성한 요약을 그대로 저장 (세션 캐시와 일관)
-                            summary: result.summary,
-                            summaryJson: result.summaryJson,
-                            content: undefined,
-                            ts: Date.now(),
-                        };
-                        setJobMeta(meta);
-                        setJobVerifyState('success');
-                        setJobVerifyNotice('success');
-                        try {
-                            sessionStorage.setItem('jobPostMeta', JSON.stringify(meta));
-                        } catch {}
-                    } else {
-                        setJobVerifyState('fail');
-                        setJobVerifyNotice('failed');
-                    }
-                } catch (e) {
-                    console.error('채용공고 사전 추출 실패:', e);
-                    setJobVerifyState('fail');
-                    setJobVerifyNotice('failed');
-                } finally {
-                    setIsVerifyingJob(false);
-                }
-            } else {
-                setJobVerifyState('idle');
-                setJobVerifyNotice('none');
-                setUrlError(null);
-            }
-
-            // 환경 체크 시작 (검증 이후 진행)
+            // 환경 체크 시작
             setIsCheckingEnvironment(true);
 
             // 이력서가 업로드된 경우 파싱 시작
@@ -135,7 +137,16 @@ export default function AiInterviewSelectPage() {
                 sessionStorage.setItem('interviewType', 'profile-based');
             }
 
-            sessionStorage.setItem('jobPostUrl', jobPostUrl);
+            // 채용공고 URL/메타 저장은 검증 성공시에만 수행
+            if (isJobVerified) {
+                sessionStorage.setItem('jobPostUrl', jobPostUrl.trim());
+                try {
+                    sessionStorage.setItem('jobPostMeta', JSON.stringify(jobMeta));
+                } catch {}
+            } else {
+                sessionStorage.removeItem('jobPostUrl');
+                sessionStorage.removeItem('jobPostMeta');
+            }
 
             // 파싱 성공 시 다음 페이지로 이동
             router.push('/ai-interview/setting');
@@ -175,6 +186,7 @@ export default function AiInterviewSelectPage() {
                 'interviewVisualPerQuestion',
                 'interviewAnalysis',
                 'interviewQA',
+                'aiInterviewSessionId',
             ];
             keysToClear.forEach((k) => localStorage.removeItem(k));
         } catch {}
@@ -397,21 +409,7 @@ export default function AiInterviewSelectPage() {
                                                 className='flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors duration-200'
                                             >
                                                 <div className='flex flex-col items-center justify-center pt-5 pb-6'>
-                                                    <svg
-                                                        className='w-8 h-8 mb-4 text-gray-500'
-                                                        aria-hidden='true'
-                                                        xmlns='http://www.w3.org/2000/svg'
-                                                        fill='none'
-                                                        viewBox='0 0 20 16'
-                                                    >
-                                                        <path
-                                                            stroke='currentColor'
-                                                            strokeLinecap='round'
-                                                            strokeLinejoin='round'
-                                                            strokeWidth='2'
-                                                            d='M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.5c-.376 0-.75.072-1.09.213a5.5 5.5 0 0 0-1.44 10.5A5.5 5.5 0 0 0 7.5 16h6a5.5 5.5 0 0 0 5.5-5.5 5.5 5.5 0 0 0-5.5-5.5H13v3Z'
-                                                        />
-                                                    </svg>
+                                                    <FileText className='w-9 h-9 mb-4 text-gray-500' />
                                                     <p className='mb-2 text-sm text-gray-500'>
                                                         <span className='font-semibold'>
                                                             클릭하여 PDF 파일 선택
@@ -454,8 +452,12 @@ export default function AiInterviewSelectPage() {
                                                     채용공고 URL (선택사항)
                                                 </p>
                                                 <p className='text-blue-700 text-sm'>
-                                                    사람인 사이트의 채용공고 URL을 입력하면 더
-                                                    정확한 면접을 진행할 수 있습니다.
+                                                    채용공고 URL을 입력하면 더 정확한 면접을 진행할
+                                                    수 있습니다. <br />
+                                                    채용공고 URL을 입력하고 "채용공고 정보
+                                                    확인하기"를 눌러주세요. <br /> 정보 확인에
+                                                    성공하면 아래에 확인된 채용공고 정보가 면접에
+                                                    반영됩니다.
                                                 </p>
                                                 <p className='text-blue-600 text-xs mt-1'>
                                                     예시:
@@ -507,20 +509,31 @@ export default function AiInterviewSelectPage() {
                                     {!isVerifyingJob && jobVerifyState === 'success' && jobMeta && (
                                         <Alert className='border-green-300 bg-green-50'>
                                             <AlertTitle className='text-green-800'>
-                                                채용공고 확인됨
+                                                아래 정보를 확인해주세요. 해당 내용으로 채용공고가
+                                                면접에 반영됩니다.
                                             </AlertTitle>
                                             <AlertDescription className='text-green-700'>
-                                                {jobMeta.title || jobMeta.company ? (
+                                                {jobMeta.title || jobMeta.summaryJson?.company ? (
                                                     <span>
-                                                        {jobMeta.title
-                                                            ? `제목: ${jobMeta.title}`
-                                                            : ''}
-                                                        {jobMeta.title && jobMeta.company
+                                                        <p>
+                                                            {jobMeta.title
+                                                                ? `제목: ${jobMeta.title}`
+                                                                : ''}
+                                                        </p>
+                                                        {/* {jobMeta.title &&
+                                                        jobMeta.summaryJson?.company
                                                             ? ' / '
-                                                            : ''}
-                                                        {jobMeta.company
-                                                            ? `회사: ${jobMeta.company}`
-                                                            : ''}
+                                                            : ''} */}
+                                                        <p>
+                                                            {jobMeta.summaryJson?.company
+                                                                ? `회사: ${jobMeta.summaryJson?.company}`
+                                                                : ''}
+                                                        </p>
+                                                        <p>
+                                                            {jobMeta.summaryJson?.jobTitle
+                                                                ? `직무: ${jobMeta.summaryJson?.jobTitle}`
+                                                                : ''}
+                                                        </p>
                                                     </span>
                                                 ) : (
                                                     <span>채용공고를 성공적으로 확인했습니다.</span>
@@ -539,6 +552,20 @@ export default function AiInterviewSelectPage() {
                                             </AlertDescription>
                                         </Alert>
                                     )}
+
+                                    <div>
+                                        <Button
+                                            variant='outline'
+                                            onClick={verifyJobPost}
+                                            disabled={isVerifyingJob || !jobPostUrl.trim()}
+                                            className='flex items-center gap-2'
+                                        >
+                                            {isVerifyingJob && (
+                                                <Loader2 className='w-4 h-4 animate-spin' />
+                                            )}
+                                            채용공고 정보 확인하기
+                                        </Button>
+                                    </div>
 
                                     {jobPostUrl &&
                                         (() => {
@@ -573,8 +600,8 @@ export default function AiInterviewSelectPage() {
                                                                 }`}
                                                             >
                                                                 {isSaraminUrl
-                                                                    ? '사람인 채용공고 URL이 입력되었습니다.'
-                                                                    : '사람인 사이트의 URL만 입력할 수 있습니다.'}
+                                                                    ? '채용공고 URL이 입력되었습니다.'
+                                                                    : '정상적인 채용공고 URL이 아닙니다.'}
                                                             </p>
                                                         </div>
                                                     </div>
@@ -611,7 +638,7 @@ export default function AiInterviewSelectPage() {
                                 disabled={!canStart || isParsing || isCheckingEnvironment}
                             >
                                 {(() => {
-                                    if (isParsing) return '이력서 파싱 중…';
+                                    if (isParsing) return '이력서 요약 중…';
                                     if (!uploadedFile) return '이력서를 먼저 업로드해주세요';
                                     return '면접 환경 체크하기';
                                 })()}

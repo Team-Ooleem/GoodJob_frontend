@@ -7,6 +7,8 @@ import { useTTSManager } from './_hooks/useTTSManager';
 import { useInterviewSession } from './_hooks/useInterviewSession';
 import { InterviewAPI } from './_apis/interview-api';
 import { InfoCircleOutlined } from '@ant-design/icons';
+import { useRouter } from 'next/navigation';
+import { API_BASE_URL } from '@/constants/config';
 
 // 더미 면접 데이터
 const interviewData = {
@@ -37,29 +39,60 @@ export default function AiInterviewSessionsPage() {
     const questionManager = useQuestionManager();
     const ttsManager = useTTSManager();
 
+    const router = useRouter();
     const webcamRef = useRef<WebcamHandle>(null);
-    const sessionIdRef = useRef<string>(
-        typeof window !== 'undefined'
-            ? localStorage.getItem('aiInterviewSessionId') ||
-                  `sess_${Math.random().toString(36).slice(2, 10)}_${Date.now()}`
-            : `sess_${Math.random().toString(36).slice(2, 10)}_${Date.now()}`,
-    );
-    const SESSION_ID = sessionIdRef.current as string;
+    const [sessionId, setSessionId] = useState<string | null>(null);
+    const redirectRef = useRef(false);
+
+    // 세션 ID 게이트: 없거나 서버에 존재하지 않으면 선택 페이지로 리다이렉트
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const sid = localStorage.getItem('aiInterviewSessionId');
+        if (!sid) {
+            if (!redirectRef.current) {
+                redirectRef.current = true;
+                alert('세션 정보가 없습니다. 이력서 선택 화면으로 이동합니다.');
+                router.replace('/ai-interview/select');
+            }
+            return;
+        }
+        (async () => {
+            try {
+                const res = await fetch(`${API_BASE_URL}/ai/${sid}/status`, {
+                    credentials: 'include',
+                });
+                const data = await res.json().catch(() => null);
+                if (!data?.ok || !data?.exists) {
+                    if (!redirectRef.current) {
+                        redirectRef.current = true;
+                        alert('세션이 유효하지 않습니다. 이력서 선택 화면으로 이동합니다.');
+                        router.replace('/ai-interview/select');
+                    }
+                    return;
+                }
+                setSessionId(sid);
+            } catch {
+                setSessionId(sid);
+            }
+        })();
+    }, [router]);
 
     const interviewSession = useInterviewSession({
         questionManager,
         ttsManager,
         maxQuestions: MAX_QUESTIONS,
-        sessionId: SESSION_ID,
+        sessionId: sessionId || 'unknown',
         webcamRef,
     });
 
     // 질문 초기화 (개발모드 StrictMode 중복 실행 방지 가드) + 인사 멘트 준비
     const initAskedRef = useRef(false);
     useEffect(() => {
+        if (!sessionId) return;
         const initializeFirstQuestion = async () => {
             try {
-                localStorage.setItem('aiInterviewSessionId', SESSION_ID);
+                // Select 단계에서 생성된 세션 ID를 보존
+                localStorage.setItem('aiInterviewSessionId', sessionId);
 
                 questionManager.setIsLoading(true);
                 const firstQuestion = await InterviewAPI.fetchFirstQuestion();
@@ -109,7 +142,7 @@ export default function AiInterviewSessionsPage() {
             initializeFirstQuestion();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [sessionId]);
 
     // 준비 완료 시: 인사 멘트 → 첫 질문 순서로 TTS 수행
     useEffect(() => {
@@ -186,6 +219,7 @@ export default function AiInterviewSessionsPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [questionManager.currentIndex, questionManager.hasCurrentQuestion]);
 
+    if (!sessionId) return null;
     return (
         <div className='w-screen h-screen flex flex-col justify-end items-center  bg-gradient-to-br from-gray-50 to-gray-100 relative overflow-hidden pb-16'>
             {/* 준비 모달 */}

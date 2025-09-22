@@ -1,211 +1,90 @@
 'use client';
 
 import { useEffect, useMemo, useCallback } from 'react';
-import { CloseOutlined, LeftOutlined } from '@ant-design/icons';
+import { X } from 'lucide-react';
 import { useCanvasStore } from '../_stores/useCanvasStore';
-import { useRecordingStore } from '../_stores/useRecordingStore';
 import { useAudioPlayer } from '../_hooks/useAudioPlayer';
-import { useAudioMetadata } from '../_hooks/useAudioMetadata';
-import { useSessionData } from '../_hooks/useSessionData';
 import { useDragPosition } from '../_hooks/useDragPosition';
+import { useSessionData } from '../_hooks/useSessionData';
 import TranscriptList from './TranscriptList';
-import RecordingList from './RecordingList';
 import { ChatSession, SpeakerSegment, TranscriptItem } from '@/apis/recoding-api';
-
-export type RecordingItem = {
-    id: string;
-    title: string;
-    durationSec: number;
-    createdAt: string;
-};
+import { useParams } from 'next/navigation';
 
 export function RecordingListPopup() {
+    const { sessionId } = useParams<{ sessionId: string }>();
     // 스토어에서 상태 가져오기
     const isOpen = useCanvasStore((s) => s.isRecordingListOpen);
     const setOpen = useCanvasStore((s) => s.setRecordingListOpen);
-    const { selectedRecording, setSelectedRecording, isLoadingAudio, setIsLoadingAudio } =
-        useRecordingStore();
 
     // 커스텀 훅들
     const { pos, handleMouseDown } = useDragPosition();
-    const { sessions, loading, error, fetchSessionMessages, loadMore, setSessions } =
-        useSessionData('resume-room');
-    const { loadAudioMetadata } = useAudioMetadata();
 
-    // 오디오 플레이어 훅
+    // 해당 캔버스의 세션 데이터 로드
+    const { sessions: apiSessions, loading, fetchSessionMessages } = useSessionData(sessionId);
+
+    // AudioPlayer에서 필요한 것들 가져오기
     const {
-        playingSegment,
         currentSession,
-        currentSegment,
+        playingSegment,
         currentTime,
-        duration,
-        isPlaying,
-        isFullSessionMode,
-        audioRef,
-        playSegment,
-        stopAudio,
-        handleTimeUpdate,
-        handleAudioEnd,
-        getAudioSources,
+        setSeekToTime,
         setCurrentSession,
-        setPlayingSegment,
-        setCurrentSegment,
-        setIsFullSessionMode,
-        setIsPlaying,
-        setCurrentTime,
-        setDuration,
+        stopAudio,
+        recentSessions,
+        togglePlayPause,
     } = useAudioPlayer();
 
-    // 오디오 로딩 함수 (useAudioLoading 훅 대신 직접 구현)
-    const loadAudioWithDuration = useCallback(
-        async (audioUrl: string, session: ChatSession) => {
-            setIsLoadingAudio(true);
-            try {
-                const audioDuration = await loadAudioMetadata(audioUrl);
-                setDuration(audioDuration);
-
-                if (audioRef.current) {
-                    audioRef.current.src = audioUrl;
-                    audioRef.current.preload = 'auto';
-                    audioRef.current.load();
-                }
-
-                return audioDuration;
-            } catch (error) {
-                console.warn('Failed to load audio metadata:', error);
-                const fallbackDuration = Math.max(...session.segments.map((s) => s.endTime));
-                setDuration(fallbackDuration);
-                return fallbackDuration;
-            } finally {
-                setIsLoadingAudio(false);
-            }
-        },
-        [loadAudioMetadata, setIsLoadingAudio, setDuration, audioRef],
-    );
-
-    // 데이터 로딩
+    // 팝업이 열릴 때 해당 캔버스 데이터 로드
     useEffect(() => {
-        if (isOpen) {
-            const loadData = async () => {
-                try {
-                    const sessions = await fetchSessionMessages(1);
-                    setSessions(sessions);
-                } catch (error) {
-                    console.error('Failed to load sessions:', error);
-                }
-            };
-            loadData();
+        if (isOpen && sessionId) {
+            fetchSessionMessages(1);
         }
-    }, [isOpen, fetchSessionMessages, setSessions]);
+    }, [isOpen, sessionId, fetchSessionMessages]);
 
-    // 세션 로딩 최적화
+    // recentSessions와 API 세션 통합 (중복 제거)
+    const allSessions = useMemo(() => {
+        const combined = [...(recentSessions || []), ...(apiSessions || [])];
+        return combined.filter(
+            (session, index, self) =>
+                index === self.findIndex((s) => s.sessionIdx === session.sessionIdx),
+        );
+    }, [recentSessions, apiSessions]);
+
+    // 첫 번째 세션을 자동으로 선택
     useEffect(() => {
-        if (selectedRecording && sessions.length > 0) {
-            const session = sessions.find((s) => `rec-${s.sessionIdx}` === selectedRecording.id);
-            if (session) {
-                setCurrentSession(session as unknown as ChatSession);
-                setPlayingSegment(null);
-                setCurrentSegment(null);
-                setIsFullSessionMode(true);
-                setCurrentTime(0);
-                setIsPlaying(false);
-
-
-                const audioUrl = session.segments[0]?.audioUrl;
-                if (audioUrl) {
-                    loadAudioWithDuration(audioUrl, session as unknown as ChatSession);
-                }
-            }
+        if (isOpen && allSessions.length > 0 && !currentSession) {
+            setCurrentSession(allSessions[0] as unknown as ChatSession);
         }
-    }, [
-        selectedRecording,
-        sessions,
-        setIsPlaying,
-        setCurrentSession,
-        setPlayingSegment,
-        setCurrentSegment,
-        setIsFullSessionMode,
-        setCurrentTime,
-        loadAudioWithDuration,
-    ]);
-
-    const getTotalDuration = (session: ChatSession): number => {
-        if (!session.segments || session.segments.length === 0) return 0;
-
-        // audioDuration이 있으면 사용, 없으면 마지막 세그먼트의 endTime 사용
-        if (session.audioDuration && session.audioDuration > 0) {
-            return session.audioDuration;
-        }
-
-        const lastSegment = session.segments[session.segments.length - 1];
-        return lastSegment ? lastSegment.endTime : 0;
-    };
-
-    const items = useMemo<RecordingItem[]>(() => {
-        return sessions.map((session) => ({
-            id: `rec-${session.sessionIdx}`,
-            title: `음성 메모 ${session.segmentIndex}`,
-            durationSec: Math.floor(getTotalDuration(session)), // 🆕 타입 캐스팅 제거
-
-            createdAt: new Date(session.timestamp).toLocaleString(),
-        }));
-    }, [sessions]);
+    }, [isOpen, allSessions, currentSession, setCurrentSession]);
 
     const transcripts = useMemo<TranscriptItem[]>(() => {
-        if (!selectedRecording) return [];
+        if (!currentSession) return [];
 
-        const session = sessions.find((s) => `rec-${s.sessionIdx}` === selectedRecording.id);
-        if (!session) return [];
-
-        return session.segments.map((seg, idx) => ({
-            id: `${selectedRecording.id}-line-${idx + 1}`,
-            speaker: seg.speakerTag === 0 ? '멘토' : '멘티',
+        return currentSession.segments.map((seg, idx) => ({
+            id: `line-${idx + 1}`,
+            speaker:
+                seg.speakerTag === 1
+                    ? currentSession.mentor_name || '멘토'
+                    : currentSession.mentee_name || '멘티',
             timeSec: seg.startTime,
             text: seg.textContent,
             segment: seg,
-            session: session, // �� 타입 캐스팅 제거
+            session: currentSession,
         }));
-    }, [selectedRecording, sessions]);
+    }, [currentSession]);
 
-    //  핸들러들
+    // STT 타임라인 클릭 시 해당 시간으로 이동하고 자동 재생
     const handleSegmentClick = useCallback(
         (segment: SpeakerSegment, session: ChatSession) => {
-            if (isFullSessionMode && audioRef.current) {
-                audioRef.current.currentTime = segment.startTime;
-                setPlayingSegment(segment);
-                setCurrentSegment(segment);
-            } else {
-                playSegment(segment, session);
-            }
+            setSeekToTime(segment.startTime);
+
+            // 잠시 후 자동 재생 시작 (시간 이동 후)
+            setTimeout(() => {
+                togglePlayPause(); // 재생 시작
+            }, 100);
         },
-        [isFullSessionMode, playSegment, setPlayingSegment, setCurrentSegment],
+        [setSeekToTime, togglePlayPause],
     );
-
-    const handlePlayPause = useCallback(async () => {
-        if (audioRef.current) {
-            try {
-                if (audioRef.current.paused) {
-                    if (duration === 0) {
-                        await new Promise((resolve) => setTimeout(resolve, 100));
-                    }
-                    await audioRef.current.play();
-                    setIsPlaying(true);
-                } else {
-                    audioRef.current.pause();
-                    setIsPlaying(false);
-                }
-            } catch (error) {
-                if (error instanceof Error && error.name !== 'AbortError') {
-                    console.error('Audio play/pause error:', error);
-                }
-            }
-        }
-    }, [audioRef, duration, setIsPlaying]);
-
-    const handleBack = useCallback(() => {
-        setSelectedRecording(null);
-        stopAudio();
-    }, [setSelectedRecording, stopAudio]);
 
     const handleClose = useCallback(() => {
         setOpen(false);
@@ -216,91 +95,81 @@ export function RecordingListPopup() {
 
     return (
         <>
-            {/* 숨겨진 오디오 엘리먼트 */}
-            {currentSession && (
-                <audio
-                    ref={audioRef}
-                    onTimeUpdate={handleTimeUpdate}
-                    onEnded={handleAudioEnd}
-                    className='hidden'
-                    controls={false}
-                    preload='none'
-                    muted={false}
-                >
-                    {getAudioSources(currentSession.segments[0]?.audioUrl || '').map(
-                        (source, index) => (
-                            <source key={index} src={source.src} type={source.type} />
-                        ),
-                    )}
-                </audio>
-            )}
-
-            {/* 메인 팝업 */}
+            {/*shadcn/ui 디자인 토큰 적용된 메인 팝업 */}
             <div
                 className='fixed z-[50]'
                 style={{ left: pos.x, top: pos.y }}
                 role='dialog'
                 aria-modal='false'
-                aria-label='녹음 목록'
+                aria-label='STT 타임라인'
             >
-                <div className='w-[380px] h-[400px] bg-white rounded-xl shadow-[0_8px_24px_rgba(0,0,0,0.2)] border border-slate-200 overflow-hidden flex flex-col'>
-                    {/* 헤더 */}
+                <div className='w-[380px] h-[400px] bg-card border rounded-lg shadow-lg overflow-hidden flex flex-col'>
+                    {/*shadcn/ui 헤더 스타일 */}
                     <div
-                        className='h-10 px-2 flex items-center justify-between bg-slate-50 border-b border-slate-200 cursor-move select-none flex-shrink-0'
+                        className='h-12 px-4 flex items-center justify-between bg-muted/50 border-b cursor-move select-none flex-shrink-0'
                         onMouseDown={handleMouseDown}
                     >
-                        <div className='flex items-center gap-1'>
-                            {selectedRecording && (
-                                <button
-                                    aria-label='뒤로'
-                                    className='p-1 rounded hover:bg-slate-200 cursor-pointer'
-                                    onClick={handleBack}
-                                >
-                                    <LeftOutlined style={{ fontSize: 14, color: '#334155' }} />
-                                </button>
-                            )}
-                            <span className='text-sm font-medium text-slate-700'>
-                                {selectedRecording
-                                    ? `${selectedRecording.title} • STT 타임라인`
-                                    : '녹음 목록'}
+                        <div className='flex items-center gap-2'>
+                            <span className='text-sm font-medium text-foreground'>
+                                STT 타임라인
                             </span>
-                            {isLoadingAudio && (
-                                <div className='ml-2 w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin' />
+                            {loading && (
+                                <div className='h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin' />
                             )}
                         </div>
                         <button
                             aria-label='닫기'
-                            className='p-1 rounded hover:bg-slate-200'
+                            className='inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-8 w-8'
                             onClick={handleClose}
                         >
-                            <CloseOutlined style={{ fontSize: 14, color: '#334155' }} />
+                            <X className='h-4 w-4' />
                         </button>
                     </div>
 
-                    {/* 콘텐츠 영역 */}
+                    {/* 콘텐츠 영역 - STT 타임라인만 표시 */}
                     <div className='flex-1 overflow-hidden flex flex-col min-h-0'>
-                        {selectedRecording ? (
+                        {loading ? (
+                            // 로딩 상태
+                            <div className='flex-1 flex items-center justify-center'>
+                                <div className='text-center'>
+                                    <div className='h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2' />
+                                    <p className='text-sm text-muted-foreground'>
+                                        세션 데이터를 불러오는 중...
+                                    </p>
+                                </div>
+                            </div>
+                        ) : allSessions.length === 0 ? (
+                            // 세션이 없는 경우
+                            <div className='flex-1 flex flex-col items-center justify-center p-4 text-center'>
+                                <div className='text-muted-foreground mb-2'>
+                                    <svg
+                                        className='h-12 w-12 mx-auto mb-4'
+                                        fill='none'
+                                        stroke='currentColor'
+                                        viewBox='0 0 24 24'
+                                    >
+                                        <path
+                                            strokeLinecap='round'
+                                            strokeLinejoin='round'
+                                            strokeWidth={1}
+                                            d='M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z'
+                                        />
+                                    </svg>
+                                </div>
+                                <h3 className='text-sm font-medium text-foreground mb-2'>
+                                    녹음 데이터가 없습니다
+                                </h3>
+                                <p className='text-xs text-muted-foreground'>
+                                    이 캔버스에 대한 녹음된 세션이 없습니다.
+                                </p>
+                            </div>
+                        ) : (
+                            // 정상 상태 - 트랜스크립트 표시
                             <TranscriptList
                                 transcripts={transcripts}
                                 playingSegment={playingSegment}
                                 onPlaySegment={handleSegmentClick}
-                                isFullSessionMode={isFullSessionMode}
-                                audioRef={audioRef}
-                                currentSegment={currentSegment}
-                                currentSession={currentSession as ChatSession}
                                 currentTime={currentTime}
-                                duration={duration}
-                                isPlaying={isPlaying}
-                                onPlayPause={handlePlayPause}
-                                onClose={stopAudio}
-                            />
-                        ) : (
-                            <RecordingList
-                                items={items}
-                                loading={loading}
-                                onRecordingClick={() => {}}
-                                onSelectItem={setSelectedRecording}
-                                onLoadMore={loadMore}
                             />
                         )}
                     </div>

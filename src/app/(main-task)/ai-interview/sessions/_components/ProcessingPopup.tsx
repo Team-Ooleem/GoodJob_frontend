@@ -18,7 +18,7 @@ interface ProcessingPopupProps {
 const STEP_MESSAGES: Record<ProcessingStep, string> = {
     'webcam-upload': '영상 데이터를 업로드하고 있습니다...',
     'audio-analysis': '음성을 분석하고 있습니다...',
-    'stt-transcription': '구글 STT로 답변을 전사하고 있습니다...',
+    'stt-transcription': '답변 내용을 텍스트화하고 있습니다...',
     'content-analysis': '답변 내용을 분석하고 있습니다...',
     'next-question': '다음 질문을 생성하고 있습니다...',
 };

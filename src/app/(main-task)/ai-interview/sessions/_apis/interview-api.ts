@@ -1,4 +1,5 @@
 import { api } from '@/apis/api';
+import { API_BASE_URL } from '@/constants/config';
 import { QuestionDto } from '../_hooks/useQuestionManager';
 
 type SelectedResume = {
@@ -16,6 +17,33 @@ type SelectedResume = {
  * 질문 생성, 후속 질문, STT, 음성 분석 등의 API 호출을 담당
  */
 export class InterviewAPI {
+    /**
+     * 세션 상태 조회 (exists/hasReport)
+     */
+    static async getSessionStatus(sessionId: string): Promise<{ ok: boolean; exists: boolean; hasReport: boolean; endedAt?: string | null }> {
+        const res = await api.get(`/ai/${sessionId}/status`);
+        return res.data;
+    }
+
+    /**
+     * 세션 취소/이탈 알림 (unload-safe)
+     * fetch keepalive를 사용하여 페이지 이탈 시에도 요청 전송 시도
+     */
+    static async cancelSession(sessionId: string): Promise<boolean> {
+        try {
+            const url = `${API_BASE_URL}/ai/${sessionId}/cancel`;
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reason: 'client-leave' }),
+                credentials: 'include',
+                keepalive: true,
+            });
+            return res.ok;
+        } catch (e) {
+            return false;
+        }
+    }
     /**
      * 첫 번째 면접 질문을 생성합니다
      */
