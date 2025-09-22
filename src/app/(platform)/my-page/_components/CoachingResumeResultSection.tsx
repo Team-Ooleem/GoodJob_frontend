@@ -56,7 +56,7 @@ export default function CoachingResumeResultSection({
                 <div className='text-center py-12 bg-muted/30 rounded-lg'>
                     <Edit3 className='h-12 w-12 text-muted-foreground mx-auto mb-4' />
                     <p className='text-muted-foreground mb-4'>아직 이력서 코칭 결과가 없습니다</p>
-                    <Link href='/coaching-resume'>
+                    <Link href='/mentoring/landing'>
                         <Button>이력서 코칭 시작하기</Button>
                     </Link>
                 </div>

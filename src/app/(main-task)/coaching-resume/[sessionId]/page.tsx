@@ -87,12 +87,15 @@ export default function CoachingResumePage() {
         );
     }
 
+
     // 완료된 세션
     if (isSessionCompleted) {
         return <SessionCompletedView canvasData={canvasData} canvasId={sessionId} />;
     }
+    // Check if session is ended
+    const isSessionEnded = canvasData?.end_time ? new Date().getTime() > new Date(canvasData.end_time).getTime() : false;
 
-    if (!sessionStarted) {
+    if (!sessionStarted && !isSessionEnded) {
         return (
             <>
                 <SocketProvider />
@@ -106,6 +109,8 @@ export default function CoachingResumePage() {
             <SocketProvider />
             <CanvasHeader
                 title={canvasData?.name || '코칭 세션'}
+                startTime={canvasData?.start_time}
+                endTime={canvasData?.end_time}
                 onExit={() => {
                     resetSession();
                     router.back();
@@ -115,6 +120,7 @@ export default function CoachingResumePage() {
             <FabricCanvas
                 mentorName={canvasData?.mentor?.name}
                 menteeName={canvasData?.mentee?.name}
+                endTime={canvasData?.end_time}
             />
             <RecordingListPopup />
             <SessionCompletedView canvasData={canvasData} canvasId={sessionId} />

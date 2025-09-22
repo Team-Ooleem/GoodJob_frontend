@@ -68,36 +68,36 @@ export default function InterviewReport() {
     const error = reportError?.message || null;
 
     // 기본 접근 가드: 세션이 없거나 서버 상태상 리포트가 없으면 리다이렉트
-    useEffect(() => {
-        if (typeof window === 'undefined') return;
-        // 세션 자체가 없으면 바로 가드
-        if (!sessionId) {
-            if (!redirectRef.current) {
-                redirectRef.current = true;
-                alert('세션 정보가 없습니다. 이력서 선택 화면으로 이동합니다.');
-                router.replace('/ai-interview/select');
-            }
-            return;
-        }
-        (async () => {
-            try {
-                const st = await InterviewAPI.getSessionStatus(sessionId);
-                if (!st?.ok || !st.exists || !st.hasReport) {
-                    if (!redirectRef.current) {
-                        redirectRef.current = true;
-                        alert('세션이 유효하지 않습니다. 이력서 선택 화면으로 이동합니다.');
-                        router.replace('/ai-interview/select');
-                    }
-                }
-            } catch {
-                if (!redirectRef.current) {
-                    redirectRef.current = true;
-                    alert('세션이 유효하지 않습니다. 이력서 선택 화면으로 이동합니다.');
-                    router.replace('/ai-interview/select');
-                }
-            }
-        })();
-    }, [sessionId, router]);
+    // useEffect(() => {
+    //     if (typeof window === 'undefined') return;
+    //     // 세션 자체가 없으면 바로 가드
+    //     if (!sessionId) {
+    //         if (!redirectRef.current) {
+    //             redirectRef.current = true;
+    //             alert('세션 정보가 없습니다. 이력서 선택 화면으로 이동합니다.');
+    //             router.replace('/ai-interview/select');
+    //         }
+    //         return;
+    //     }
+    //     (async () => {
+    //         try {
+    //             const st = await InterviewAPI.getSessionStatus(sessionId);
+    //             if (!st?.ok || !st.exists || !st.hasReport) {
+    //                 if (!redirectRef.current) {
+    //                     redirectRef.current = true;
+    //                     alert('세션이 유효하지 않습니다. 이력서 선택 화면으로 이동합니다.');
+    //                     router.replace('/ai-interview/select');
+    //                 }
+    //             }
+    //         } catch {
+    //             if (!redirectRef.current) {
+    //                 redirectRef.current = true;
+    //                 alert('세션이 유효하지 않습니다. 이력서 선택 화면으로 이동합니다.');
+    //                 router.replace('/ai-interview/select');
+    //             }
+    //         }
+    //     })();
+    // }, [sessionId, router]);
 
     // 로딩 상태
     if (isLoading) {
