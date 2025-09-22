@@ -16,13 +16,13 @@ export default function AiInterviewResultPage() {
                 {/* 액션 버튼 */}
                 <div className='text-center mt-8'>
                     <div className='flex justify-center gap-4'>
-                        <Link href='/'>
+                        <Link prefetch={true} href='/'>
                             <Button variant='outline' size='lg' className='flex items-center gap-2'>
                                 <ArrowLeft className='w-4 h-4' />
                                 메인으로 돌아가기
                             </Button>
                         </Link>
-                        <Link href='/ai-interview/select'>
+                        <Link prefetch={true} href='/ai-interview/select'>
                             <Button size='lg'>다시 면접하기</Button>
                         </Link>
                     </div>

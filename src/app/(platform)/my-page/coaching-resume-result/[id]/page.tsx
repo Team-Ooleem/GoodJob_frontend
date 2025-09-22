@@ -45,7 +45,7 @@ export default function CoachingResumeDetailPage({ params }: CoachingResumeDetai
         <div className='space-y-6'>
             {/* 헤더 */}
             <div className='flex items-center gap-4'>
-                <Link href='/my-page/coaching-resume-result'>
+                <Link prefetch={true} href='/my-page/coaching-resume-result'>
                     <Button variant='outline' size='sm'>
                         <ArrowLeft className='h-4 w-4 mr-2' />
                         목록으로

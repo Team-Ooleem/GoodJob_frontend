@@ -33,7 +33,7 @@ export default function CoachingResumeResultCard({ application }: CoachingResume
     };
 
     return (
-        <Link href={`/coaching-resume/${application.canvas_id}`}>
+        <Link prefetch={true} href={`/coaching-resume/${application.canvas_id}`}>
             <Card className='hover:shadow-md transition-shadow overflow-hidden'>
                 {/* Thumbnail */}
                 <div className='w-full h-32 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center relative'>

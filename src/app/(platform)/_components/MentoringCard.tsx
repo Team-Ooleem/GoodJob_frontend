@@ -54,7 +54,7 @@ export const MentoringCard = ({ mentoring }: MentoringCardProps) => {
                     <span className='text-l font-semibold text-foreground'>
                         ₩{mentoring?.price ? Number(mentoring.price).toLocaleString() : '0'}
                     </span>
-                    <Link href={`/mentoring/${mentoring?.product_idx || ''}`}>
+                    <Link prefetch={true} href={`/mentoring/${mentoring?.product_idx || ''}`}>
                         <Button className='px-6 font-semibold text-sm cursor-pointer'>
                             멘토링 신청하기
                         </Button>
