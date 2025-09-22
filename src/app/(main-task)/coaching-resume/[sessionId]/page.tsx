@@ -96,6 +96,7 @@ export default function CoachingResumePage() {
             <FabricCanvas
                 mentorName={canvasData?.mentor?.name}
                 menteeName={canvasData?.mentee?.name}
+                endTime={canvasData?.end_time}
             />
             <RecordingListPopup />
         </>
