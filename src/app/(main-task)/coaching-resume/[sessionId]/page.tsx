@@ -71,7 +71,10 @@ export default function CoachingResumePage() {
         );
     }
 
-    if (!sessionStarted) {
+    // Check if session is ended
+    const isSessionEnded = canvasData?.end_time ? new Date().getTime() > new Date(canvasData.end_time).getTime() : false;
+
+    if (!sessionStarted && !isSessionEnded) {
         return (
             <>
                 <SocketProvider />
