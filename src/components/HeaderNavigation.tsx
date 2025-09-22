@@ -10,9 +10,6 @@ export function HeaderNavigation() {
             <HeaderNavigationAnchor href='/ai-interview' target='_blank'>
                 AI 인터뷰
             </HeaderNavigationAnchor>
-            <HeaderNavigationAnchor href='/coaching-resume' target='_blank'>
-                이력서
-            </HeaderNavigationAnchor>
             <HeaderNavigationAnchor href='/social'>커뮤니티</HeaderNavigationAnchor>
         </div>
     );
