@@ -71,7 +71,10 @@ export default function CoachingResumePage() {
         );
     }
 
-    if (!sessionStarted) {
+    // Check if session is ended
+    const isSessionEnded = canvasData?.end_time ? new Date().getTime() > new Date(canvasData.end_time).getTime() : false;
+
+    if (!sessionStarted && !isSessionEnded) {
         return (
             <>
                 <SocketProvider />
@@ -85,7 +88,8 @@ export default function CoachingResumePage() {
             <SocketProvider />
             <CanvasHeader
                 title={canvasData?.name || '코칭 세션'}
-                scheduledAt={canvasData?.scheduled_at}
+                startTime={canvasData?.start_time}
+                endTime={canvasData?.end_time}
                 onExit={() => {
                     resetSession();
                     router.back();
@@ -95,6 +99,7 @@ export default function CoachingResumePage() {
             <FabricCanvas
                 mentorName={canvasData?.mentor?.name}
                 menteeName={canvasData?.mentee?.name}
+                endTime={canvasData?.end_time}
             />
             <RecordingListPopup />
         </>

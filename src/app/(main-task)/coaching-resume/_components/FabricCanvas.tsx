@@ -33,9 +33,10 @@ import { useCanvasStore } from '../_stores';
 type Props = {
     mentorName?: string;
     menteeName?: string;
+    endTime?: string;
 };
 
-export function FabricCanvas({ mentorName, menteeName }: Props) {
+export function FabricCanvas({ mentorName, menteeName, endTime }: Props) {
     const { sessionId } = useParams<{ sessionId: string }>();
     const { width, height } = useWindowSize();
     const { canvasRef, canvas } = useFabricCanvas({
@@ -53,6 +54,7 @@ export function FabricCanvas({ mentorName, menteeName }: Props) {
 
     const setCanvasInstance = useCanvasStore((store) => store.setCanvasInstance);
     const saveHistory = useCanvasStore((store) => store.saveHistory);
+    const setSessionEnded = useCanvasStore((store) => store.setSessionEnded);
 
     useEffect(() => {
         if (!canvas) {
@@ -60,6 +62,31 @@ export function FabricCanvas({ mentorName, menteeName }: Props) {
         }
 
         setCanvasInstance(canvas);
+
+        // Check if session is ended
+        const isSessionEnded = endTime ? new Date().getTime() > new Date(endTime).getTime() : false;
+
+        console.log('Session check:', {
+            endTime,
+            currentTime: new Date().toISOString(),
+            endTimeMs: endTime ? new Date(endTime).getTime() : null,
+            currentTimeMs: new Date().getTime(),
+            isSessionEnded,
+        });
+
+        // Update global session state
+        setSessionEnded(isSessionEnded);
+
+        if (isSessionEnded) {
+            console.log('Session ended - disabling canvas interactions');
+            // Disable all interactions except zoom and pan
+            canvas.selection = false;
+            canvas.isDrawingMode = false; // Disable free drawing
+            canvas.forEachObject((obj: any) => {
+                obj.selectable = false;
+                obj.evented = false;
+            });
+        }
 
         // history
         canvas.on('object:added', saveHistory);
@@ -69,7 +96,7 @@ export function FabricCanvas({ mentorName, menteeName }: Props) {
         return () => {
             setCanvasInstance(null);
         };
-    }, [canvas, setCanvasInstance]);
+    }, [canvas, setCanvasInstance, endTime]);
 
     // 줌 인, 아웃 / 휠 이동
     useZoomPan(canvas);

@@ -15,7 +15,6 @@ export const useMentoringApplications = ({
     return useQuery({
         queryKey: ['mentoring-applications', user_idx, page, limit],
         queryFn: () => fetchMentoringApplications({ user_idx, page, limit }),
-        staleTime: 5 * 60 * 1000, // 5 minutes
         retry: 1,
         enabled: !!user_idx, // user_idx가 있을 때만 호출
     });
