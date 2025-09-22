@@ -11,6 +11,7 @@ import {
     SocketProvider,
     WaitingRoom,
     CanvasHeader,
+    SessionCompletedView,
 } from '../_components';
 import {
     AlertDialog,
@@ -21,6 +22,7 @@ import {
     AlertDialogDescription,
     AlertDialogAction,
 } from '@/components/ui/alert-dialog';
+import { CoachingResumeApi } from '@/apis/coaching-resume-api';
 
 export default function CoachingResumePage() {
     const { sessionId } = useParams<{ sessionId: string }>();
@@ -31,8 +33,22 @@ export default function CoachingResumePage() {
     const setMentorName = useSessionStore((s) => s.setMentorName);
     const setMenteeName = useSessionStore((s) => s.setMenteeName);
     const [showAccessDeniedAlert, setShowAccessDeniedAlert] = useState(true);
-
     const { data: canvasData, isError, isLoading } = useCoachingResumeCanvas(sessionId);
+    const [isSessionCompleted, setIsSessionCompleted] = useState<boolean | null>(null);
+
+    useEffect(() => {
+        const checkCompletionStatus = async () => {
+            try {
+                const status = await CoachingResumeApi.checkSessionStatus(sessionId);
+                setIsSessionCompleted(status.isCompleted);
+            } catch (error) {
+                console.error('Failed to check session status:', error);
+                setIsSessionCompleted(false);
+            }
+        };
+
+        checkCompletionStatus();
+    }, [sessionId]);
 
     useEffect(() => {
         if (canvasData) {
@@ -71,6 +87,11 @@ export default function CoachingResumePage() {
         );
     }
 
+
+    // 완료된 세션
+    if (isSessionCompleted) {
+        return <SessionCompletedView canvasData={canvasData} canvasId={sessionId} />;
+    }
     // Check if session is ended
     const isSessionEnded = canvasData?.end_time ? new Date().getTime() > new Date(canvasData.end_time).getTime() : false;
 
@@ -102,6 +123,7 @@ export default function CoachingResumePage() {
                 endTime={canvasData?.end_time}
             />
             <RecordingListPopup />
+            <SessionCompletedView canvasData={canvasData} canvasId={sessionId} />
         </>
     );
 }
