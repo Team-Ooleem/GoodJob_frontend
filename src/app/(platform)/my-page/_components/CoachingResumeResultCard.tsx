@@ -13,10 +13,11 @@ interface CoachingResumeResultCardProps {
 
 export default function CoachingResumeResultCard({ application }: CoachingResumeResultCardProps) {
     console.log(application);
-    const sessionDate = new Date(application.booked_date);
+    const startTime = new Date(application.start_time);
+    const endTime = new Date(application.end_time);
     const now = new Date();
-    const isUpcoming = sessionDate > now;
-    const isCompleted = application.application_status === 'approved' && !isUpcoming;
+    const isUpcoming = startTime > now;
+    const isCompleted = application.application_status === 'approved' && endTime < now;
 
     const getScoreColor = (score: number) => {
         if (score >= 90) return 'bg-green-500';
@@ -67,7 +68,7 @@ export default function CoachingResumeResultCard({ application }: CoachingResume
                                 <Calendar className='h-3 w-3' />
                                 <span className='text-xs'>
                                     {(() => {
-                                        const date = new Date(application.booked_date);
+                                        const date = new Date(application.start_time);
                                         const dateStr = date.toLocaleDateString('ko-KR', {
                                             year: 'numeric',
                                             month: 'long',
