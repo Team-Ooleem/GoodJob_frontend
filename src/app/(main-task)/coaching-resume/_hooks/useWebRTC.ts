@@ -415,7 +415,7 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
             // 🆕 녹화 담당자만 실제 녹화 시작
             if (data.isRecorder) {
                 console.log('🎥 녹화 담당자로 지정됨 - 녹화 시작');
-                startRecording();
+                // startRecording();
             } else {
                 console.log('👥 참관자로 지정됨 - 녹화 안 함');
                 // UI에서 "녹화 중" 표시만 하고 실제 녹화는 안 함
@@ -425,7 +425,7 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
         // 🆕 녹화 종료 이벤트 추가
         socket.on('stopRecording', (data) => {
             console.log('🛑 녹화 종료 이벤트 수신:', data.reason);
-            stopRecording(); // 모든 사용자가 녹화 종료
+            // stopRecording(); // 모든 사용자가 녹화 종료
         });
 
         return () => {
