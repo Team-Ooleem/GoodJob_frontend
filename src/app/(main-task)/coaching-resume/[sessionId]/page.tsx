@@ -11,7 +11,7 @@ import {
     SocketProvider,
     WaitingRoom,
     CanvasHeader,
-    SessionCompletedView,
+    AudioPlayer,
 } from '../_components';
 import {
     AlertDialog,
@@ -34,21 +34,6 @@ export default function CoachingResumePage() {
     const setMenteeName = useSessionStore((s) => s.setMenteeName);
     const [showAccessDeniedAlert, setShowAccessDeniedAlert] = useState(true);
     const { data: canvasData, isError, isLoading } = useCoachingResumeCanvas(sessionId);
-    const [isSessionCompleted, setIsSessionCompleted] = useState<boolean | null>(null);
-
-    useEffect(() => {
-        const checkCompletionStatus = async () => {
-            try {
-                const status = await CoachingResumeApi.checkSessionStatus(sessionId);
-                setIsSessionCompleted(status.isCompleted);
-            } catch (error) {
-                console.error('Failed to check session status:', error);
-                setIsSessionCompleted(false);
-            }
-        };
-
-        checkCompletionStatus();
-    }, [sessionId]);
 
     useEffect(() => {
         if (canvasData) {
@@ -87,13 +72,10 @@ export default function CoachingResumePage() {
         );
     }
 
-
-    // 완료된 세션
-    if (isSessionCompleted) {
-        return <SessionCompletedView canvasData={canvasData} canvasId={sessionId} />;
-    }
     // Check if session is ended
-    const isSessionEnded = canvasData?.end_time ? new Date().getTime() > new Date(canvasData.end_time).getTime() : false;
+    const isSessionEnded = canvasData?.end_time
+        ? new Date().getTime() > new Date(canvasData.end_time).getTime()
+        : false;
 
     if (!sessionStarted && !isSessionEnded) {
         return (
@@ -116,14 +98,14 @@ export default function CoachingResumePage() {
                     router.back();
                 }}
             />
-            <FabricToolbar />
+            {!isSessionEnded && <FabricToolbar />}
             <FabricCanvas
                 mentorName={canvasData?.mentor?.name}
                 menteeName={canvasData?.mentee?.name}
                 endTime={canvasData?.end_time}
             />
-            <RecordingListPopup />
-            <SessionCompletedView canvasData={canvasData} canvasId={sessionId} />
+            {isSessionEnded && <AudioPlayer />}
+            {isSessionEnded && <RecordingListPopup />}
         </>
     );
 }
