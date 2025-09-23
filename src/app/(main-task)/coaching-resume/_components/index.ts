@@ -14,4 +14,3 @@ export * from './SocketProvider';
 export * from './WaitingRoom';
 export * from './CanvasHeader';
 export * from './DotOnlyCanvas';
-export * from './SessionCompletedView';

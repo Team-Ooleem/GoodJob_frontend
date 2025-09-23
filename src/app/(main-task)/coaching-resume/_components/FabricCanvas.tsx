@@ -122,11 +122,11 @@ export function FabricCanvas({ mentorName, menteeName, endTime }: Props) {
     // pdf drag & drop
     usePdfDrop(canvasRef);
 
-    const isRecording = useCanvasStore((store) => store.isRecording);
+    const isSessionEnded = endTime ? new Date().getTime() > new Date(endTime).getTime() : false;
 
     return (
         <div id='canvas-container' className='relative'>
-            <ParticipantCamera mentorName={mentorName} menteeName={menteeName} />
+            {!isSessionEnded && <ParticipantCamera mentorName={mentorName} menteeName={menteeName} />}
             <canvas ref={canvasRef} />
         </div>
     );
