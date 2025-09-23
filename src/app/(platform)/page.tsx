@@ -83,12 +83,12 @@ export default function PlatformPage() {
                                     </div>
 
                                     <div className='flex flex-col sm:flex-row gap-3 justify-center items-center mt-8'>
-                                        <Link href='/mentoring'>
+                                        <Link prefetch={true} href='/mentoring'>
                                             <Button className='flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-sky-500 via-blue-500 to-sky-600 dark:from-sky-600 dark:via-blue-600 dark:to-sky-700 hover:from-sky-600 hover:via-blue-600 hover:to-sky-700 dark:hover:from-sky-700 dark:hover:via-blue-700 dark:hover:to-sky-800 text-white rounded-lg shadow-lg hover:shadow-xl transition-all duration-300'>
                                                 멘토 지원하기
                                             </Button>
                                         </Link>
-                                        <Link href='/ai-interview'>
+                                        <Link prefetch={true} href='/ai-interview'>
                                             <Button
                                                 variant='outline'
                                                 className='flex items-center gap-2 px-6 py-3 border-sky-300 dark:border-sky-600 text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/20 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300'

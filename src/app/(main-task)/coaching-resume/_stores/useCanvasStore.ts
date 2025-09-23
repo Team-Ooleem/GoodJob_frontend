@@ -32,6 +32,8 @@ type CanvasStoreState = {
     isRecording: boolean;
     isRecordingListOpen: boolean;
     stickyNoteConfig: StickyNoteConfig;
+    // session
+    isSessionEnded: boolean;
 
     // history
     isLocked: boolean;
@@ -73,6 +75,8 @@ type CanvasStoreState = {
     setStickyMode: (enabled: boolean) => void;
     addStickyNote: (x: number, y: number, text?: string) => void;
     setStickyNoteConfig: (config: Partial<StickyNoteConfig>) => void;
+    // session
+    setSessionEnded: (ended: boolean) => void;
 
     // history
     saveHistory: () => void;
@@ -102,6 +106,7 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
         minHeight: 150,
         padding: 10,
     },
+    isSessionEnded: false,
     isLocked: false,
     history: [],
     socket: null,
@@ -192,7 +197,8 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
 
     setDrawingMode: (enabled) => {
         const canvas = get().canvasInstance;
-        if (!canvas) return;
+        const isSessionEnded = get().isSessionEnded;
+        if (!canvas || isSessionEnded) return;
 
         canvas.isDrawingMode = enabled;
         set({ isDrawingMode: enabled });
@@ -214,6 +220,9 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     setStickyMode: (enabled) =>
         set(() => {
             const canvas = get().canvasInstance;
+            const isSessionEnded = get().isSessionEnded;
+            if (!canvas || isSessionEnded) return {};
+
             if (canvas) {
                 canvas.isDrawingMode = false;
                 canvas.freeDrawingBrush = undefined;
@@ -223,7 +232,8 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
 
     addStickyNote: (x, y, text = '') => {
         const canvas = get().canvasInstance;
-        if (!canvas) return;
+        const isSessionEnded = get().isSessionEnded;
+        if (!canvas || isSessionEnded) return;
 
         const { width: rectWidth, minHeight: minRectHeight, padding } = get().stickyNoteConfig;
 
@@ -382,6 +392,7 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => ({
     },
 
     setOnChange: (fn) => set({ onChange: fn }),
+    setSessionEnded: (ended) => set({ isSessionEnded: ended }),
 }));
 
 function ensureFreeDrawingBrush(canvas: fabric.Canvas, brushConfig: BrushConfig) {

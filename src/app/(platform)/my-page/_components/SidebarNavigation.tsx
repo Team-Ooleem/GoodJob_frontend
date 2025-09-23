@@ -42,6 +42,7 @@ export default function SidebarNavigation() {
 
                 return (
                     <Link
+                        prefetch={true}
                         key={item.href}
                         href={item.href}
                         className={cn(

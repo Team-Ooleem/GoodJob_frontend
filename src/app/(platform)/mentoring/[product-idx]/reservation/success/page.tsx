@@ -274,10 +274,14 @@ export default function ReservationSuccessPage({ params, searchParams }: Props) 
                             </div>
                             <div className='flex gap-2'>
                                 <Button asChild variant='secondary'>
-                                    <Link href={`/mentoring/${productId}`}>멘토링 상세로 이동</Link>
+                                    <Link prefetch={true} href={`/mentoring/${productId}`}>
+                                        멘토링 상세로 이동
+                                    </Link>
                                 </Button>
                                 <Button asChild>
-                                    <Link href='/'>홈으로 가기</Link>
+                                    <Link prefetch={true} href='/'>
+                                        홈으로 가기
+                                    </Link>
                                 </Button>
                             </div>
                         </div>
