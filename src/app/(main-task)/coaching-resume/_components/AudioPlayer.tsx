@@ -379,9 +379,6 @@ function AudioPlayer() {
                     ))}
                 </audio>
             )}
-
-            {/* RecordingListPopup 컴포넌트 사용 */}
-            <RecordingListPopup />
         </div>
     );
 }
