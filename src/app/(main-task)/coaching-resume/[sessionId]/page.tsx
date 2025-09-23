@@ -22,7 +22,6 @@ import {
     AlertDialogDescription,
     AlertDialogAction,
 } from '@/components/ui/alert-dialog';
-import { CoachingResumeApi } from '@/apis/coaching-resume-api';
 
 export default function CoachingResumePage() {
     const { sessionId } = useParams<{ sessionId: string }>();
@@ -88,7 +87,7 @@ export default function CoachingResumePage() {
 
     return (
         <>
-            <SocketProvider />
+            {!isSessionEnded && <SocketProvider />}
             <CanvasHeader
                 title={canvasData?.name || '코칭 세션'}
                 startTime={canvasData?.start_time}

@@ -18,13 +18,12 @@ function AudioPlayer() {
 
     // 🎯 60fps를 위한 부드러운 진행률 상태
     const [smoothProgress, setSmoothProgress] = useState(0);
-    const isRecordingListOpen = useCanvasStore((s) => s.isRecordingListOpen);
     const toggleRecordingList = useCanvasStore((s) => s.toggleRecordingList);
 
-    // �� 드래그 상태 관리
+    // 드래그 상태 관리
     const [isDragging, setIsDragging] = useState(false);
 
-    // �� 핸들 드래그 시작
+    // 핸들 드래그 시작
     const handleHandleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
         e.stopPropagation(); // 진행률 바 클릭 이벤트 방지
         setIsDragging(true);
@@ -39,7 +38,7 @@ function AudioPlayer() {
         seekTo(newTime);
     };
 
-    // �� 드래그 종료
+    // 드래그 종료
     const handleMouseUp = () => {
         setIsDragging(false);
     };
@@ -156,7 +155,7 @@ function AudioPlayer() {
             const audioSources = getAudioSources(currentSession.audioUrl || '');
 
             if (audioSources.length > 0) {
-                // �� 새로운 세션 로드 시 즉시 진행률 0으로 초기화
+                // 새로운 세션 로드 시 즉시 진행률 0으로 초기화
                 setSmoothProgress(0);
 
                 audioElement.src = audioSources[0].src;
@@ -198,7 +197,7 @@ function AudioPlayer() {
     const progressPercentage = smoothProgress;
 
     return (
-        <div className='w-full max-w-4xl mx-auto'>
+        <div className='w-full max-w-4xl absolute bottom-10 left-1/2 -translate-x-1/2'>
             {/* 🎯 shadcn/ui 디자인 토큰 적용 */}
             <div className='bg-card border rounded-lg shadow-sm overflow-hidden'>
                 {/* 컨트롤 영역 */}
