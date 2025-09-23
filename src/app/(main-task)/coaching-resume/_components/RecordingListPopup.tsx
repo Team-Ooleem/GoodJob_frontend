@@ -29,7 +29,7 @@ export function RecordingListPopup() {
         currentTime,
         setSeekToTime,
         setCurrentSession,
-        stopAudio,
+        // stopAudio,
         recentSessions,
         togglePlayPause,
     } = useAudioPlayer();
@@ -88,8 +88,8 @@ export function RecordingListPopup() {
 
     const handleClose = useCallback(() => {
         setOpen(false);
-        stopAudio();
-    }, [setOpen, stopAudio]);
+        // stopAudio();
+    }, [setOpen]);
 
     if (!isOpen) return null;
 
