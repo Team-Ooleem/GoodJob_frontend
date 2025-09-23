@@ -40,7 +40,12 @@ function normalizeProduct(raw: any): MentoringProduct {
         menteeCount: raw?.mentee_count ?? raw?.menteesCount ?? raw?.menteeCount ?? undefined,
         mentor: {
             name: mentor?.name ?? raw?.mentor_name,
-            avatarUrl: mentor?.profileImage ?? mentor?.avatarUrl ?? raw?.mentor_avatar ?? null,
+            avatarUrl:
+                mentor?.profile_img ??
+                mentor?.profileImage ??
+                mentor?.avatarUrl ??
+                raw?.mentor_avatar ??
+                null,
             jobTitle:
                 mentor?.jobTitle ??
                 mentor?.job_category ??
