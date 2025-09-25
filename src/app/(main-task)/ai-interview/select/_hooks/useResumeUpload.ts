@@ -12,7 +12,7 @@ export const useResumeUpload = () => {
             // 업로드 성공 시 파일 정보 저장
             setUploadedFile({
                 id: data.id,
-                originalName: '', // 업로드 시에는 파일명만 저장
+                originalName: data.originalName, // 업로드 시에는 파일명만 저장
                 url: '',
                 size: 0,
                 mimetype: 'application/pdf',
