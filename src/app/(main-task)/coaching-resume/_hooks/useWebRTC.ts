@@ -205,8 +205,41 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
         };
 
         pc.onconnectionstatechange = () => {
-            setIsConnected(pc.connectionState === 'connected');
-            onConnectionStateChange?.(pc.connectionState);
+            const state = pc.connectionState;
+            console.log(`🔗 WebRTC 연결 상태: ${state}`);
+
+            if (state === 'connected') {
+                // P2P 연결 완료 시 하울링 방지 설정 강화
+                console.log('✅ P2P 연결 완료 - 하울링 방지 설정 강화');
+
+                // 로컬 스트림의 오디오 트랙에 추가 제약 조건 적용
+                if (localStream) {
+                    localStream.getAudioTracks().forEach((track) => {
+                        track
+                            .applyConstraints({
+                                echoCancellation: true,
+                                noiseSuppression: true,
+                                autoGainControl: true,
+                                volume: 0.7,
+                            })
+                            .catch((err) => {
+                                console.warn('오디오 제약 조건 적용 실패:', err);
+                            });
+                    });
+                }
+
+                // 원격 스트림도 하울링 방지 설정 적용
+                if (remoteStream) {
+                    const audioElement = document.querySelector('audio') as HTMLAudioElement;
+                    if (audioElement) {
+                        audioElement.volume = 0.7; // 원격 오디오 볼륨 조절
+                        console.log('🔊 원격 오디오 볼륨 0.7로 설정');
+                    }
+                }
+            }
+
+            setIsConnected(state === 'connected');
+            onConnectionStateChange?.(state);
         };
 
         pcRef.current = pc;
@@ -217,7 +250,25 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
         if (localStream) return localStream;
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
-                audio: true,
+                audio: {
+                    // 하울링 방지 설정
+                    echoCancellation: true, // 에코 캔슬레이션
+                    noiseSuppression: true, // 노이즈 억제
+                    autoGainControl: true, // 자동 게인 제어
+                    sampleRate: 44100, // 샘플레이트
+                    channelCount: 1, // 모노 채널
+                    latency: 0.01, // 낮은 지연시간
+                    volume: 0.7, // 볼륨 조절
+                    // Google Chrome 전용 하울링 방지 설정 (타입 캐스팅)
+                    ...({
+                        googEchoCancellation: true,
+                        googAutoGainControl: true,
+                        googNoiseSuppression: true,
+                        googHighpassFilter: true, // 하울링 방지 핵심!
+                        googTypingNoiseDetection: true,
+                        googAudioMirroring: false,
+                    } as any),
+                },
                 video: { width: { ideal: 1280 }, height: { ideal: 720 } },
             });
             setLocalStream(stream);
