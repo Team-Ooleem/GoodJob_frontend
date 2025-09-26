@@ -45,15 +45,17 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
     const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
     const [isConnected, setIsConnected] = useState(false);
-    const [isMuted, setIsMuted] = useState(false);
+    const [isMuted, setIsMuted] = useState(true);
+    const isMutedRef = useRef(isMuted);
     const [isCameraOff, setIsCameraOff] = useState(false);
-    const [isRemoteMuted, setIsRemoteMuted] = useState(false);
+    const [isRemoteMuted, setIsRemoteMuted] = useState(true);
     const [isRemoteCameraOff, setIsRemoteCameraOff] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     // 🆕 Canvas Store의 isRecording 상태를 직접 사용 (단일 소스)
     const isRecording = useCanvasStore((s) => s.isRecording);
     const dataChannelRef = useRef<RTCDataChannel | null>(null);
+    const pushToTalkStateRef = useRef({ active: false, wasMutedBeforePress: true });
 
     const onRemoteStream = options?.onRemoteStream;
     const onConnectionStateChange = options?.onConnectionStateChange;
@@ -68,6 +70,10 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
         leaveRoomLogged: false,
         endCallLogged: false,
     });
+
+    useEffect(() => {
+        isMutedRef.current = isMuted;
+    }, [isMuted]);
 
     // 🆕 WebRTC 스트림을 useVoiceRecorder에 전달
     useEffect(() => {
@@ -271,6 +277,12 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
                 },
                 video: { width: { ideal: 1280 }, height: { ideal: 720 } },
             });
+
+            const shouldEnableAudio = !isMuted;
+            stream.getAudioTracks().forEach((track) => {
+                track.enabled = shouldEnableAudio;
+            });
+
             setLocalStream(stream);
             const pc = ensurePeer();
             stream.getTracks().forEach((t) => pc.addTrack(t, stream));
@@ -279,7 +291,7 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
             setError(e?.message || 'Failed to get user media');
             throw e;
         }
-    }, [ensurePeer, localStream]);
+    }, [ensurePeer, isMuted, localStream]);
 
     const sendMuteStatus = useCallback(
         (isMuted: boolean) => {
@@ -306,6 +318,25 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
             }
         },
         [isConnected],
+    );
+
+    const setMicTrackState = useCallback(
+        (shouldEnable: boolean) => {
+            const tracks = localStream?.getAudioTracks() || [];
+            tracks.forEach((track) => {
+                if (track.enabled !== shouldEnable) {
+                    track.enabled = shouldEnable;
+                }
+            });
+
+            const nextMuted = !shouldEnable;
+            if (isMutedRef.current !== nextMuted) {
+                isMutedRef.current = nextMuted;
+                setIsMuted(nextMuted);
+                sendMuteStatus(nextMuted);
+            }
+        },
+        [localStream, sendMuteStatus],
     );
 
     const sendCameraStatus = useCallback(
@@ -526,20 +557,72 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
             return;
         }
 
-        const currentEnabled = tracks[0]?.enabled;
+        const currentEnabled = tracks[0]?.enabled ?? !isMuted;
         const nextEnabled = !currentEnabled;
 
-        tracks.forEach((track) => {
-            track.enabled = nextEnabled;
-        });
-
-        setIsMuted(!nextEnabled);
-        sendMuteStatus(!nextEnabled);
+        setMicTrackState(nextEnabled);
 
         console.log(
             `🎤 마이크 ${nextEnabled ? '켜짐' : '꺼짐'}, 상태 전송: isMuted=${!nextEnabled}`,
         );
-    }, [localStream, sendMuteStatus]);
+    }, [isMuted, localStream, setMicTrackState]);
+
+    useEffect(() => {
+        const isTypingTarget = (target: EventTarget | null) => {
+            if (!(target instanceof HTMLElement)) return false;
+            const tag = target.tagName;
+            return tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable;
+        };
+
+        const releasePushToTalk = () => {
+            if (!pushToTalkStateRef.current.active) return;
+
+            const shouldRemute = pushToTalkStateRef.current.wasMutedBeforePress;
+            pushToTalkStateRef.current.active = false;
+            pushToTalkStateRef.current.wasMutedBeforePress = true;
+
+            if (shouldRemute) {
+                setMicTrackState(false);
+            }
+        };
+
+        const isPushToTalkKey = (key: string) => key === 't' || key === 'T' || key === 'ㅅ';
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (!isPushToTalkKey(event.key)) return;
+            if (event.repeat) return;
+            if (isTypingTarget(event.target)) return;
+            if (pushToTalkStateRef.current.active) return;
+
+            pushToTalkStateRef.current.active = true;
+            pushToTalkStateRef.current.wasMutedBeforePress = isMutedRef.current;
+
+            if (isMutedRef.current) {
+                setMicTrackState(true);
+            }
+        };
+
+        const handleKeyUp = (event: KeyboardEvent) => {
+            if (!isPushToTalkKey(event.key)) return;
+            releasePushToTalk();
+        };
+
+        const handleVisibilityLoss = () => {
+            releasePushToTalk();
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keyup', handleKeyUp);
+        window.addEventListener('blur', handleVisibilityLoss);
+        document.addEventListener('visibilitychange', handleVisibilityLoss);
+
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('keyup', handleKeyUp);
+            window.removeEventListener('blur', handleVisibilityLoss);
+            document.removeEventListener('visibilitychange', handleVisibilityLoss);
+        };
+    }, [setMicTrackState]);
 
     const toggleCamera = useCallback(() => {
         const tracks = localStream?.getVideoTracks() || [];
