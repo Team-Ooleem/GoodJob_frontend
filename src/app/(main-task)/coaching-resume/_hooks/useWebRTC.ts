@@ -45,15 +45,17 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
     const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
     const [isConnected, setIsConnected] = useState(false);
-    const [isMuted, setIsMuted] = useState(false);
+    const [isMuted, setIsMuted] = useState(true);
+    const isMutedRef = useRef(isMuted);
     const [isCameraOff, setIsCameraOff] = useState(false);
-    const [isRemoteMuted, setIsRemoteMuted] = useState(false);
+    const [isRemoteMuted, setIsRemoteMuted] = useState(true);
     const [isRemoteCameraOff, setIsRemoteCameraOff] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     // 🆕 Canvas Store의 isRecording 상태를 직접 사용 (단일 소스)
     const isRecording = useCanvasStore((s) => s.isRecording);
     const dataChannelRef = useRef<RTCDataChannel | null>(null);
+    const pushToTalkStateRef = useRef({ active: false, wasMutedBeforePress: true });
 
     const onRemoteStream = options?.onRemoteStream;
     const onConnectionStateChange = options?.onConnectionStateChange;
@@ -68,6 +70,10 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
         leaveRoomLogged: false,
         endCallLogged: false,
     });
+
+    useEffect(() => {
+        isMutedRef.current = isMuted;
+    }, [isMuted]);
 
     // 🆕 WebRTC 스트림을 useVoiceRecorder에 전달
     useEffect(() => {
@@ -205,8 +211,41 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
         };
 
         pc.onconnectionstatechange = () => {
-            setIsConnected(pc.connectionState === 'connected');
-            onConnectionStateChange?.(pc.connectionState);
+            const state = pc.connectionState;
+            console.log(`🔗 WebRTC 연결 상태: ${state}`);
+
+            if (state === 'connected') {
+                // P2P 연결 완료 시 하울링 방지 설정 강화
+                console.log('✅ P2P 연결 완료 - 하울링 방지 설정 강화');
+
+                // 로컬 스트림의 오디오 트랙에 추가 제약 조건 적용
+                if (localStream) {
+                    localStream.getAudioTracks().forEach((track) => {
+                        track
+                            .applyConstraints({
+                                echoCancellation: true,
+                                noiseSuppression: true,
+                                autoGainControl: true,
+                                volume: 0.7,
+                            })
+                            .catch((err) => {
+                                console.warn('오디오 제약 조건 적용 실패:', err);
+                            });
+                    });
+                }
+
+                // 원격 스트림도 하울링 방지 설정 적용
+                if (remoteStream) {
+                    const audioElement = document.querySelector('audio') as HTMLAudioElement;
+                    if (audioElement) {
+                        audioElement.volume = 0.7; // 원격 오디오 볼륨 조절
+                        console.log('🔊 원격 오디오 볼륨 0.7로 설정');
+                    }
+                }
+            }
+
+            setIsConnected(state === 'connected');
+            onConnectionStateChange?.(state);
         };
 
         pcRef.current = pc;
@@ -217,9 +256,33 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
         if (localStream) return localStream;
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
-                audio: true,
+                audio: {
+                    // 하울링 방지 설정
+                    echoCancellation: true, // 에코 캔슬레이션
+                    noiseSuppression: true, // 노이즈 억제
+                    autoGainControl: true, // 자동 게인 제어
+                    sampleRate: 44100, // 샘플레이트
+                    channelCount: 1, // 모노 채널
+                    latency: 0.01, // 낮은 지연시간
+                    volume: 0.7, // 볼륨 조절
+                    // Google Chrome 전용 하울링 방지 설정 (타입 캐스팅)
+                    ...({
+                        googEchoCancellation: true,
+                        googAutoGainControl: true,
+                        googNoiseSuppression: true,
+                        googHighpassFilter: true, // 하울링 방지 핵심!
+                        googTypingNoiseDetection: true,
+                        googAudioMirroring: false,
+                    } as any),
+                },
                 video: { width: { ideal: 1280 }, height: { ideal: 720 } },
             });
+
+            const shouldEnableAudio = !isMuted;
+            stream.getAudioTracks().forEach((track) => {
+                track.enabled = shouldEnableAudio;
+            });
+
             setLocalStream(stream);
             const pc = ensurePeer();
             stream.getTracks().forEach((t) => pc.addTrack(t, stream));
@@ -228,7 +291,7 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
             setError(e?.message || 'Failed to get user media');
             throw e;
         }
-    }, [ensurePeer, localStream]);
+    }, [ensurePeer, isMuted, localStream]);
 
     const sendMuteStatus = useCallback(
         (isMuted: boolean) => {
@@ -255,6 +318,25 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
             }
         },
         [isConnected],
+    );
+
+    const setMicTrackState = useCallback(
+        (shouldEnable: boolean) => {
+            const tracks = localStream?.getAudioTracks() || [];
+            tracks.forEach((track) => {
+                if (track.enabled !== shouldEnable) {
+                    track.enabled = shouldEnable;
+                }
+            });
+
+            const nextMuted = !shouldEnable;
+            if (isMutedRef.current !== nextMuted) {
+                isMutedRef.current = nextMuted;
+                setIsMuted(nextMuted);
+                sendMuteStatus(nextMuted);
+            }
+        },
+        [localStream, sendMuteStatus],
     );
 
     const sendCameraStatus = useCallback(
@@ -475,20 +557,72 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
             return;
         }
 
-        const currentEnabled = tracks[0]?.enabled;
+        const currentEnabled = tracks[0]?.enabled ?? !isMuted;
         const nextEnabled = !currentEnabled;
 
-        tracks.forEach((track) => {
-            track.enabled = nextEnabled;
-        });
-
-        setIsMuted(!nextEnabled);
-        sendMuteStatus(!nextEnabled);
+        setMicTrackState(nextEnabled);
 
         console.log(
             `🎤 마이크 ${nextEnabled ? '켜짐' : '꺼짐'}, 상태 전송: isMuted=${!nextEnabled}`,
         );
-    }, [localStream, sendMuteStatus]);
+    }, [isMuted, localStream, setMicTrackState]);
+
+    useEffect(() => {
+        const isTypingTarget = (target: EventTarget | null) => {
+            if (!(target instanceof HTMLElement)) return false;
+            const tag = target.tagName;
+            return tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable;
+        };
+
+        const releasePushToTalk = () => {
+            if (!pushToTalkStateRef.current.active) return;
+
+            const shouldRemute = pushToTalkStateRef.current.wasMutedBeforePress;
+            pushToTalkStateRef.current.active = false;
+            pushToTalkStateRef.current.wasMutedBeforePress = true;
+
+            if (shouldRemute) {
+                setMicTrackState(false);
+            }
+        };
+
+        const isPushToTalkKey = (key: string) => key === 't' || key === 'T' || key === 'ㅅ';
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (!isPushToTalkKey(event.key)) return;
+            if (event.repeat) return;
+            if (isTypingTarget(event.target)) return;
+            if (pushToTalkStateRef.current.active) return;
+
+            pushToTalkStateRef.current.active = true;
+            pushToTalkStateRef.current.wasMutedBeforePress = isMutedRef.current;
+
+            if (isMutedRef.current) {
+                setMicTrackState(true);
+            }
+        };
+
+        const handleKeyUp = (event: KeyboardEvent) => {
+            if (!isPushToTalkKey(event.key)) return;
+            releasePushToTalk();
+        };
+
+        const handleVisibilityLoss = () => {
+            releasePushToTalk();
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keyup', handleKeyUp);
+        window.addEventListener('blur', handleVisibilityLoss);
+        document.addEventListener('visibilitychange', handleVisibilityLoss);
+
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('keyup', handleKeyUp);
+            window.removeEventListener('blur', handleVisibilityLoss);
+            document.removeEventListener('visibilitychange', handleVisibilityLoss);
+        };
+    }, [setMicTrackState]);
 
     const toggleCamera = useCallback(() => {
         const tracks = localStream?.getVideoTracks() || [];

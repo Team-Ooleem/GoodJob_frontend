@@ -17,7 +17,7 @@ export const resumeApi = {
         const form = new FormData();
         form.append('file', file, encodeURIComponent(file.name));
         const response = await api.post(`resume-files`, form);
-        return response.data as { id: string };
+        return response.data as { id: string; originalName: string };
     },
 
     // 이력서 파싱 및 요약 생성 (완료될 때까지 대기)
