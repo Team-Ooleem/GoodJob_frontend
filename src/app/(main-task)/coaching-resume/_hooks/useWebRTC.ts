@@ -586,8 +586,10 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
             }
         };
 
+        const isPushToTalkKey = (key: string) => key === 't' || key === 'T' || key === 'ㅅ';
+
         const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.key !== 't' && event.key !== 'T') return;
+            if (!isPushToTalkKey(event.key)) return;
             if (event.repeat) return;
             if (isTypingTarget(event.target)) return;
             if (pushToTalkStateRef.current.active) return;
@@ -601,7 +603,7 @@ export const useWebRTC = (room?: string, options?: Options): UseWebRTC => {
         };
 
         const handleKeyUp = (event: KeyboardEvent) => {
-            if (event.key !== 't' && event.key !== 'T') return;
+            if (!isPushToTalkKey(event.key)) return;
             releasePushToTalk();
         };
 
