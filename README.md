@@ -1,4 +1,7 @@
 # Good Job - AI 기반 채용플랫폼
+<img width="1169" height="1659" alt="image" src="https://github.com/user-attachments/assets/53c7f04e-7fca-4ce1-9621-f1e7906e054b" />
+<img width="1168" height="1657" alt="image" src="https://github.com/user-attachments/assets/278c2ab1-0262-4201-8e5d-0dc3ad739ec1" />
+
 
 ## 🚀 주요 기능
 
@@ -124,3 +127,4 @@ pnpm start        # 프로덕션 서버 실행
 pnpm lint         # ESLint 검사
 pnpm type-check   # TypeScript 타입 검사
 ```
+
